@@ -1,0 +1,30 @@
+[project]
+name = "meditations-rag"
+version = "0.1.0"
+description = "Retrieval engine over Marcus Aurelius' Meditations — advanced-RAG practice project"
+requires-python = ">=3.10"
+# Dependencies stay commented until the phase that needs them (see PLAN.md),
+# so the scaffold installs with zero deps and each phase's footprint is explicit.
+dependencies = [
+    # "httpx",                  # Phase 1: Gutenberg download
+    # "numpy",                  # Phase 2: vector index (exact cosine search)
+    # "sentence-transformers",  # Phase 2: local embedder
+    # "anthropic",              # Phase 4: HyDE / multi-query / LLM rerank
+    # "voyageai",               # Phase 4: second embedder for comparison
+    # "rank-bm25",              # Phase 4: hybrid retrieval
+]
+
+[project.optional-dependencies]
+dev = [
+    # "pytest",                 # Phase 1: parser invariant tests
+]
+
+[project.scripts]
+meditations = "meditations_rag.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meditations_rag"]

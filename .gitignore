@@ -1,0 +1,15 @@
+# Corpus, embeddings, and indexes are derived artifacts — rebuilt via
+# `meditations ingest` / `meditations index`. Never commit them.
+# (data/* rather than data/ so the .gitkeep re-include below can work —
+# git never descends into a fully excluded directory.)
+data/*
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Secrets (ANTHROPIC_API_KEY / VOYAGE_API_KEY live in the environment or here)
+.env

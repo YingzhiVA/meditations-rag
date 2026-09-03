@@ -1,10 +1,19 @@
 """Build, persist, and search the per-embedder vector index.
 
-Deliberate simplicity: ~500 vectors means EXACT cosine search via one numpy
+Deliberate simplicity: 487 vectors means EXACT cosine search via one numpy
 matmul (<1 ms). No ANN library, no vector database — that would be resume-
 driven overengineering here, and saying so in the README is part of the
-portfolio story. Revisit only if the corpus grows or we need metadata
+portfolio story. An approximate index could only be slower AND less accurate
+at this size; bench/ann_scaling.py measures where that stops being true rather
+than asserting it. Revisit only if the corpus grows or we need metadata
 filtering (then: sqlite-vec or Chroma).
+
+Phase 4 note — parent-child chunking: when indexing sub-chunks of the 14 long
+passages (Passage.is_long), ids become "<passage_id>#<n>". The index stays
+oblivious; retrieve/pipeline.py dedupes hits back to the parent § so citations
+always name a whole passage. Keep sub-chunked indexes in their own embedder
+subdir (e.g. "local-subchunk") so both variants can sit in the eval grid at
+once.
 
 On-disk layout (one subdir per embedder, so eval can grid without clobbering):
     data/index/<embedder.name>/

@@ -1,5 +1,8 @@
 """Fetch the Meditations plain-text file from Project Gutenberg, with caching.
 
+Edition: PG #55317, Chrystal (1902). See config.py for why.
+
+
 Gutenberg etiquette: download once, cache forever. The cached file under
 data/raw/ is the single source of truth for the parser; re-running ingest
 must NOT hit the network if the cache exists.

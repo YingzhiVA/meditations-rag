@@ -5,16 +5,28 @@ Three subcommands + a default query mode (argparse; stdlib is enough):
   meditations ingest [--force]
       ingest.download.fetch_raw_text -> ingest.parse.parse_passages
       -> corpus.store.save_passages. Print passage count + a sample so the
-      user can eyeball parser output immediately.
+      user can eyeball parser output immediately. Expect 487 passages; the
+      parser raises if the count or per-book tallies don't match.
 
   meditations index [--embedder NAME]
       corpus.store.load_passages -> embed.get_embedder
       -> index.vector_index.build_index. Print where the index landed.
 
   meditations "problem statement..." [--k N] [--all] [--strategy NAME]
-                                     [--embedder NAME]
+                                     [--embedder NAME] [--router NAME]
+                                     [--llm NAME]
       retrieve.pipeline.run_query with a RetrievalConfig assembled from
-      flags + config defaults. Rendering contract:
+      flags + config defaults.
+
+      The result carries an Intent (see route/base.py). Branch on it BEFORE
+      rendering passages — three of the four cases produce no retrieval:
+
+        CHITCHAT      a short greeting, no passages
+        META          explain what the tool does and which edition it uses
+        OUT_OF_SCOPE  say plainly this isn't something Marcus wrote about
+        IN_SCOPE      render results as below
+
+      Rendering contract:
 
       1. Book 11, §18 — "Consider that thou also doest many things..."  [0.81]
       2. Book 7, §2  — "..."                                            [0.74]
@@ -23,7 +35,9 @@ Three subcommands + a default query mode (argparse; stdlib is enough):
 
       Default: top-k with first ~200 chars of each passage. --all prints
       every candidate in full. Below-threshold results render an honest
-      "no strong match found" notice instead (see pipeline docstring).
+      "no strong match found" notice instead (see pipeline docstring) — note
+      this is a different case from OUT_OF_SCOPE above: here the question was
+      a real one, the corpus just had no good answer.
 
   meditations show 4.7
       Print one passage in full by id (corpus lookup, no retrieval).
@@ -31,8 +45,12 @@ Three subcommands + a default query mode (argparse; stdlib is enough):
 UX notes for Phase 2:
 - Missing artifacts produce actionable errors ("run `meditations ingest`
   first"), not tracebacks.
-- Phase 4 strategies hit the network (Claude call) — print a brief
-  "expanding query..." status line so latency is explained.
+- Phase 4 strategies and LLM routers hit the network — print a brief
+  "expanding query..." status line so latency is explained. If an LLM router
+  falls back after a provider error, say so quietly rather than silently
+  degrading; the user should know they got the keyword path.
+- Tracing: call telemetry.setup_tracing() once at startup. It is a no-op
+  unless MEDITATIONS_TRACING=1, so this costs nothing by default.
 """
 
 import argparse  # noqa: F401

@@ -9,7 +9,15 @@ dependencies = [
     # "httpx",                  # Phase 1: Gutenberg download
     # "numpy",                  # Phase 2: vector index (exact cosine search)
     # "sentence-transformers",  # Phase 2: local embedder
-    # "anthropic",              # Phase 4: HyDE / multi-query / LLM rerank
+    # Phase 3: telemetry. Vendor-neutral instrumentation; Phoenix is just the
+    # OTLP backend (dev extra below), so these stay swappable.
+    # "opentelemetry-sdk",
+    # "opentelemetry-exporter-otlp-proto-http",
+    # "openinference-semantic-conventions",
+    # Phase 4: LLM providers. huggingface-hub is the DEFAULT path (Apertus,
+    # router + query transformation); anthropic is the eval comparator only.
+    # "huggingface-hub",
+    # "anthropic",
     # "voyageai",               # Phase 4: second embedder for comparison
     # "rank-bm25",              # Phase 4: hybrid retrieval
 ]
@@ -17,6 +25,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     # "pytest",                 # Phase 1: parser invariant tests
+    # "arize-phoenix",          # Phase 3: local trace UI — dev tool, not runtime
+    # "hnswlib",                # Phase 5: bench/ann_scaling.py only
 ]
 
 [project.scripts]

@@ -1,0 +1,32 @@
+{"query": "hello", "intent": "chitchat", "note": "the canonical case: no meditation warranted"}
+{"query": "hi there", "intent": "chitchat", "note": "greeting variant"}
+{"query": "thanks, that helped", "intent": "chitchat", "note": "closing pleasantry, not a problem"}
+{"query": "good morning", "intent": "chitchat", "note": "greeting variant"}
+{"query": "ok", "intent": "chitchat", "note": "minimal input — keyword router should catch this"}
+{"query": "what can you do?", "intent": "meta", "note": "question about the tool, not about life"}
+{"query": "how does this work", "intent": "meta", "note": "meta variant"}
+{"query": "who wrote these passages?", "intent": "meta", "note": "about the corpus itself — tempting to route as in_scope"}
+{"query": "can you cite your sources", "intent": "meta", "note": "meta variant"}
+{"query": "what translation is this", "intent": "meta", "note": "meta; answer is Chrystal 1902"}
+{"query": "my coworker takes credit for my work and it's eating at me", "intent": "in_scope", "note": "core case: workplace injustice, dichotomy of control"}
+{"query": "I keep replaying an argument I lost and can't let it go", "intent": "in_scope", "note": "rumination"}
+{"query": "I'm terrified of dying", "intent": "in_scope", "note": "lexical anchor present"}
+{"query": "my father died last month and I can't function", "intent": "in_scope", "note": "grief; check the router doesn't reject heavy topics"}
+{"query": "I got passed over for promotion again", "intent": "in_scope", "note": "ambition, external goods"}
+{"query": "everyone online seems to be doing better than me", "intent": "in_scope", "note": "modern framing, no lexical overlap with a 1902 text"}
+{"query": "I can't stop worrying about things I can't control", "intent": "in_scope", "note": "near-explicit dichotomy of control"}
+{"query": "I lose my temper with my kids and hate myself after", "intent": "in_scope", "note": "anger + self-reproach"}
+{"query": "should I care what my critics think", "intent": "in_scope", "note": "phrased as a question, still in scope"}
+{"query": "I feel like nothing I do matters", "intent": "in_scope", "note": "meaning/impermanence"}
+{"query": "how do I stop procrastinating on work I know matters", "intent": "in_scope", "note": "duty, action; borderline self-help but genuinely addressed"}
+{"query": "I'm exhausted by people who are rude for no reason", "intent": "in_scope", "note": "on bearing with others' faults"}
+{"query": "I'm anxious about a presentation tomorrow", "intent": "in_scope", "note": "mild/ordinary — check the router doesn't demand gravity"}
+{"query": "is it wrong to want to be remembered", "intent": "in_scope", "note": "posthumous fame — a recurring theme"}
+{"query": "which tax software should I use", "intent": "out_of_scope", "note": "the keyword router CANNOT catch this — needs semantics"}
+{"query": "what's the weather in Zurich tomorrow", "intent": "out_of_scope", "note": "factual lookup"}
+{"query": "write me a python function to reverse a linked list", "intent": "out_of_scope", "note": "task request, not a difficulty"}
+{"query": "how do I fix a leaking radiator valve", "intent": "out_of_scope", "note": "practical how-to"}
+{"query": "what were the causes of the Second Punic War", "intent": "out_of_scope", "note": "Roman history — thematically adjacent, still not Marcus's subject"}
+{"query": "summarize the plot of Hamlet", "intent": "out_of_scope", "note": "literature question"}
+{"query": "I have chest pain and shortness of breath, what should I do", "intent": "out_of_scope", "note": "medical emergency; must NOT return a passage on enduring pain"}
+{"query": "how many books are in the Meditations", "intent": "meta", "note": "answerable from corpus metadata, not by retrieval"}

@@ -16,6 +16,73 @@ get there.
 
 ---
 
+## Scope & safety boundaries
+
+**Settled before any labelling, deliberately — deciding these while looking at
+router output would bias every label toward whatever the router already does.**
+These four rules are the source of truth for `eval/router_set.jsonl` and
+`eval/safety_set.jsonl`, and they govern behaviour from Phase 2 on.
+
+meditations-rag:
+
+1. **Never gives advice on physical or clinical conditions.** -> `OUT_OF_SCOPE`.
+2. **Never gives legal counsel.** -> `OUT_OF_SCOPE`.
+3. **Is not an SOS hotline** for victims of harassment, abuse or mobbing, or
+   for users with clinical depression or harmful addiction. On detecting one
+   of these it says so and points to professional help **before** deciding
+   whether *Meditations* has anything to say — the referral is not a refusal,
+   and may be followed by passages.
+4. **Never advises enduring harassment, abuse or mobbing.**
+
+Generic do-no-harm rules are omitted on purpose: a corpus that can only emit
+Marcus Aurelius cannot produce the usual harmful outputs. The residual risk is
+not what the corpus *says* but what a benign passage *means* in a context it
+was not retrieved for — which is rule 4, and which is a post-retrieval
+problem (see below).
+
+### Two axes, two stages
+
+Rule 3 does not fit the `Intent` enum. It is not a fourth terminal state
+alongside chitchat/meta/out_of_scope — all of which short-circuit retrieval —
+because the referral is explicitly meant to *compose* with retrieval. And
+rule 4 is not a routing concern at all: it survives a perfectly correct
+routing decision, because the hazard is a correctly-retrieved passage read in
+the wrong context. So safety gets the same pre/post split that relevance
+already has in `route/base.py`:
+
+|              | pre-retrieval            | post-retrieval             |
+|--------------|--------------------------|----------------------------|
+| **relevance**| `Router` -> `Intent`     | `MIN_SCORE_THRESHOLD`      |
+| **safety**   | `Router` -> `SafetyFlag` | `retrieve/safety.py`       |
+
+**The two safety stages have opposite tradeoffs, which is why one mechanism
+cannot serve both.** Pre-retrieval, over-firing costs an unnecessary "consider
+talking to someone" line and under-firing is the real harm — so it wants high
+recall, and a crude word list is genuinely fit for purpose. Post-retrieval,
+over-suppression strips useful passages from exactly the users in the worst
+situations — so it wants precision, and "suppress anything about patience"
+would leave a mobbing victim with nothing.
+
+### Why post-retrieval safety can be a reviewed artifact
+
+The corpus is closed and fixed at 487 passages, so the passages that counsel
+tolerating wrongdoers can simply be *enumerated and read*. A regex sweep
+surfaces 11 candidates — 1.15, 2.1, 4.3, 5.20, 5.25, 6.6, 7.26, 8.59, 9.3,
+11.16, 11.18 — of which the clearest hazards are 8.59 ("Teach them better
+then, or bear with them"), 5.20 ("I must do good to him and bear with him"),
+2.1 ("Today I shall have to do with meddlers...") and 11.18. Those would rank
+highly for "my coworker humiliates me in every meeting", and v1 has no
+synthesis layer to soften them.
+
+**The list is human-reviewed, not regex output** — same rule as the golden
+set. The point is that suppression becomes something you can read, diff and
+argue with, rather than a runtime LLM verdict you cannot inspect. That matters
+here more than elsewhere: this is the safety path, Risk 1 below names HF
+provider availability as a single point of failure, and an LLM-based check
+fails *open* during an outage. A list does not.
+
+---
+
 ## Phase 0 — Setup (~1 hour)
 
 - [x] `git init`, virtualenv, `pip install -e .`
@@ -120,14 +187,40 @@ short corpus.
       re-normalizing. Both layers currently claim the job, which is harmless
       while every embedder is sentence-transformers and a silent quality bug
       the day one isn't — an assert turns that into a clear error instead.
-- [ ] `route/base.py`: freeze the `Intent` enum and `Router` protocol.
+- [ ] `route/base.py`: freeze the `Intent` enum, the `SafetyFlag` enum, and
+      the `Router` protocol. **`route()` returns `RouteDecision(intent,
+      safety)`, not a bare `Intent`** — the two are orthogonal axes (see
+      Scope & safety boundaries): a mobbing query is `IN_SCOPE` *and* carries
+      a safety flag, and rule 3 requires both. Frozen here, so Phase 4's LLM
+      routers are written against it from the start.
 - [ ] `route/keyword.py`: `KeywordRouter` — free, deterministic, no network.
-      The baseline the LLM routers must beat, and their fallback.
+      Two jobs, and note that "baseline the LLM must beat" is **not** one of
+      them (see the Phase 3 note on why that comparison is uninformative):
+      (a) make the CLI work in Phase 2 before any LLM exists, and (b) be the
+      `config.ROUTER_FALLBACK` when a provider is down.
+      **Its safety word list always runs, including under the LLM router.**
+      Otherwise an HF outage — Risk 1 — silently switches safety detection
+      off, and "degrade rather than fail" is right for quality and wrong for
+      safety. Crude high-recall matching is the correct tool here precisely
+      because over-firing is cheap on this axis.
+- [ ] `retrieve/safety.py`: post-retrieval suppression. A **human-reviewed**
+      list of passage ids that must not be shown when the abuse/harassment/
+      mobbing flag is set, applied to results after rerank and after Phase 4's
+      dedup-to-parent (11.18 is 704 words, so it is in the sub-chunking set).
+      **Gated on the pre-retrieval flag** — if no flag fired, skip entirely:
+      zero cost, zero latency, no behaviour change for the queries where none
+      of this applies. **No backfill** when passages are suppressed: pulling
+      in ranks 6-7 risks surfacing another endurance passage. Show what
+      remains and say plainly that some were withheld.
 - [ ] `retrieve/strategies.py`: `RawQuery` only (identity).
 - [ ] `retrieve/pipeline.py`: route -> strategy -> embed -> search -> top-k
       (no fusion or rerank yet; single query path).
 - [ ] `cli.py`: `ingest`, `index`, `show`, and the default query command with
       `--k`, `--all`, `--router`, intent-aware rendering, citations and scores.
+      The safety flag travels on `QueryResult` and reaches **rendering**: when
+      set, the referral leads, and whatever survives suppression is framed as
+      reflection rather than counsel. Rule 4 is violated by a *correct*
+      retrieval, so it cannot be handled inside the router.
 - [ ] `tests/test_index.py`, `tests/test_route.py`: four invariants, no more.
       See **What Phase 2 tests, and what it deliberately does not** below.
 
@@ -203,12 +296,38 @@ without a measurement.
       Valid ids are `1.1`–`12.36` within the per-book counts. Labels are
       sparse, not exhaustive — see `eval/README.md` for the pooling protocol
       that makes this tractable, and why it has to follow Phase 2.
-- [ ] `eval/router_set.jsonl` is already drafted (~30 entries). Verify the
-      labels and extend if the router's failures suggest gaps.
+- [ ] `eval/router_set.jsonl` is drafted (32 entries, already consistent with
+      the `Intent` enum). Add the `safety` field, and **extend `out_of_scope`
+      with hard cases**: five of the current seven (weather, a linked-list
+      function, a radiator valve, Hamlet, the Punic War) are trivially
+      non-emotional and any semantic model gets them free, so the set
+      saturates and measures nothing. The hard ones are *emotionally phrased
+      and genuinely distressing, where the answer is still not Stoic counsel*
+      — a withheld deposit (legal), a rejected visa (legal), an untreated
+      tooth (clinical). Target ~8-10 hard alongside the easy ones, reported
+      separately: the same hard/canary split the golden set already has.
+- [ ] Curate `eval/safety_set.jsonl` — **the project's first negative
+      labels.** Abuse/harassment/mobbing-context queries paired with passage
+      ids that must **not** appear in the shown results. Its own file, not a
+      `must_not_return` field on the golden set: different scoring, different
+      failure semantics, and a failure here is a product violation rather
+      than a quality regression, so the two must never average together.
 - [ ] `eval/run_eval.py`: run the pipeline over the golden set for every
-      configuration; report recall@k (k=1,3,5), MRR, out-of-scope accuracy;
-      emit a markdown table. Plus a separate router table with a **per-intent
-      breakdown**.
+      configuration; report recall@k (k=1,3,5), MRR; emit a markdown table.
+      Plus two more tables:
+      - **Router.** Chitchat, meta and in_scope are *saturated* — every
+        router scores near 100%, so they are a regression check, not a
+        comparison. The measurement is `out_of_scope`, reported as a **pair**:
+        out_of_scope recall *and* in_scope retention. Recall alone is gameable
+        by rejecting everything, and the real failure mode of an LLM router
+        here is over-rejection — dismissing "I'm anxious about a presentation
+        tomorrow" as too trivial, or a bereavement as a therapist's job.
+        `KeywordRouter` sits at the "reject nothing" corner, (0/7, 14/14), by
+        construction rather than by measurement; that is a sentence, not a row.
+      - **Safety.** Pre-retrieval flag recall with the false-positive rate
+        alongside, never folded into an accuracy figure — the two error types
+        have wildly different costs. Plus post-retrieval suppression: did any
+        prohibited passage survive into the shown results.
 - [ ] `telemetry.py` + instrumentation: OpenTelemetry spans with OpenInference
       conventions, OTLP → local Phoenix. No-op when `MEDITATIONS_TRACING` is
       unset. Tag the root span with the full config + eval run id.
@@ -240,10 +359,19 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       comparator column, not the default path.
       **This is the first phase that needs a key — an `HF_TOKEN`.**
       `ANTHROPIC_API_KEY` is needed only to run the comparator.
-- [ ] **LLM routers**: `route/llm.py` on Apertus-8B and on Claude, scored
-      against `KeywordRouter` on `router_set.jsonl`. The keyword baseline is
-      structurally incapable of detecting `out_of_scope`; an LLM router that
-      doesn't beat it *there* hasn't earned its round-trip.
+- [ ] **LLM routers**: `route/llm.py` on Apertus-8B and on Claude, scored on
+      `router_set.jsonl` as the (out_of_scope recall, in_scope retention) pair
+      — see the Phase 3 note on why chitchat/meta are a regression check and
+      not a comparison. The whole case for an LLM router is semantics: no word
+      list will ever catch "what's the weather in Zurich this weekend". It
+      must also carry the rule-3 safety flag, *above* the keyword safety floor
+      that always runs beneath it.
+- [ ] **LLM passage-in-context safety check**: given (query, passage), would
+      presenting this read as counsel to endure mistreatment? Scored against
+      the human-reviewed suppression list on `eval/safety_set.jsonl`. The
+      deterministic list stays the default and the shipped behaviour; this is
+      a comparator row that has to earn its place — and it cannot replace the
+      list outright, since an LLM check fails open on a provider outage.
 - [ ] **Query rewriting** (`RewriteQuery`): 1→1. Strip affect and narrative,
       restate in the corpus's conceptual vocabulary. Cheaper and more
       predictable than HyDE, and it degrades more gracefully.

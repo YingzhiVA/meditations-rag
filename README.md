@@ -101,7 +101,20 @@ data/                    (gitignored) raw text, passages, indexes
 
 ## Setup
 
-The default path needs a **HuggingFace token**:
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+git config core.hooksPath .githooks   # enable the branch-protection hook
+```
+
+The third line is per-clone git config, so it has to be run once by hand — a
+checkout cannot carry it. See `CLAUDE.md` for the working conventions it
+enforces.
+
+Dependencies are uncommented in `pyproject.toml` phase by phase (see
+`PLAN.md`), so re-run the install when you start a new phase.
+
+The default *LLM* path (Phase 4 onward) needs a **HuggingFace token**:
 
 ```
 export HF_TOKEN=hf_...

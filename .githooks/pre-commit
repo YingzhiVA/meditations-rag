@@ -1,0 +1,33 @@
+#!/bin/sh
+# Refuse commits made directly on a protected branch.
+#
+# Convention (see CLAUDE.md): work happens on a phase branch and reaches main
+# through a PR. This hook is the mechanical reminder, not the policy.
+#
+# Enabled by `git config core.hooksPath .githooks` — run once per clone; the
+# repo's setup instructions in README.md say so.
+
+protected="main master"
+branch=$(git symbolic-ref --short HEAD 2>/dev/null) || exit 0
+
+for p in $protected; do
+    if [ "$branch" = "$p" ]; then
+        cat >&2 <<MSG
+
+  ✗ Refusing to commit directly to '$branch'.
+
+    Move this work onto a phase branch:
+
+        git switch -c phase-N-<name>
+
+    Already staged? The branch takes the staged changes with it.
+    Override when you genuinely mean it (rare):
+
+        git commit --no-verify
+
+MSG
+        exit 1
+    fi
+done
+
+exit 0

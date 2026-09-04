@@ -6,7 +6,7 @@ requires-python = ">=3.10"
 # Dependencies stay commented until the phase that needs them (see PLAN.md),
 # so the scaffold installs with zero deps and each phase's footprint is explicit.
 dependencies = [
-    # "httpx",                  # Phase 1: Gutenberg download
+    "httpx",                    # Phase 1: Gutenberg download
     # "numpy",                  # Phase 2: vector index (exact cosine search)
     # "sentence-transformers",  # Phase 2: local embedder
     # Phase 3: telemetry. Vendor-neutral instrumentation; Phoenix is just the

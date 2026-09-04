@@ -1,3 +1,4 @@
-{"query": "I keep replaying an argument I lost, and I can't let it go", "gold_ids": ["PLACEHOLDER"], "note": "PHASE 3: example entry — verify real passage ids against the parsed corpus before labeling"}
-{"query": "my coworker takes credit for my work and it's eating at me", "gold_ids": ["PLACEHOLDER"], "note": "PHASE 3: vocabulary-gap case"}
+{"query": "I keep replaying an argument I lost, and I can't let it go", "gold_ids": ["PLACEHOLDER"], "tier": "hard", "note": "PHASE 3: example entry — verify real passage ids against the parsed corpus before labeling"}
+{"query": "my coworker takes credit for my work and it's eating at me", "gold_ids": ["PLACEHOLDER"], "tier": "hard", "note": "PHASE 3: vocabulary-gap case"}
+{"query": "how do I stop being so afraid of dying", "gold_ids": ["PLACEHOLDER"], "tier": "canary", "note": "PHASE 3: canary — strong lexical anchor, every config should get this; a miss is a bug, not a hard case"}
 {"query": "which tax software should I use", "gold_ids": [], "note": "PHASE 3: out-of-scope — expected behavior is 'no strong match'"}

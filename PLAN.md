@@ -18,8 +18,8 @@ get there.
 
 ## Phase 0 — Setup (~1 hour)
 
-- [ ] `git init`, virtualenv, `pip install -e .`
-- [ ] Uncomment `httpx` in `pyproject.toml` (first real dependency)
+- [x] `git init`, virtualenv, `pip install -e .`
+- [x] Uncomment `httpx` in `pyproject.toml` (first real dependency)
 
 **Done when:** `meditations --help` runs (even if subcommands raise
 `NotImplementedError`).

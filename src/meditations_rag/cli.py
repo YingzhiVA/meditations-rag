@@ -53,10 +53,88 @@ UX notes for Phase 2:
   unless MEDITATIONS_TRACING=1, so this costs nothing by default.
 """
 
-import argparse  # noqa: F401
+import argparse
+import sys
+
+# Subcommands, as opposed to the default query mode. Kept as data because
+# main() has to decide which of the two parsers an argv belongs to before
+# argparse sees it — argparse cannot hold subparsers and a free-text
+# positional in the same parser.
+SUBCOMMANDS = ("ingest", "index", "show")
+
+_EPILOG = """\
+default query mode:
+  meditations "problem statement..." [--k N] [--all] [--strategy NAME]
+                                     [--embedder NAME] [--router NAME]
+  Any first argument that is not a subcommand is treated as the query.
+  Run `meditations query --help` for its flags.
+
+examples:
+  meditations ingest
+  meditations index --embedder local
+  meditations "my manager keeps taking credit for my work"
+  meditations show 4.7
+"""
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """Parser for the subcommands (ingest / index / show)."""
+    parser = argparse.ArgumentParser(
+        prog="meditations",
+        description=(
+            "Retrieve passages of Marcus Aurelius' Meditations that speak to a "
+            "modern problem statement."
+        ),
+        epilog=_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sub = parser.add_subparsers(dest="command", metavar="{ingest,index,show,query}")
+
+    p_ingest = sub.add_parser("ingest", help="download and parse the source text")
+    p_ingest.add_argument(
+        "--force", action="store_true", help="re-parse even if passages.jsonl exists"
+    )
+
+    p_index = sub.add_parser("index", help="embed the corpus and build the index")
+    p_index.add_argument("--embedder", default=None, help="embedder name (see embed/)")
+
+    p_show = sub.add_parser("show", help="print one passage in full by id, e.g. 4.7")
+    p_show.add_argument("passage_id", help="passage id as BOOK.SECTION, e.g. 4.7")
+
+    _add_query_parser(sub)
+    return parser
+
+
+def _add_query_parser(sub: argparse._SubParsersAction) -> argparse.ArgumentParser:
+    """The explicit `query` subcommand — also the parser for the default mode."""
+    p = sub.add_parser("query", help="retrieve passages (also the default mode)")
+    p.add_argument("query", help="the problem statement to retrieve against")
+    p.add_argument("--k", type=int, default=None, help="how many passages to show")
+    p.add_argument("--all", action="store_true", help="print every candidate in full")
+    p.add_argument("--strategy", default=None, help="query strategy (see retrieve/)")
+    p.add_argument("--embedder", default=None, help="embedder name (see embed/)")
+    p.add_argument("--router", default=None, help="intent router (see route/)")
+    p.add_argument("--llm", default=None, help="LLM provider (see llm/)")
+    return p
+
+
+def main(argv: list[str] | None = None) -> None:
+    argv = list(sys.argv[1:] if argv is None else argv)
+
+    # Default query mode: a first argument that is neither a subcommand nor a
+    # flag is the query itself, so rewrite it into the explicit form.
+    if argv and argv[0] not in SUBCOMMANDS and not argv[0].startswith("-"):
+        argv = ["query", *argv]
+
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.command is None:
+        parser.print_help()
+        return
+
+    # Phase 2 replaces these with the real handlers; see this module's
+    # docstring for each one's contract.
     raise NotImplementedError(
-        "Phase 2: argparse wiring for ingest/index/show + default query mode"
+        f"`meditations {args.command}` lands in Phase 2 — see PLAN.md."
     )

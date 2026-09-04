@@ -2,11 +2,14 @@
 
 Three subcommands + a default query mode (argparse; stdlib is enough):
 
-  meditations ingest [--force]
+  meditations ingest [--force]          (Phase 1 — implemented)
       ingest.download.fetch_raw_text -> ingest.parse.parse_passages
-      -> corpus.store.save_passages. Print passage count + a sample so the
-      user can eyeball parser output immediately. Expect 487 passages; the
-      parser raises if the count or per-book tallies don't match.
+      -> corpus.store.save_passages. Prints the passage count, the per-book
+      tally and a sample so the user can eyeball parser output immediately.
+      Expect 487 passages; the parser raises if the count or per-book tallies
+      don't match. --force re-downloads and re-parses; without it, an existing
+      passages.jsonl is left alone and the cached download is never re-fetched
+      (Gutenberg etiquette).
 
   meditations index [--embedder NAME]
       corpus.store.load_passages -> embed.get_embedder
@@ -55,6 +58,7 @@ UX notes for Phase 2:
 
 import argparse
 import sys
+from collections import Counter
 
 # Subcommands, as opposed to the default query mode. Kept as data because
 # main() has to decide which of the two parsers an argv belongs to before
@@ -92,7 +96,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_ingest = sub.add_parser("ingest", help="download and parse the source text")
     p_ingest.add_argument(
-        "--force", action="store_true", help="re-parse even if passages.jsonl exists"
+        "--force",
+        action="store_true",
+        help="re-download the source text and re-parse, ignoring both caches",
     )
 
     p_index = sub.add_parser("index", help="embed the corpus and build the index")
@@ -133,8 +139,46 @@ def main(argv: list[str] | None = None) -> None:
         parser.print_help()
         return
 
+    if args.command == "ingest":
+        cmd_ingest(force=args.force)
+        return
+
     # Phase 2 replaces these with the real handlers; see this module's
     # docstring for each one's contract.
     raise NotImplementedError(
         f"`meditations {args.command}` lands in Phase 2 — see PLAN.md."
     )
+
+
+def cmd_ingest(force: bool = False) -> None:
+    """Download (cached), parse, and persist the corpus."""
+    from meditations_rag import config
+    from meditations_rag.corpus.store import save_passages
+    from meditations_rag.ingest.download import fetch_raw_text
+    from meditations_rag.ingest.parse import parse_passages
+
+    if config.PASSAGES_PATH.exists() and not force:
+        print(
+            f"{config.PASSAGES_PATH} already exists — nothing to do. "
+            "Pass --force to rebuild it."
+        )
+        return
+
+    raw_path = fetch_raw_text(force=force)
+    print(f"source: {raw_path}  (PG #{config.GUTENBERG_EBOOK_ID}, "
+          f"{config.EDITION_TRANSLATOR} {config.EDITION_YEAR})")
+
+    passages = parse_passages(raw_path.read_text(encoding="utf-8"))
+    save_passages(passages)
+
+    per_book = Counter(p.book for p in passages)
+    long_ones = [p for p in passages if p.is_long]
+    print(f"parsed {len(passages)} passages -> {config.PASSAGES_PATH}")
+    print("  per book: " + "  ".join(f"{b}:{per_book[b]}" for b in sorted(per_book)))
+    print(f"  {len(long_ones)} over {config.LONG_PASSAGE_WORDS} words "
+          f"(longest {max(long_ones, key=lambda p: p.word_count).id})")
+    print()
+    # A sample to eyeball: the parser's two known traps live in Book I.
+    for passage in (passages[0], passages[15], passages[-1]):
+        head = " ".join(passage.text.split())[:160]
+        print(f"  {passage.citation:<16} [{passage.word_count:>3}w] {head}...")

@@ -20,8 +20,15 @@ rigorous enough to say which of them actually helped and what each one cost.
 
 ## Status
 
-Scaffolding only — all modules are stubs. See [PLAN.md](PLAN.md) for the
-phased implementation plan.
+**Phase 1 (ingestion) done**; retrieval, routing and eval are still stubs.
+`meditations ingest` downloads the source text (cached) and writes 487
+passages to `data/passages.jsonl`; `tests/test_parse.py` pins the parser's
+invariants. See [PLAN.md](PLAN.md) for the phased implementation plan.
+
+```sh
+.venv/bin/meditations ingest
+.venv/bin/pytest
+```
 
 ## Source text
 

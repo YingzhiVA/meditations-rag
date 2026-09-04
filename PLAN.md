@@ -98,12 +98,28 @@ short corpus.
 ## Phase 2 — Baseline retrieval, routing, CLI (~1 day)
 
 - [ ] `embed/base.py`: freeze the `Embedder` protocol.
-- [ ] `embed/local.py`: sentence-transformers implementation (start with one
-      model, e.g. a bge/gte small variant). Uncomment dependency.
-- [ ] `index/vector_index.py`: embed all passages, L2-normalize, persist per
-      embedder under `data/index/`. Search = exact cosine via numpy matmul —
-      487 vectors needs no ANN library. (See Phase 5 for the measured
-      justification rather than the assertion.)
+- [ ] `embed/local.py`: sentence-transformers implementation. **One model in
+      this phase: `BAAI/bge-base-en-v1.5`** (109M params, 768-dim, 512-token
+      window), registered as **`bge-base`**. Uncomment `numpy` and
+      `sentence-transformers` (which pulls the CUDA torch wheel, ~2.5 GB).
+      It is asymmetric: apply the query instruction `"Represent this sentence
+      for searching relevant passages: "` in `embed_query` **only**, never to
+      passages. A second embedder is deliberately deferred to Phase 4 — this
+      phase produces one baseline row, not a comparison.
+      **Registry key == `Embedder.name` == index subdirectory == eval row
+      label** — one string, no mapping to keep straight, so
+      `config.DEFAULT_EMBEDDER` becomes `"bge-base"` rather than `"local"`.
+      By Phase 4 there are three local embedders and "local" distinguishes
+      none of them; the string is also baked into `data/index/<name>/` and
+      into every committed eval results file, so it is cheapest to settle now.
+- [ ] `index/vector_index.py`: embed all passages, persist per embedder under
+      `data/index/`. Search = exact cosine via numpy matmul — 487 vectors
+      needs no ANN library. (See Phase 5 for the measured justification rather
+      than the assertion.) **The embedder owns L2 normalization; the index
+      asserts it** (one `np.allclose` over the row norms) rather than
+      re-normalizing. Both layers currently claim the job, which is harmless
+      while every embedder is sentence-transformers and a silent quality bug
+      the day one isn't — an assert turns that into a clear error instead.
 - [ ] `route/base.py`: freeze the `Intent` enum and `Router` protocol.
 - [ ] `route/keyword.py`: `KeywordRouter` — free, deterministic, no network.
       The baseline the LLM routers must beat, and their fallback.
@@ -112,10 +128,63 @@ short corpus.
       (no fusion or rerank yet; single query path).
 - [ ] `cli.py`: `ingest`, `index`, `show`, and the default query command with
       `--k`, `--all`, `--router`, intent-aware rendering, citations and scores.
+- [ ] `tests/test_index.py`, `tests/test_route.py`: four invariants, no more.
+      See **What Phase 2 tests, and what it deliberately does not** below.
+
+**Why `bge-base-en-v1.5`** and not something longer-context or multilingual:
+the corpus and the queries are both English, so a multilingual encoder pays a
+quality tax for a capability nothing here uses. Its **512-token window is a
+feature, not a limitation** — it is what makes the Phase 4 parent-child
+sub-chunking row a real experiment; an 8K-context encoder (`gte-base-en-v1.5`,
+`nomic-embed-text-v1.5`) would never truncate the 14 long sections and that
+row would measure nothing. And its asymmetry exercises the
+`embed_query`/`embed_texts` split in `embed/base.py` from day one instead of
+leaving it speculative.
+
+**What Phase 2 tests, and what it deliberately does not.** Same bar as Phase 1:
+a test earns its place only if it names a failure that is both *silent* and
+*poisons a downstream artifact*. Four qualify.
+
+1. **Row <-> id alignment** (no model). If `vectors.npz` row *i* stops
+   corresponding to `ids.json[i]`, every retrieval is wrong and every
+   golden-set label measures nothing — the Phase 1 numbering-shift failure
+   one layer up. Hand-write a small `vectors.npz` / `ids.json` / `meta.json`
+   fixture with known vectors, `load_index`, `search`, assert the expected
+   ids in the expected order. Also covers the stale-index `meta.json` check.
+2. **The query prefix is actually applied** (real model).
+   `embed_query(x) != embed_texts([x])[0]`. One assertion, and it catches the
+   likeliest silent quality bug in the project — the one the asymmetric
+   protocol in `embed/base.py` exists to prevent.
+3. **Self-retrieval** (real model): a passage's own text retrieves that
+   passage at rank 1. End-to-end smoke test, ~5s with a module-scoped
+   fixture since the weights are cached after the first `meditations index`.
+4. **Router short-circuit**: a CHITCHAT input retrieves nothing, asserted
+   with a stub embedder that *raises if called* — which is the actual claim
+   in `route/base.py` ("cheaply, before any embedding work"). Plus the
+   structural one: `KeywordRouter` can never return `OUT_OF_SCOPE`, since
+   Phase 4's whole router argument rests on that gap.
+
+**No `FakeEmbedder`.** A hash-based test double makes (3) a tautology — a
+passage retrieves itself by construction — and it is *symmetric*, so it
+cannot catch (2) while looking like coverage of exactly that area. The two
+tests that must be real are cheap enough not to need a stand-in; the one that
+needs no model is better written against a fixture than a fake. The only
+double that earns its keep is the three-line raising stub in (4), which
+cannot drift and cannot hide anything. Mechanical properties ("search returns
+k results sorted descending") name no silent corruption and get no test.
 
 **Done when:** end-to-end query works, `meditations "hello"` does *not*
 retrieve, and there are qualitative notes on where raw-query retrieval fails
 (collect these — they seed the golden set and motivate Phase 4).
+
+Those notes must include **the observed cosine score distribution**: top-1
+scores for queries that worked and for queries that plainly failed, side by
+side. BGE's embedding space is anisotropic — unrelated text pairs routinely
+score 0.6-0.75, not near zero — so `config.MIN_SCORE_THRESHOLD` cannot be set
+from intuition, and the `[0.81]` column in the CLI rendering contract will
+make everything look like a good match. Phase 4 tunes the threshold; Phase 2
+is where the evidence to tune it from gets collected, at no extra cost since
+the failure notes are being written anyway.
 
 ## Phase 3 — Eval harness, golden set, telemetry (~1–2 days, ongoing curation)
 
@@ -190,12 +259,25 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       people ("From Rusticus I learned…"), not counsel, and will match queries
       like "how do I become more patient" for the wrong reason. Cheap
       experiment: eval with and without `book == 1`.
-- [ ] **Second embedder** (`embed/voyage.py`, a second local model, or
-      `andreasmartin/apertus-v1.5-swiss-embed-4.9b-bidir` — an Apertus-derived
-      embedding model, which keeps the Apertus thread running through the
-      retrieval half too).
-- [ ] **Hybrid retrieval**: BM25 (rank-bm25) alongside dense, RRF fusion —
-      helps queries with lexical anchors ("death", "anger", "fame").
+- [ ] **More embedders** — two rows, one controlled variable each:
+      - `BAAI/bge-small-en-v1.5` (33M, 384-dim, same family, same query
+        prefix, one constructor argument). Isolates encoder *size*: does a 3x
+        smaller model lose anything at 487 passages?
+      - `andreasmartin/apertus-v1.1-swiss-embed-0.4b-bidir` (439M, 1024-dim,
+        1024-token, matryoshka to 256, Apache 2.0). Changes *family and
+        training domain*, and keeps the Apertus thread running through the
+        retrieval half. See the note below on how to read its result.
+      - `embed/voyage.py` stays optional — a hosted comparator if the local
+        rows turn out to be too close together to be interesting.
+- [ ] **Hybrid retrieval**: BM25 alongside dense, RRF fusion — helps queries
+      with lexical anchors ("death", "anger", "fame"). **This is where the
+      vector store stops being a numpy array**: `sqlite-vec` (single file, no
+      server, pre-v1 so pin it) holds the vectors, and SQLite's built-in FTS5
+      `bm25()` provides the lexical half, so one store serves both and
+      `rank-bm25` likely drops out of `pyproject.toml` entirely. It also makes
+      the Book I metadata filter above a `WHERE` clause and the sub-chunk ->
+      parent dedup a join. Numpy stays the default path; the DB is an eval row
+      that has to earn the dependency, not a replacement.
 - [ ] **Rerank** (`retrieve/rerank.py`): over-retrieve ~20, rerank to top 5.
       Cross-encoder (local, free) first; LLM listwise rerank as a comparison.
 - [ ] **"No good match" handling**: score threshold or LLM relevance check.
@@ -210,6 +292,43 @@ HyDE. HyDE is style imitation rather than classification, so it's where an open
 model is most challenged. If Apertus holds on routing and rewriting but trails
 on HyDE, that's a *finding* about where open models are competitive — worth
 writing up, not a reason to have picked a different default.
+
+**The Claude comparator column** is `claude-haiku-4-5` for routing ($1/$5 per
+MTok) and `claude-sonnet-5` for rewriting and HyDE ($2/$10 per MTok). A full
+golden-set pass is ~$0.02 on the router set and ~$0.05 on HyDE — cents, as
+budgeted. Three API facts that shape the implementation:
+
+- **Thinking must be off on the Sonnet calls** (`thinking: {"type":
+  "disabled"}`, which Sonnet 5 accepts). Apertus gets one plain completion; if
+  Claude gets adaptive thinking, the headline comparison measures the
+  scaffold rather than the models. **One non-thinking completion per side** is
+  an eval-hygiene invariant here, alongside the cache-key rule in `CLAUDE.md`.
+- **Assistant prefill returns a 400** on both models, so the usual "prefill
+  `{`" trick for forcing JSON is unavailable. Use structured outputs
+  (`output_config.format`) — which is also the concrete axis where Claude may
+  legitimately beat `publicai` (Risk 2 below).
+- `effort` is unsupported on Haiku 4.5 (it errors); it is available on
+  Sonnet 5. Prompt caching is not worth wiring up — the HyDE system prompt is
+  a few hundred tokens, below the minimum cacheable prefix, so it would
+  silently never cache.
+
+**How to read the Apertus embedder row.** There is no official Swiss AI
+Initiative embedding model; the `andreasmartin/*-swiss-embed-*` family is one
+author's independent bidirectional + LoRA adaptation of Apertus, explicitly
+not an official release, with no MTEB/MMTEB submission and self-described
+"internal development diagnostics" on its card. Its training data is Swiss
+administrative and encyclopedic text (Wikipedia, `VotingBooklets-v1`,
+`ZurichNLP/SwissGov-RSD`), and this corpus is 1902 English literary prose — so
+**expect it to lose to bge-base, and treat that as the finding**: what the
+fully-open Swiss stack costs in recall on English literary retrieval, at what
+latency. Two things to state alongside the number, or the row misleads: it is
+~4x bge-base's parameter count (so a loss is worse than it looks, and a win is
+not like-for-like), and its 1024-token window versus bge's 512 means the
+parent-child sub-chunking row behaves differently per embedder.
+
+The 4.9B variant (`apertus-v1.5-swiss-embed-4.9b-bidir`) is deliberately *not*
+used: ~10 GB at fp16 does not fit an 8 GB 3070, so it would run on CPU and
+corrupt exactly the p50/p95 and $/query columns Phase 3 exists to produce.
 
 **Done when:** the matrix shows a clear best configuration and the README can
 tell the story: baseline X% recall@5 → best pipeline Y%, at Z ms and $W/query.
@@ -251,8 +370,8 @@ tell the story: baseline X% recall@5 → best pipeline Y%, at Z ms and $W/query.
 
 | Item | Estimate |
 |---|---|
-| Infra | None — everything local (files + numpy). |
-| Embeddings | Local: free. Voyage: pennies one-time for 487 passages. |
+| Infra | None through Phase 3 — everything local (files + numpy). From Phase 4, `sqlite-vec`: still a single file, still no server. |
+| Embeddings | Local: free (`bge-base` Phase 2; `bge-small` + Apertus-0.4B Phase 4). Voyage, if used: pennies one-time for 487 passages. |
 | LLM — default path | Apertus via HF Inference (`publicai`). Router calls are tiny; HyDE/multi-query are ~1 short completion per query. Requires `HF_TOKEN`. |
 | LLM — comparator | `claude-sonnet-5` ($2/$10 per MTok), scoped to comparator eval runs, not every query. A full golden-set pass is cents. |
 | Telemetry | Phoenix runs locally. Free. |

@@ -24,7 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    # "pytest",                 # Phase 1: parser invariant tests
+    "pytest",                   # Phase 1: parser invariant tests
     # "arize-phoenix",          # Phase 3: local trace UI — dev tool, not runtime
     # "hnswlib",                # Phase 5: bench/ann_scaling.py only
 ]

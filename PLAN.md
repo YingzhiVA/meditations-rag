@@ -42,17 +42,18 @@ What makes it the clean one:
 
 Work:
 
-- [ ] `ingest/download.py`: fetch the plain-text file once, cache under
+- [x] `ingest/download.py`: fetch the plain-text file once, cache under
       `data/raw/`. Never re-download if cached (Gutenberg etiquette).
-- [ ] `ingest/parse.py`: strip the Gutenberg license header/footer, split on
+- [x] `ingest/parse.py`: strip the Gutenberg license header/footer, split on
       `^\s*BOOK ([IVX]+)\.\s*$`, drop front matter / `END OF THE Nth BOOK.` /
       `THE END.`, then **scan sequentially for the next expected section
       number** rather than matching a global regex. Normalize whitespace.
-- [ ] `corpus/store.py`: persist as `data/passages.jsonl`. `Passage` carries
+- [x] `corpus/store.py`: persist as `data/passages.jsonl`. `Passage` carries
       `book_subtitle` and derives `word_count` / `is_long`.
-- [ ] `tests/test_parse.py`: exact invariants — 12 books, `== 487` passages,
+- [x] `tests/test_parse.py`: exact invariants — 12 books, `== 487` passages,
       exact per-book counts, contiguous numbering, no boilerplate, no brackets,
       pinned spot-checks.
+- [x] `meditations ingest` (the rest of the CLI stays Phase 2).
 
 **Two edition-specific traps** the sequential scan handles and a line-anchored
 regex does not — both silently produce a plausible-looking but wrong corpus:
@@ -67,6 +68,26 @@ regex does not — both silently produce a plausible-looking but wrong corpus:
 **Done when:** `meditations ingest` produces `passages.jsonl` with 487
 passages and matching per-book counts. Manually read ~10 random passages
 against the source text.
+
+**Met.** 487 passages, per-book counts exact, 18 invariants green. Verified
+beyond the spot-read: every one of the 487 texts occurs verbatim in the
+whitespace-flattened source, and the 579 dropped words are fully accounted for
+by the 12 book headings, 11 `END OF THE Nth BOOK.` lines, `THE END.`, the 487
+section numerals and the 2 colophons. Measured distribution matches the
+figures above (median 56, mean 84, 14 sections over 300 words, longest 1.16 at
+754).
+
+**A third edition trap, found during implementation.** The place-of-writing
+lines are **colophons at the *end* of Books I and II**, immediately before
+`END OF THE FIRST BOOK.` — not subtitles under the heading, as this plan
+originally assumed. Left in place they get absorbed onto the tail of §1.17 and
+§2.17, which is how a corpus that passes a count check still ships two
+corrupted passages. `parse.py` lifts a trailing all-caps block out of each
+book; `test_book_subtitles` asserts no passage text contains "CARNUNTUM" or
+"GRANUA".
+
+Passage text keeps paragraph breaks as `\n\n` (15 sections span more than one
+paragraph) and joins hard wraps within a paragraph.
 
 **Risk (downgraded):** the plan originally budgeted heavily for parser
 fiddling. This edition is materially cleaner than assumed. The real risk is

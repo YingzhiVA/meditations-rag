@@ -9,7 +9,8 @@ JSONL (one object per line) rather than a database: 487 rows, human-
 inspectable with `head`/`grep`, trivially diffable when the parser changes.
 """
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 
 from meditations_rag import config
 
@@ -22,11 +23,13 @@ class Passage:
             used across the index, golden set, and CLI.
     book:   1..12
     number: passage number within the book
-    text:   normalized passage text (paragraphs joined, whitespace collapsed)
+    text:   normalized passage text (hard wraps joined, paragraphs kept as a
+            blank line, other whitespace collapsed)
     book_subtitle:
-            the location line under a book heading, where the edition has one
-            ("In the country of the Quadi, by the Granua" for Book I,
-            "At Carnuntum" for Book II). None for the other ten books.
+            the place-of-writing colophon this edition prints at the END of
+            Books I and II — "IN THE COUNTRY OF THE QUADI, BY THE GRANUA" and
+            "AT CARNUNTUM". Stored verbatim (the edition sets them in caps);
+            presentation is the CLI's business. None for the other ten books.
     """
 
     id: str
@@ -38,13 +41,13 @@ class Passage:
     @property
     def citation(self) -> str:
         """Human-readable citation, e.g. 'Book 4, §7'."""
-        raise NotImplementedError("Phase 1: trivial format string")
+        return f"Book {self.book}, §{self.number}"
 
     @property
     def word_count(self) -> int:
         """Words in the normalized text. Derived rather than stored so it
         cannot drift out of sync with the text."""
-        raise NotImplementedError("Phase 1: len(self.text.split())")
+        return len(self.text.split())
 
     @property
     def is_long(self) -> bool:
@@ -56,7 +59,11 @@ class Passage:
         sub-chunking selects on — sub-chunks are embedded, but hits dedupe back
         to the parent § so citations stay whole.
         """
-        raise NotImplementedError("Phase 1: self.word_count > config.LONG_PASSAGE_WORDS")
+        return self.word_count > config.LONG_PASSAGE_WORDS
+
+
+class CorpusMissingError(FileNotFoundError):
+    """passages.jsonl has not been built yet."""
 
 
 def save_passages(passages: list[Passage]) -> None:
@@ -65,10 +72,18 @@ def save_passages(passages: list[Passage]) -> None:
     Only the stored fields are serialized; word_count/is_long are derived on
     load, so changing LONG_PASSAGE_WORDS does not require re-ingesting.
     """
-    raise NotImplementedError("Phase 1")
+    config.PASSAGES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with config.PASSAGES_PATH.open("w", encoding="utf-8") as handle:
+        for passage in passages:
+            handle.write(json.dumps(asdict(passage), ensure_ascii=False) + "\n")
 
 
 def load_passages() -> list[Passage]:
     """Load passages from config.PASSAGES_PATH; raise a clear error telling
     the user to run `meditations ingest` if the file is missing."""
-    raise NotImplementedError("Phase 1")
+    if not config.PASSAGES_PATH.exists():
+        raise CorpusMissingError(
+            f"No corpus at {config.PASSAGES_PATH}. Run `meditations ingest` first."
+        )
+    with config.PASSAGES_PATH.open(encoding="utf-8") as handle:
+        return [Passage(**json.loads(line)) for line in handle if line.strip()]

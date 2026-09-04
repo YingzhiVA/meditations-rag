@@ -12,7 +12,8 @@ stories would blur the one thing the project is trying to demonstrate.
 
 Plan:
 1. Load eval/golden_set.jsonl (skip entries with PLACEHOLDER ids; warn) and
-   eval/router_set.jsonl.
+   eval/router_set.jsonl. Split the golden entries by `tier` ("hard" when
+   the field is absent); see eval/README.md for what each tier is for.
 2. Build the grid: {embedder x strategy x llm x reranker}, from the same
    registries the CLI uses (embed.get_embedder, llm.get_llm, ...) — an
    experiment IS a RetrievalConfig, nothing more.
@@ -28,7 +29,7 @@ Plan:
    (strategy, llm, query) — the llm in the key is essential, or switching
    providers silently serves the previous provider's expansions and the
    comparison is worthless.
-4. Metrics per config:
+4. Metrics per config, over the tier=="hard" entries only:
      recall@k (k=1,3,5): fraction of queries with ANY gold id in top k
      MRR: mean of 1/rank of first gold hit (0 if absent)
      oos_accuracy: fraction of gold_ids==[] queries where the no-match
@@ -39,6 +40,13 @@ Plan:
                    turns "HyDE wins on recall" into "HyDE wins on recall, at
                    3x latency and $X/query" — the comparison that actually
                    informs a default.
+
+   Canaries (tier=="canary") are scored the same way but reported on their
+   OWN line, never folded into recall@k. They are the easy lexical-anchor
+   queries every configuration should get; the number is uninteresting until
+   it drops, and a drop means something broke rather than that the set got
+   harder. Folding them in would lift every row equally and blunt the
+   comparison the matrix exists for.
 5. Router table (separate from the retrieval matrix, same run): for each
    router in the registry, accuracy over eval/router_set.jsonl plus a
    per-intent breakdown. The per-intent split is the interesting part: the

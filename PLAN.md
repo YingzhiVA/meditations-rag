@@ -101,11 +101,18 @@ retrieve, and there are qualitative notes on where raw-query retrieval fails
 This phase is deliberately BEFORE the advanced techniques: no improvement
 without a measurement.
 
-- [ ] Curate `eval/golden_set.jsonl`: 30–50 entries, each a realistic modern
-      problem statement mapped to the passage id(s) a thoughtful human would
-      pick. Candidates may be LLM-assisted, but **every label human-verified**.
-      Include hard cases (vocabulary mismatch) and 2–3 out-of-scope queries.
-      Valid ids are `1.1`–`12.36` within the per-book counts.
+- [ ] Curate `eval/golden_set.jsonl`: ~25 entries — about 20 `hard` cases
+      (modern phrasing, little lexical overlap, where configs plausibly
+      disagree) and about 5 `canary` cases (easy lexical anchors every config
+      should get, reported separately as a regression check rather than folded
+      into recall@k). Each a realistic modern problem statement mapped to the
+      passage id(s) a thoughtful human would pick. Candidates may be
+      LLM-assisted, but **every label human-verified**. Spread the hard cases
+      across distinct concerns so a technique that only helps one theme cannot
+      look like a general win.
+      Valid ids are `1.1`–`12.36` within the per-book counts. Labels are
+      sparse, not exhaustive — see `eval/README.md` for the pooling protocol
+      that makes this tractable, and why it has to follow Phase 2.
 - [ ] `eval/router_set.jsonl` is already drafted (~30 entries). Verify the
       labels and extend if the router's failures suggest gaps.
 - [ ] `eval/run_eval.py`: run the pipeline over the golden set for every
@@ -172,6 +179,10 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       Cross-encoder (local, free) first; LLM listwise rerank as a comparison.
 - [ ] **"No good match" handling**: score threshold or LLM relevance check.
       Post-retrieval rejection — distinct from the router; see `route/base.py`.
+      Set the threshold from evidence and keep it conservative: a low cosine
+      score means the passage shares little vocabulary with the query, not
+      that it cannot help. Passages that land obliquely are part of what this
+      corpus is for, and an eager threshold suppresses exactly those.
 
 **The headline comparison of this phase** is Apertus-70B vs Claude Sonnet 5 on
 HyDE. HyDE is style imitation rather than classification, so it's where an open
@@ -245,8 +256,9 @@ side — the comparator column is the smaller half of the bill.
 3. **Apertus HyDE register quality.** Style imitation is the hardest ask of the
    default model. See the Phase 4 note — a loss here is a result, not a defeat.
 4. **Golden-set subjectivity** — mitigated by multi-label hit-any scoring.
-5. **Overfitting to the golden set** — keep a small held-out split, or at
-   minimum sanity-check the winner on fresh queries.
+5. **Overfitting to the golden set** — at ~40 queries a held-out split is too
+   small to be informative and costs a fifth of the development signal.
+   Instead, sanity-check the Phase 5 winner on ~10 genuinely fresh queries.
 6. **Telemetry scope creep.** Keep tracing optional, no-op when disabled, and
    confined behind `telemetry.py`. `run_eval.py` stays authoritative for
    quality; Phoenix is observability only.

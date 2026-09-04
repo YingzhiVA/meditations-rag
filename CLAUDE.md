@@ -27,9 +27,14 @@ lands as its own eval row) are reasonable; everything else is one branch.
 
 ## Commits
 
-Small and scoped to one plan item. The message says what changed and why, not
-which files moved. Tick the `PLAN.md` checkbox in the same commit that
-satisfies it, so the plan never drifts from the code.
+**Commits are mine to make.** Claude does not run `git commit`, `git push`, or
+`gh pr create` — it leaves the working tree in a finished state, says what it
+changed, and may propose a commit message. I read the diff and commit. The
+point is that nothing enters the history unreviewed.
+
+Commits are small and scoped to one plan item. The message says what changed
+and why, not which files moved. Tick the `PLAN.md` checkbox in the same commit
+that satisfies it, so the plan never drifts from the code.
 
 ## Dependencies
 
@@ -37,6 +42,50 @@ Dependencies stay commented out in `pyproject.toml` until the phase that needs
 them, and get uncommented in that phase's branch. This keeps each phase's
 footprint explicit and the scaffold installable with near-zero deps. When you
 uncomment one, re-run `pip install -e .` and say so in the commit.
+
+## Eval hygiene
+
+The eval harness is the product (see `PLAN.md`), so the numbers have to stay
+trustworthy.
+
+**Never change the measurement and the thing measured in the same commit.**
+Golden-set edits, label fixes, and scoring changes in `run_eval.py` go in
+their own commits, separate from retrieval code. Otherwise a jump in recall@5
+is ambiguous — you cannot tell whether the pipeline improved or a query got
+relabeled to something it already found.
+
+**Commit every eval run as an artifact.** `eval/results/<phase>-<config>.md`,
+carrying the matrix plus the versions that produced it (embedder model id,
+`sentence-transformers` / `torch` versions, LLM model id). Embedding numbers
+move when a dependency upgrades, so an unstamped baseline row stops being
+comparable a month later.
+
+**Read the per-query breakdown, not the headline delta.** With ~20 scored
+golden queries, a five-point move in recall@5 is a single query. "HyDE fixed
+these six and broke this one, here they are" is a finding; "HyDE is up five
+points" is not. The matrix is the summary; the per-query file is the
+evidence.
+
+## Tests
+
+From Phase 1 there are hard invariants in `tests/`. Claude runs them before
+handing work over and pastes the actual output — never "this should pass." A
+silent parser shift invalidates every golden-set label downstream, which is
+exactly what these catch.
+
+## Network and cost
+
+LLM-backed work starts in Phase 4 and a full grid run costs real money. Claude
+asks before spending. Eval runs cache completions on disk keyed by
+`(strategy, llm, query)` — including the llm, or switching providers silently
+serves the previous one's expansions and the comparison is worthless. The
+cache also makes reruns free and repeatable.
+
+## What we deliberately skip
+
+No CI, no lint gates, no coverage targets, no pytest-on-commit hook. Solo repo,
+and reading the diff already does that job. Revisit if the repo opens up to
+other people.
 
 ## Environment
 

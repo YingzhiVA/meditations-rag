@@ -63,6 +63,41 @@ over-suppression strips useful passages from exactly the users in the worst
 situations — so it wants precision, and "suppress anything about patience"
 would leave a mobbing victim with nothing.
 
+### `SafetyFlag` is a category, and the categories behave differently
+
+One flag is not enough: the referral text differs per situation, and — more
+importantly — **the hazard set differs per situation**. The passages that
+endanger someone being mobbed are not the ones that endanger someone
+suicidal. So suppression is **per flag**, which is a generalisation of one
+list rather than new machinery.
+
+| flag | retrieval | suppression list |
+|---|---|---|
+| `ABUSE` (harassment, mobbing, domestic) | yes | the rule-4 four: 2.1, 4.3, 7.26, 11.18 |
+| `MENTAL_HEALTH` (depression, distress) | yes | the death-counsel four: 5.29, 8.47, 9.3, 10.8 |
+| `ADDICTION` | yes | the death-counsel list |
+| `SELF_HARM` (suicidal ideation, self-injury) | **none — referral only** | n/a |
+| `MEDICAL_EMERGENCY` | **none — referral only** | n/a |
+
+**Why `SELF_HARM` short-circuits retrieval instead of suppressing.** 68 of the
+487 passages mention death — 14% of the corpus — and the hazard is not a
+handful of ids but the text's whole posture toward mortality, much of it
+consoling and some of it not. A reviewed list works for rule 4 because eleven
+candidates could be read in an evening; here no list makes the boundary
+auditable, so the honest answer is to not retrieve at all. `MENTAL_HEALTH` is
+the softer flag deliberately — "depressed" is used colloquially, and
+referral-only is a heavy response to "this weather is depressing" — and for it
+a small list of the explicitly life-departing passages is proportionate,
+precisely because the user is not in acute crisis.
+
+**`MEDICAL_EMERGENCY` exists to close a hole in the fallback path.** Rule 1
+routes medical questions to `OUT_OF_SCOPE`, but `KeywordRouter` is
+structurally incapable of detecting `OUT_OF_SCOPE` — so during an HF outage
+"I have chest pain and shortness of breath" would route `IN_SCOPE` and return
+passages on enduring pain, which is exactly what `eval/router_set.jsonl`
+flags as prohibited. The safety floor must catch it directly, since the
+fallback cannot.
+
 ### Why post-retrieval safety can be a reviewed artifact
 
 The corpus is closed and fixed at 487 passages, so the passages that counsel
@@ -83,9 +118,9 @@ reverse-engineer):
 > conduct, judgment, or inner state are not hazards — those are precisely what
 > someone under mistreatment may legitimately need.
 
-**The reviewed list — four ids.** A regex sweep produced 11 candidates; all
-11 were read in full and 7 struck. Reasons are recorded because the strikes
-are as informative as the keeps:
+**The `ABUSE` list — four ids, reviewed.** A regex sweep produced 11
+candidates; all 11 were read in full and 7 struck. Reasons are recorded
+because the strikes are as informative as the keeps:
 
 | id | why it is a hazard |
 |---|---|
@@ -100,6 +135,36 @@ them", so correction is offered. **5.25** — "Let him look to that" places your
 concern, it does not counsel accepting the conduct. **1.15** and **9.3** were
 regex noise: a character portrait of Maximus that matched on "forgive", and a
 passage about dying in which "bear with them mildly" is one incidental clause.
+
+**The death-counsel list — four ids, reviewed.** Used by `MENTAL_HEALTH` and
+`ADDICTION`. Its own hazard test, and the distinction is what makes the list
+small enough to be worth having:
+
+> A passage is a hazard if it **counsels or licenses leaving life**, or frames
+> death as welcome or preferable to continuing. Passages that merely *observe*
+> mortality — that all things pass, that death is natural — are not hazards.
+> 14% of the corpus does that, and suppressing it would gut the book.
+
+| id | why |
+|---|---|
+| 5.29 | "if men do not permit you, then depart from life… If my house be smoky, I go out, and where is the great matter?" |
+| 8.47 | "Quit life then, in the same kindly spirit as though you had done it" |
+| 9.3 | "Despise not death; but receive it well content"; ends "Haste, death! lest I, too, should forget myself" |
+| 10.8 | "or else depart from life altogether… **having done at least one thing in life well, by so leaving it**" |
+
+Struck: **8.58** — "do not cease to live" reads as the opposite sentiment.
+**10.31, 12.27, 12.33** — matched only on "smoke"/"smoke and ashes", the
+vanity of worldly things rather than leaving life, caught by 5.29's
+smoky-house metaphor.
+
+That test is also the reason `SELF_HARM` cannot use a list at all: the line
+between "counsels leaving life" and "observes that all things pass" is
+checkable across four passages and not across 68, and in acute crisis the
+consoling ones are not safe either.
+
+Note 9.3 appears here having been struck from the `ABUSE` list — the clearest
+demonstration that hazard is a function of the *user's situation*, not a
+property of the passage, and therefore that suppression has to be per flag.
 
 ### No cherry-picking
 
@@ -227,12 +292,15 @@ short corpus.
       re-normalizing. Both layers currently claim the job, which is harmless
       while every embedder is sentence-transformers and a silent quality bug
       the day one isn't — an assert turns that into a clear error instead.
-- [ ] `route/base.py`: freeze the `Intent` enum, the `SafetyFlag` enum, and
-      the `Router` protocol. **`route()` returns `RouteDecision(intent,
-      safety)`, not a bare `Intent`** — the two are orthogonal axes (see
-      Scope & safety boundaries): a mobbing query is `IN_SCOPE` *and* carries
-      a safety flag, and rule 3 requires both. Frozen here, so Phase 4's LLM
-      routers are written against it from the start.
+- [ ] `route/base.py`: freeze the `Intent` enum, the `SafetyFlag` enum
+      (`ABUSE`, `MENTAL_HEALTH`, `ADDICTION`, `SELF_HARM`,
+      `MEDICAL_EMERGENCY`), and the `Router` protocol. **`route()` returns
+      `RouteDecision(intent, safety)`, not a bare `Intent`** — the two are
+      orthogonal axes (see Scope & safety boundaries): a mobbing query is
+      `IN_SCOPE` *and* carries a safety flag, and rule 3 requires both.
+      `SELF_HARM` and `MEDICAL_EMERGENCY` suppress retrieval entirely, so the
+      flag has to reach the pipeline, not just the renderer. Frozen here, so
+      Phase 4's LLM routers are written against it from the start.
 - [ ] `route/keyword.py`: `KeywordRouter` — free, deterministic, no network.
       Two jobs, and note that "baseline the LLM must beat" is **not** one of
       them (see the Phase 3 note on why that comparison is uninformative):
@@ -243,10 +311,33 @@ short corpus.
       off, and "degrade rather than fail" is right for quality and wrong for
       safety. Crude high-recall matching is the correct tool here precisely
       because over-firing is cheap on this axis.
-- [ ] `retrieve/safety.py`: post-retrieval suppression. The **reviewed
-      four** — 2.1, 4.3, 7.26, 11.18 (see Scope & safety boundaries for the
-      hazard test and why the other seven candidates were struck) — not shown
-      when the abuse/harassment/mobbing flag is set. Applied after rerank and
+      Three lists, each with a different matching discipline (the words
+      themselves live in this module, not in the plan):
+      - **chitchat: whole-input exact match** after normalising (lowercase,
+        strip `.,!?;:`, collapse whitespace, keep apostrophes) against a
+        closed set of greetings, acknowledgements, thanks and closings. Not
+        prefix matching — whole-input is what catches "ok" without firing on
+        "ok so my boss keeps…", and it structurally cannot match a sentence,
+        so no in_scope query can trip it. Brittle to variation ("morning",
+        "hey there!") on purpose.
+      - **meta: two narrow signals** — a short list of capability phrasings
+        ("what can you do", "how does this work", "who are you") and a set of
+        corpus nouns (translation, edition, Meditations, Chrystal, cite,
+        passages, sources). Deliberately excluded as collision-prone: bare
+        *book* ("a book about grief"), singular *source* ("the source of my
+        anxiety"), singular *passage* ("a difficult passage in my life") —
+        the plurals are far safer than the singulars.
+      - **safety: high recall, grouped by the flag it raises** (see the
+        `SafetyFlag` table above). Over-firing is the correct trade here:
+        "my therapist says…" is not a crisis and *hopeless* will catch "I
+        feel hopeless about my career", but an unnecessary referral line
+        costs almost nothing and a missed one does not.
+- [ ] `retrieve/safety.py`: post-retrieval suppression, **keyed by flag** —
+      the reviewed four (2.1, 4.3, 7.26, 11.18) for `ABUSE`, the
+      death-counsel list for `MENTAL_HEALTH` and `ADDICTION`, and nothing for
+      `SELF_HARM`/`MEDICAL_EMERGENCY` since those never retrieve. See Scope &
+      safety boundaries for the hazard test, the strikes, and why 9.3 is on
+      one list having been struck from the other. Applied after rerank and
       after Phase 4's dedup-to-parent, since 11.18 is 704 words and therefore
       in the sub-chunking set. Phase 2 suppresses whole passages; Phase 4
       refines 11.18 to precept level.

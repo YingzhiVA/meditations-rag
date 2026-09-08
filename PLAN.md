@@ -66,20 +66,60 @@ would leave a mobbing victim with nothing.
 ### Why post-retrieval safety can be a reviewed artifact
 
 The corpus is closed and fixed at 487 passages, so the passages that counsel
-tolerating wrongdoers can simply be *enumerated and read*. A regex sweep
-surfaces 11 candidates — 1.15, 2.1, 4.3, 5.20, 5.25, 6.6, 7.26, 8.59, 9.3,
-11.16, 11.18 — of which the clearest hazards are 8.59 ("Teach them better
-then, or bear with them"), 5.20 ("I must do good to him and bear with him"),
-2.1 ("Today I shall have to do with meddlers...") and 11.18. Those would rank
-highly for "my coworker humiliates me in every meeting", and v1 has no
-synthesis layer to soften them.
+tolerating wrongdoers can simply be *enumerated and read*. That makes
+suppression something you can read, diff and argue with, rather than a runtime
+LLM verdict you cannot inspect — which matters here more than elsewhere: this
+is the safety path, Risk 1 below names HF provider availability as a single
+point of failure, and an LLM-based check fails *open* during an outage. A list
+does not.
 
-**The list is human-reviewed, not regex output** — same rule as the golden
-set. The point is that suppression becomes something you can read, diff and
-argue with, rather than a runtime LLM verdict you cannot inspect. That matters
-here more than elsewhere: this is the safety path, Risk 1 below names HF
-provider availability as a single point of failure, and an LLM-based check
-fails *open* during an outage. A list does not.
+**The hazard test** (the part worth keeping — it is what lets the list be
+extended or contested later, rather than being N ids someone has to
+reverse-engineer):
+
+> A passage is a hazard only if it counsels **accepting, minimizing, or
+> forgiving the other person's continued conduct**, without offering
+> correction or action as a live alternative. Passages that govern your **own**
+> conduct, judgment, or inner state are not hazards — those are precisely what
+> someone under mistreatment may legitimately need.
+
+**The reviewed list — four ids.** A regex sweep produced 11 candidates; all
+11 were read in full and 7 struck. Reasons are recorded because the strikes
+are as informative as the keeps:
+
+| id | why it is a hazard |
+|---|---|
+| 2.1 | "…I therefore cannot be hurt by any of these" — minimizes, and it is the conclusion the whole passage builds toward, so there is no cut that removes it |
+| 4.3 | inward retreat *in place of* external change is the passage's thesis, not a stray clause: "to bear with them is a part of justice, and that they cannot help their sin… Remember and cease from your complaints" |
+| 7.26 | "Your duty then is to forgive… grant indulgence to him who is still mistaken" — forgiveness with no alternative offered |
+| 11.18 | precepts 4, 5, 7 and 9 (see the Phase 4 refinement — the tenth is a counterweight and must survive) |
+
+Struck: **5.20, 6.6, 8.59, 11.16** — these govern your own disposition or
+retaliation, and 8.59 puts "Teach them better then" *before* "or bear with
+them", so correction is offered. **5.25** — "Let him look to that" places your
+concern, it does not counsel accepting the conduct. **1.15** and **9.3** were
+regex noise: a character portrait of Maximus that matched on "forgive", and a
+passage about dying in which "bear with them mildly" is one incidental clause.
+
+### No cherry-picking
+
+Showing part of a passage is out for v1, even though some passages are part
+good counsel and part too much for the situation. Three reasons compound:
+the goal above commits to the original translation text cited by Book/§, so a
+fragment shown under "Book 2, §1" misrepresents what the reader has read;
+the seams usually are not there (in 2.1 the problematic line *is* the
+conclusion the argument earns, so no cut leaves both halves meaningful); and
+cutting is synthesis performed with scissors, in a product that says it does
+none — a suppression list of four ids is auditable in a way "the model chose
+these three sentences for this distressed user" is not.
+
+Selective emphasis belongs in **Phase 6 synthesis**, where the output is
+visibly the model's prose citing Marcus rather than Marcus presented as such.
+
+The one legitimate v1 move needs no cutting: Phase 4's sub-chunk index already
+records *which part matched*, so the whole passage can be shown with the
+matching span marked. Same text, no citation cost, and it doubles as per-query
+diagnostic evidence for whether a passage was retrieved for the right reason.
 
 ---
 
@@ -203,10 +243,13 @@ short corpus.
       off, and "degrade rather than fail" is right for quality and wrong for
       safety. Crude high-recall matching is the correct tool here precisely
       because over-firing is cheap on this axis.
-- [ ] `retrieve/safety.py`: post-retrieval suppression. A **human-reviewed**
-      list of passage ids that must not be shown when the abuse/harassment/
-      mobbing flag is set, applied to results after rerank and after Phase 4's
-      dedup-to-parent (11.18 is 704 words, so it is in the sub-chunking set).
+- [ ] `retrieve/safety.py`: post-retrieval suppression. The **reviewed
+      four** — 2.1, 4.3, 7.26, 11.18 (see Scope & safety boundaries for the
+      hazard test and why the other seven candidates were struck) — not shown
+      when the abuse/harassment/mobbing flag is set. Applied after rerank and
+      after Phase 4's dedup-to-parent, since 11.18 is 704 words and therefore
+      in the sub-chunking set. Phase 2 suppresses whole passages; Phase 4
+      refines 11.18 to precept level.
       **Gated on the pre-retrieval flag** — if no flag fired, skip entirely:
       zero cost, zero latency, no behaviour change for the queries where none
       of this applies. **No backfill** when passages are suppressed: pulling
@@ -380,9 +423,23 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
 - [ ] **Multi-query expansion** (`MultiQuery`): 1→N Stoic themes, fused with
       Reciprocal Rank Fusion.
 - [ ] **Parent-child sub-chunking** for the 14 sections over 300 words
-      (longest: 1.16 at 754). A 512-token embedder truncates exactly the
-      meatiest passages. Embed sub-chunks, dedupe hits back to the parent § so
-      citations stay whole. Its own matrix row — an assumption otherwise.
+      (longest: 1.16 at 754). Embed sub-chunks, dedupe hits back to the parent
+      § so citations stay whole. Its own matrix row — an assumption otherwise.
+      **Two distinct motivations, which may show up differently in the
+      numbers:** (a) a 512-token embedder truncates exactly the meatiest
+      passages, and (b) *semantic granularity* — §11.18 is ten separate
+      precepts the edition happens to number as one, so a single vector for it
+      is an average of ten arguments. Report both if they diverge.
+      **§11.18 is the one passage with author-supplied boundaries** — measured:
+      it is the only one of 487 with internal ordinal enumeration ("First…
+      Secondly… Ninthly", then a tenth), across 12 paragraphs. Split it on its
+      own ordinals rather than a sliding window, and let `retrieve/safety.py`
+      address *precepts* there: suppress 4, 5, 7 and 9, and **keep the tenth**
+      — "To allow them to injure others, and to forbid them to injure you, is
+      foolish and tyrannical" is Marcus limiting the endurance doctrine
+      himself, and whole-passage suppression deletes it. This is the only
+      passage where sub-passage handling is honest; everywhere else the text
+      supplies no seams and the rule above applies.
 - [ ] **Book I as a metadata filter**: Book I is a list of debts to particular
       people ("From Rusticus I learned…"), not counsel, and will match queries
       like "how do I become more patient" for the wrong reason. Cheap

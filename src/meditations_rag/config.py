@@ -90,8 +90,17 @@ OTLP_ENDPOINT = os.environ.get(
 )
 SERVICE_NAME = "meditations-rag"
 
+# --- Embedders (Phase 2: one; Phase 4: three local + optional hosted) --------
+# Registry key == Embedder.name == data/index/<name>/ == eval row label. One
+# string, so there is no mapping to keep straight across those four places.
+DEFAULT_EMBEDDER = "bge-base"  # key into embed registry; see embed/__init__.py
+# BAAI/bge-base-en-v1.5: 109M params, 768-dim, 512-token window. English-only
+# on purpose, and the short window is deliberate — it is what makes Phase 4's
+# parent-child sub-chunking row measure something. Asymmetric: the query
+# instruction lives in embed/local.py and is applied to queries only.
+BGE_BASE_MODEL = "BAAI/bge-base-en-v1.5"
+
 # --- Retrieval defaults ------------------------------------------------------
-DEFAULT_EMBEDDER = "local"   # key into embed registry; see embed/__init__.py
 DEFAULT_STRATEGY = "raw"     # baseline; eval winner becomes the default later
 DEFAULT_TOP_K = 5            # results shown by default
 OVERRETRIEVE_K = 20          # candidates fetched before rerank (Phase 4)

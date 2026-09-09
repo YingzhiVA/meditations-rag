@@ -16,8 +16,10 @@ normalize_embeddings=True at encode time, so the index can assume
 cosine == dot product (the embedder owns normalization; see embed/base.py).
 
 The first construction downloads the weights (~440 MB) into the HuggingFace
-cache; later runs load from disk. sentence-transformers picks the device
-(CUDA when available, else CPU); 487 passages embed in seconds either way.
+cache; later runs load from disk and make no network request at all (see
+_load_model for why that needs saying). sentence-transformers picks the
+device (CUDA when available, else CPU); 487 passages embed in seconds either
+way.
 """
 
 import numpy as np
@@ -28,6 +30,19 @@ from meditations_rag.embed.base import Matrix, Vector
 # Per the bge-en-v1.5 model card, for short-query -> long-passage retrieval.
 # Queries only; passages are embedded bare.
 BGE_QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
+
+
+def _load_model(cls, model_id: str):
+    """Cache-first load. sentence-transformers asks the Hub for a file that
+    does not exist in the bge repo (2_Normalize/config.json) on EVERY load,
+    because a 404 cannot be cached — so without this a query hits the
+    network each run and huggingface_hub warns about unauthenticated
+    requests. Try the cache alone first; only if the model is not there yet
+    fall through to a normal load, which downloads it."""
+    try:
+        return cls(model_id, local_files_only=True)
+    except OSError:
+        return cls(model_id)
 
 
 class SentenceTransformerEmbedder:
@@ -51,7 +66,7 @@ class SentenceTransformerEmbedder:
         self._name = name
         self._model_id = model_id
         self._query_instruction = query_instruction or ""
-        self._model = SentenceTransformer(model_id)
+        self._model = _load_model(SentenceTransformer, model_id)
         # sentence-transformers 6 renamed the accessor; support both so a
         # pinned older install still works.
         getter = getattr(self._model, "get_embedding_dimension", None) or (

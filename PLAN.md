@@ -473,6 +473,15 @@ without a measurement.
       Valid ids are `1.1`–`12.36` within the per-book counts. Labels are
       sparse, not exhaustive — see `eval/README.md` for the pooling protocol
       that makes this tractable, and why it has to follow Phase 2.
+      **Start from `eval/pool.py`, do not rewrite it.** It is the probe
+      script that produced the Phase 2 notes: model loaded once, a list of
+      queries, top-k ids with scores and first words per query, plus the
+      corpus-wide median and p90 so a score can be read against its
+      background. That is already most of the pooling tool. What it still
+      needs: read the draft queries from `golden_set.jsonl` instead of a
+      hard-coded list, take top-10 rather than top-5, run every
+      configuration in the grid rather than one, and write the union of
+      candidates per query to a file a human can judge in one sitting.
 - [ ] `eval/router_set.jsonl` is drafted (32 entries, already consistent with
       the `Intent` enum). Add the `safety` field, and **extend `out_of_scope`
       with hard cases**: five of the current seven (weather, a linked-list

@@ -39,6 +39,14 @@ def _load_model(cls, model_id: str):
     network each run and huggingface_hub warns about unauthenticated
     requests. Try the cache alone first; only if the model is not there yet
     fall through to a normal load, which downloads it."""
+    # transformers 5 prints a "Loading weights" tqdm bar while it reads the
+    # safetensors file — local work, a second or so, and noise on a CLI.
+    try:
+        from transformers.utils import logging as hf_logging
+
+        hf_logging.disable_progress_bar()
+    except ImportError:  # pragma: no cover
+        pass
     try:
         return cls(model_id, local_files_only=True)
     except OSError:

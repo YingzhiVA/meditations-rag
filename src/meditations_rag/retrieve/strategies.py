@@ -46,8 +46,12 @@ class RawQuery:
     Expected to perform poorly on vocabulary-gap queries — documenting HOW it
     fails (qualitative notes + golden-set numbers) is the 'before' picture."""
 
+    @property
+    def name(self) -> str:
+        return "raw"
+
     def expand(self, problem: str) -> list[str]:
-        raise NotImplementedError("Phase 2: return [problem]")
+        return [problem]
 
 
 class RewriteQuery:
@@ -68,6 +72,10 @@ class RewriteQuery:
 
     Prompt sketch: system sets the corpus's conceptual vocabulary; user asks
     for one restatement, no preamble."""
+
+    @property
+    def name(self) -> str:
+        return "rewrite"
 
     def expand(self, problem: str) -> list[str]:
         raise NotImplementedError("Phase 4: one llm call -> [rewritten_query]")
@@ -94,6 +102,10 @@ class HyDEQuery:
                situation: {problem}. Output only the passage."
     Cost: ~1 short completion per query."""
 
+    @property
+    def name(self) -> str:
+        return "hyde"
+
     def expand(self, problem: str) -> list[str]:
         raise NotImplementedError("Phase 4: one llm call -> [pseudo_passage]")
 
@@ -115,8 +127,19 @@ class MultiQuery:
     Consider returning the raw problem as one of the queries too (helps
     queries that were fine to begin with)."""
 
+    @property
+    def name(self) -> str:
+        return "multi"
+
     def expand(self, problem: str) -> list[str]:
         raise NotImplementedError("Phase 4: one llm call -> N reframings")
+
+
+STRATEGY_NAMES: tuple[str, ...] = ("raw",)  # Phase 4: + rewrite, hyde, multi
+
+
+class UnknownStrategyError(KeyError):
+    """No strategy is registered under that name."""
 
 
 def get_strategy(name: str, llm=None) -> QueryStrategy:
@@ -125,4 +148,10 @@ def get_strategy(name: str, llm=None) -> QueryStrategy:
     Phase 4 passes an llm.base.LLMClient through to the LLM-backed
     strategies — the provider is chosen by the caller (CLI --llm / the eval
     grid), never imported here."""
-    raise NotImplementedError("Phase 2")
+    if name == "raw":
+        return RawQuery()
+    if name in ("rewrite", "hyde", "multi"):
+        raise NotImplementedError(f"strategy {name!r} lands in Phase 4 — see PLAN.md")
+    raise UnknownStrategyError(
+        f"unknown strategy {name!r}; known: {', '.join(STRATEGY_NAMES)}"
+    )

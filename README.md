@@ -20,13 +20,20 @@ rigorous enough to say which of them actually helped and what each one cost.
 
 ## Status
 
-**Phase 1 (ingestion) done**; retrieval, routing and eval are still stubs.
-`meditations ingest` downloads the source text (cached) and writes 487
-passages to `data/passages.jsonl`; `tests/test_parse.py` pins the parser's
-invariants. See [PLAN.md](PLAN.md) for the phased implementation plan.
+**Phase 2 (baseline retrieval, routing, CLI) done**; the eval harness is next.
+`meditations ingest` writes 487 passages; `meditations index` embeds them with
+`bge-base` (BAAI/bge-base-en-v1.5) into an exact-cosine numpy index;
+`meditations "..."` routes the input (keyword router: chitchat / meta /
+in-scope, plus a safety floor) and retrieves. Qualitative notes on where
+raw-query retrieval fails, with the observed score distribution, are in
+[eval/results/phase-2-bge-base-raw-notes.md](eval/results/phase-2-bge-base-raw-notes.md).
+See [PLAN.md](PLAN.md) for the phased implementation plan.
 
 ```sh
 .venv/bin/meditations ingest
+.venv/bin/meditations index
+.venv/bin/meditations "I keep replaying an argument I lost and can't let it go"
+.venv/bin/meditations "hello"        # routed as chitchat — no retrieval
 .venv/bin/pytest
 ```
 
@@ -86,8 +93,8 @@ src/meditations_rag/
   ingest/download.py     fetch raw text from Gutenberg (cached)
   ingest/parse.py        raw text -> list[Passage]  (sequential-scan parser)
   corpus/store.py        Passage dataclass + JSONL persistence
-  route/base.py          Intent enum + Router protocol (pre-retrieval)
-  route/keyword.py       free deterministic baseline + fallback
+  route/base.py          Intent + SafetyFlag enums, Router protocol (pre-retrieval)
+  route/keyword.py       free deterministic router + the safety floor that always runs
   route/llm.py           LLM-backed router (any provider)
   embed/base.py          Embedder protocol (pluggable)
   embed/local.py         sentence-transformers implementation
@@ -95,14 +102,15 @@ src/meditations_rag/
   index/vector_index.py  build / persist / search vector index
   retrieve/strategies.py query -> retrieval queries (raw, rewrite, HyDE, multi)
   retrieve/rerank.py     optional rerank stage
-  retrieve/pipeline.py   composes route -> search -> fuse -> rerank
+  retrieve/safety.py     post-retrieval suppression, keyed by safety flag
+  retrieve/pipeline.py   composes route -> search -> fuse -> rerank -> safety
   llm/base.py            LLMClient protocol (pluggable provider)
   llm/hf.py              Apertus via HuggingFace Inference — the default
   llm/claude.py          Claude Sonnet — the eval comparator
   cli.py                 `meditations` entry point
 eval/                    golden set + router set + eval harness
 bench/ann_scaling.py     when does ANN start to pay? (exact search stays)
-tests/                   parser invariants etc.
+tests/                   parser, index/embedder and router invariants
 data/                    (gitignored) raw text, passages, indexes
 ```
 
@@ -119,7 +127,11 @@ checkout cannot carry it. See `CLAUDE.md` for the working conventions it
 enforces.
 
 Dependencies are uncommented in `pyproject.toml` phase by phase (see
-`PLAN.md`), so re-run the install when you start a new phase.
+`PLAN.md`), so re-run the install when you start a new phase. From Phase 2
+the install pulls `sentence-transformers`, which brings the CUDA build of
+torch (~2.5 GB); the first `meditations index` then downloads the
+`bge-base-en-v1.5` weights (~440 MB) into the HuggingFace cache. Both are
+one-time. The index is 487 × 768 float32 and builds in a couple of seconds.
 
 The default *LLM* path (Phase 4 onward) needs a **HuggingFace token**:
 
@@ -134,16 +146,17 @@ no terms to accept, no access request. Switching `config.py` to an
 `ANTHROPIC_API_KEY` is optional and only needed to run the Claude comparator
 column of the eval matrix.
 
-## Planned CLI
+## CLI
 
 ```
 $ meditations ingest                 # download + parse + store 487 passages
-$ meditations index --embedder local # embed passages, build index
+$ meditations index                  # embed passages with bge-base, build index
 $ meditations "I keep replaying an argument I lost and can't let it go"
-$ meditations "..." --strategy hyde --llm apertus --k 8 --all
+$ meditations "..." --k 8 --all --scores
 $ meditations "hello"                # routed as chitchat — no retrieval
 $ meditations show 11.18             # read one passage in full
-$ python eval/run_eval.py            # the comparison matrix + router table
+$ meditations "..." --strategy hyde --llm apertus   # Phase 4
+$ python eval/run_eval.py            # Phase 3: the comparison matrix + router table
 
 # with tracing:
 $ phoenix serve &

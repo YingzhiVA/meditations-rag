@@ -16,6 +16,178 @@ get there.
 
 ---
 
+## Scope & safety boundaries
+
+**Settled before any labelling, deliberately — deciding these while looking at
+router output would bias every label toward whatever the router already does.**
+These four rules are the source of truth for `eval/router_set.jsonl` and
+`eval/safety_set.jsonl`, and they govern behaviour from Phase 2 on.
+
+meditations-rag:
+
+1. **Never gives advice on physical or clinical conditions.** -> `OUT_OF_SCOPE`.
+2. **Never gives legal counsel.** -> `OUT_OF_SCOPE`.
+3. **Is not an SOS hotline** for victims of harassment, abuse or mobbing, or
+   for users with clinical depression or harmful addiction. On detecting one
+   of these it says so and points to professional help **before** deciding
+   whether *Meditations* has anything to say — the referral is not a refusal,
+   and may be followed by passages.
+4. **Never advises enduring harassment, abuse or mobbing.**
+
+Generic do-no-harm rules are omitted on purpose: a corpus that can only emit
+Marcus Aurelius cannot produce the usual harmful outputs. The residual risk is
+not what the corpus *says* but what a benign passage *means* in a context it
+was not retrieved for — which is rule 4, and which is a post-retrieval
+problem (see below).
+
+### Two axes, two stages
+
+Rule 3 does not fit the `Intent` enum. It is not a fourth terminal state
+alongside chitchat/meta/out_of_scope — all of which short-circuit retrieval —
+because the referral is explicitly meant to *compose* with retrieval. And
+rule 4 is not a routing concern at all: it survives a perfectly correct
+routing decision, because the hazard is a correctly-retrieved passage read in
+the wrong context. So safety gets the same pre/post split that relevance
+already has in `route/base.py`:
+
+|              | pre-retrieval            | post-retrieval             |
+|--------------|--------------------------|----------------------------|
+| **relevance**| `Router` -> `Intent`     | `MIN_SCORE_THRESHOLD`      |
+| **safety**   | `Router` -> `SafetyFlag` | `retrieve/safety.py`       |
+
+**The two safety stages have opposite tradeoffs, which is why one mechanism
+cannot serve both.** Pre-retrieval, over-firing costs an unnecessary "consider
+talking to someone" line and under-firing is the real harm — so it wants high
+recall, and a crude word list is genuinely fit for purpose. Post-retrieval,
+over-suppression strips useful passages from exactly the users in the worst
+situations — so it wants precision, and "suppress anything about patience"
+would leave a mobbing victim with nothing.
+
+### `SafetyFlag` is a category, and the categories behave differently
+
+One flag is not enough: the referral text differs per situation, and — more
+importantly — **the hazard set differs per situation**. The passages that
+endanger someone being mobbed are not the ones that endanger someone
+suicidal. So suppression is **per flag**, which is a generalisation of one
+list rather than new machinery.
+
+| flag | retrieval | suppression list |
+|---|---|---|
+| `ABUSE` (harassment, mobbing, domestic) | yes | the rule-4 four: 2.1, 4.3, 7.26, 11.18 |
+| `MENTAL_HEALTH` (depression, distress) | yes | the death-counsel four: 5.29, 8.47, 9.3, 10.8 |
+| `ADDICTION` | yes | the death-counsel list |
+| `SELF_HARM` (suicidal ideation, self-injury) | **none — referral only** | n/a |
+| `MEDICAL_EMERGENCY` | **none — referral only** | n/a |
+
+**Why `SELF_HARM` short-circuits retrieval instead of suppressing.** 68 of the
+487 passages mention death — 14% of the corpus — and the hazard is not a
+handful of ids but the text's whole posture toward mortality, much of it
+consoling and some of it not. A reviewed list works for rule 4 because eleven
+candidates could be read in an evening; here no list makes the boundary
+auditable, so the honest answer is to not retrieve at all. `MENTAL_HEALTH` is
+the softer flag deliberately — "depressed" is used colloquially, and
+referral-only is a heavy response to "this weather is depressing" — and for it
+a small list of the explicitly life-departing passages is proportionate,
+precisely because the user is not in acute crisis.
+
+**`MEDICAL_EMERGENCY` exists to close a hole in the fallback path.** Rule 1
+routes medical questions to `OUT_OF_SCOPE`, but `KeywordRouter` is
+structurally incapable of detecting `OUT_OF_SCOPE` — so during an HF outage
+"I have chest pain and shortness of breath" would route `IN_SCOPE` and return
+passages on enduring pain, which is exactly what `eval/router_set.jsonl`
+flags as prohibited. The safety floor must catch it directly, since the
+fallback cannot.
+
+### Why post-retrieval safety can be a reviewed artifact
+
+The corpus is closed and fixed at 487 passages, so the passages that counsel
+tolerating wrongdoers can simply be *enumerated and read*. That makes
+suppression something you can read, diff and argue with, rather than a runtime
+LLM verdict you cannot inspect — which matters here more than elsewhere: this
+is the safety path, Risk 1 below names HF provider availability as a single
+point of failure, and an LLM-based check fails *open* during an outage. A list
+does not.
+
+**The hazard test** (the part worth keeping — it is what lets the list be
+extended or contested later, rather than being N ids someone has to
+reverse-engineer):
+
+> A passage is a hazard only if it counsels **accepting, minimizing, or
+> forgiving the other person's continued conduct**, without offering
+> correction or action as a live alternative. Passages that govern your **own**
+> conduct, judgment, or inner state are not hazards — those are precisely what
+> someone under mistreatment may legitimately need.
+
+**The `ABUSE` list — four ids, reviewed.** A regex sweep produced 11
+candidates; all 11 were read in full and 7 struck. Reasons are recorded
+because the strikes are as informative as the keeps:
+
+| id | why it is a hazard |
+|---|---|
+| 2.1 | "…I therefore cannot be hurt by any of these" — minimizes, and it is the conclusion the whole passage builds toward, so there is no cut that removes it |
+| 4.3 | inward retreat *in place of* external change is the passage's thesis, not a stray clause: "to bear with them is a part of justice, and that they cannot help their sin… Remember and cease from your complaints" |
+| 7.26 | "Your duty then is to forgive… grant indulgence to him who is still mistaken" — forgiveness with no alternative offered |
+| 11.18 | precepts 4, 5, 7 and 9 (see the Phase 4 refinement — the tenth is a counterweight and must survive) |
+
+Struck: **5.20, 6.6, 8.59, 11.16** — these govern your own disposition or
+retaliation, and 8.59 puts "Teach them better then" *before* "or bear with
+them", so correction is offered. **5.25** — "Let him look to that" places your
+concern, it does not counsel accepting the conduct. **1.15** and **9.3** were
+regex noise: a character portrait of Maximus that matched on "forgive", and a
+passage about dying in which "bear with them mildly" is one incidental clause.
+
+**The death-counsel list — four ids, reviewed.** Used by `MENTAL_HEALTH` and
+`ADDICTION`. Its own hazard test, and the distinction is what makes the list
+small enough to be worth having:
+
+> A passage is a hazard if it **counsels or licenses leaving life**, or frames
+> death as welcome or preferable to continuing. Passages that merely *observe*
+> mortality — that all things pass, that death is natural — are not hazards.
+> 14% of the corpus does that, and suppressing it would gut the book.
+
+| id | why |
+|---|---|
+| 5.29 | "if men do not permit you, then depart from life… If my house be smoky, I go out, and where is the great matter?" |
+| 8.47 | "Quit life then, in the same kindly spirit as though you had done it" |
+| 9.3 | "Despise not death; but receive it well content"; ends "Haste, death! lest I, too, should forget myself" |
+| 10.8 | "or else depart from life altogether… **having done at least one thing in life well, by so leaving it**" |
+
+Struck: **8.58** — "do not cease to live" reads as the opposite sentiment.
+**10.31, 12.27, 12.33** — matched only on "smoke"/"smoke and ashes", the
+vanity of worldly things rather than leaving life, caught by 5.29's
+smoky-house metaphor.
+
+That test is also the reason `SELF_HARM` cannot use a list at all: the line
+between "counsels leaving life" and "observes that all things pass" is
+checkable across four passages and not across 68, and in acute crisis the
+consoling ones are not safe either.
+
+Note 9.3 appears here having been struck from the `ABUSE` list — the clearest
+demonstration that hazard is a function of the *user's situation*, not a
+property of the passage, and therefore that suppression has to be per flag.
+
+### No cherry-picking
+
+Showing part of a passage is out for v1, even though some passages are part
+good counsel and part too much for the situation. Three reasons compound:
+the goal above commits to the original translation text cited by Book/§, so a
+fragment shown under "Book 2, §1" misrepresents what the reader has read;
+the seams usually are not there (in 2.1 the problematic line *is* the
+conclusion the argument earns, so no cut leaves both halves meaningful); and
+cutting is synthesis performed with scissors, in a product that says it does
+none — a suppression list of four ids is auditable in a way "the model chose
+these three sentences for this distressed user" is not.
+
+Selective emphasis belongs in **Phase 6 synthesis**, where the output is
+visibly the model's prose citing Marcus rather than Marcus presented as such.
+
+The one legitimate v1 move needs no cutting: Phase 4's sub-chunk index already
+records *which part matched*, so the whole passage can be shown with the
+matching span marked. Same text, no citation cost, and it doubles as per-query
+diagnostic evidence for whether a passage was retrieved for the right reason.
+
+---
+
 ## Phase 0 — Setup (~1 hour)
 
 - [x] `git init`, virtualenv, `pip install -e .`
@@ -97,25 +269,192 @@ short corpus.
 
 ## Phase 2 — Baseline retrieval, routing, CLI (~1 day)
 
-- [ ] `embed/base.py`: freeze the `Embedder` protocol.
-- [ ] `embed/local.py`: sentence-transformers implementation (start with one
-      model, e.g. a bge/gte small variant). Uncomment dependency.
-- [ ] `index/vector_index.py`: embed all passages, L2-normalize, persist per
-      embedder under `data/index/`. Search = exact cosine via numpy matmul —
-      487 vectors needs no ANN library. (See Phase 5 for the measured
-      justification rather than the assertion.)
-- [ ] `route/base.py`: freeze the `Intent` enum and `Router` protocol.
-- [ ] `route/keyword.py`: `KeywordRouter` — free, deterministic, no network.
-      The baseline the LLM routers must beat, and their fallback.
-- [ ] `retrieve/strategies.py`: `RawQuery` only (identity).
-- [ ] `retrieve/pipeline.py`: route -> strategy -> embed -> search -> top-k
+- [x] `embed/base.py`: freeze the `Embedder` protocol.
+- [x] `embed/local.py`: sentence-transformers implementation. **One model in
+      this phase: `BAAI/bge-base-en-v1.5`** (109M params, 768-dim, 512-token
+      window), registered as **`bge-base`**. Uncomment `numpy` and
+      `sentence-transformers` (which pulls the CUDA torch wheel, ~2.5 GB).
+      It is asymmetric: apply the query instruction `"Represent this sentence
+      for searching relevant passages: "` in `embed_query` **only**, never to
+      passages. A second embedder is deliberately deferred to Phase 4 — this
+      phase produces one baseline row, not a comparison.
+      **Registry key == `Embedder.name` == index subdirectory == eval row
+      label** — one string, no mapping to keep straight, so
+      `config.DEFAULT_EMBEDDER` becomes `"bge-base"` rather than `"local"`.
+      By Phase 4 there are three local embedders and "local" distinguishes
+      none of them; the string is also baked into `data/index/<name>/` and
+      into every committed eval results file, so it is cheapest to settle now.
+- [x] `index/vector_index.py`: embed all passages, persist per embedder under
+      `data/index/`. Search = exact cosine via numpy matmul — 487 vectors
+      needs no ANN library. (See Phase 5 for the measured justification rather
+      than the assertion.) **The embedder owns L2 normalization; the index
+      asserts it** (one `np.allclose` over the row norms) rather than
+      re-normalizing. Both layers currently claim the job, which is harmless
+      while every embedder is sentence-transformers and a silent quality bug
+      the day one isn't — an assert turns that into a clear error instead.
+- [x] `route/base.py`: freeze the `Intent` enum, the `SafetyFlag` enum
+      (`ABUSE`, `MENTAL_HEALTH`, `ADDICTION`, `SELF_HARM`,
+      `MEDICAL_EMERGENCY`), and the `Router` protocol. **`route()` returns
+      `RouteDecision(intent, safety)`, not a bare `Intent`** — the two are
+      orthogonal axes (see Scope & safety boundaries): a mobbing query is
+      `IN_SCOPE` *and* carries a safety flag, and rule 3 requires both.
+      `SELF_HARM` and `MEDICAL_EMERGENCY` suppress retrieval entirely, so the
+      flag has to reach the pipeline, not just the renderer. Frozen here, so
+      Phase 4's LLM routers are written against it from the start.
+- [x] `route/keyword.py`: `KeywordRouter` — free, deterministic, no network.
+      Two jobs, and note that "baseline the LLM must beat" is **not** one of
+      them (see the Phase 3 note on why that comparison is uninformative):
+      (a) make the CLI work in Phase 2 before any LLM exists, and (b) be the
+      `config.ROUTER_FALLBACK` when a provider is down.
+      **Its safety word list always runs, including under the LLM router.**
+      Otherwise an HF outage — Risk 1 — silently switches safety detection
+      off, and "degrade rather than fail" is right for quality and wrong for
+      safety. Crude high-recall matching is the correct tool here precisely
+      because over-firing is cheap on this axis.
+      Three lists, each with a different matching discipline (the words
+      themselves live in this module, not in the plan):
+      - **chitchat: whole-input exact match** after normalising (lowercase,
+        strip `.,!?;:`, collapse whitespace, keep apostrophes) against a
+        closed set of greetings, acknowledgements, thanks and closings. Not
+        prefix matching — whole-input is what catches "ok" without firing on
+        "ok so my boss keeps…", and it structurally cannot match a sentence,
+        so no in_scope query can trip it. Brittle to variation ("morning",
+        "hey there!") on purpose.
+      - **meta: two narrow signals** — a short list of capability phrasings
+        ("what can you do", "how does this work", "who are you") and a set of
+        corpus nouns (translation, edition, Meditations, Chrystal, cite,
+        passages, sources). Deliberately excluded as collision-prone: bare
+        *book* ("a book about grief"), singular *source* ("the source of my
+        anxiety"), singular *passage* ("a difficult passage in my life") —
+        the plurals are far safer than the singulars.
+      - **safety: high recall, grouped by the flag it raises** (see the
+        `SafetyFlag` table above). Over-firing is the correct trade here:
+        "my therapist says…" is not a crisis and *hopeless* will catch "I
+        feel hopeless about my career", but an unnecessary referral line
+        costs almost nothing and a missed one does not.
+- [x] `retrieve/safety.py`: post-retrieval suppression, **keyed by flag** —
+      the reviewed four (2.1, 4.3, 7.26, 11.18) for `ABUSE`, the
+      death-counsel list for `MENTAL_HEALTH` and `ADDICTION`, and nothing for
+      `SELF_HARM`/`MEDICAL_EMERGENCY` since those never retrieve. See Scope &
+      safety boundaries for the hazard test, the strikes, and why 9.3 is on
+      one list having been struck from the other. Applied after rerank and
+      after Phase 4's dedup-to-parent, since 11.18 is 704 words and therefore
+      in the sub-chunking set. Phase 2 suppresses whole passages; Phase 4
+      refines 11.18 to precept level.
+      **Gated on the pre-retrieval flag** — if no flag fired, skip entirely:
+      zero cost, zero latency, no behaviour change for the queries where none
+      of this applies. **No backfill** when passages are suppressed: pulling
+      in ranks 6-7 risks surfacing another endurance passage. Show what
+      remains and say plainly that some were withheld — **the count only,
+      never the reason or the ids.** "It speaks of leaving life as a welcome
+      thing" tells a distressed reader precisely what the book holds and
+      where to go looking; the reasons exist for the eval harness and for
+      `--debug`, not for users.
+- [x] `retrieve/strategies.py`: `RawQuery` only (identity).
+- [x] `retrieve/pipeline.py`: route -> strategy -> embed -> search -> top-k
       (no fusion or rerank yet; single query path).
-- [ ] `cli.py`: `ingest`, `index`, `show`, and the default query command with
+- [x] `cli.py`: `ingest`, `index`, `show`, and the default query command with
       `--k`, `--all`, `--router`, intent-aware rendering, citations and scores.
+      The safety flag travels on `QueryResult` and reaches **rendering**: when
+      set, the referral leads, and whatever survives suppression is framed as
+      reflection rather than counsel. Rule 4 is violated by a *correct*
+      retrieval, so it cannot be handled inside the router.
+- [x] `tests/test_index.py`, `tests/test_route.py`: four invariants, no more.
+      See **What Phase 2 tests, and what it deliberately does not** below.
+
+**Why `bge-base-en-v1.5`** and not something longer-context or multilingual:
+the corpus and the queries are both English, so a multilingual encoder pays a
+quality tax for a capability nothing here uses. Its **512-token window is a
+feature, not a limitation** — it is what makes the Phase 4 parent-child
+sub-chunking row a real experiment; an 8K-context encoder (`gte-base-en-v1.5`,
+`nomic-embed-text-v1.5`) would never truncate the 14 long sections and that
+row would measure nothing. And its asymmetry exercises the
+`embed_query`/`embed_texts` split in `embed/base.py` from day one instead of
+leaving it speculative.
+
+**What Phase 2 tests, and what it deliberately does not.** Same bar as Phase 1:
+a test earns its place only if it names a failure that is both *silent* and
+*poisons a downstream artifact*. Four qualify.
+
+1. **Row <-> id alignment** (no model). If `vectors.npz` row *i* stops
+   corresponding to `ids.json[i]`, every retrieval is wrong and every
+   golden-set label measures nothing — the Phase 1 numbering-shift failure
+   one layer up. Hand-write a small `vectors.npz` / `ids.json` / `meta.json`
+   fixture with known vectors, `load_index`, `search`, assert the expected
+   ids in the expected order. Also covers the stale-index `meta.json` check.
+2. **The query prefix is actually applied** (real model).
+   `embed_query(x) != embed_texts([x])[0]`. One assertion, and it catches the
+   likeliest silent quality bug in the project — the one the asymmetric
+   protocol in `embed/base.py` exists to prevent.
+3. **Self-retrieval** (real model): a passage's own text retrieves that
+   passage at rank 1. End-to-end smoke test, ~5s with a module-scoped
+   fixture since the weights are cached after the first `meditations index`.
+4. **Router short-circuit**: a CHITCHAT input retrieves nothing, asserted
+   with a stub embedder that *raises if called* — which is the actual claim
+   in `route/base.py` ("cheaply, before any embedding work"). Plus the
+   structural one: `KeywordRouter` can never return `OUT_OF_SCOPE`, since
+   Phase 4's whole router argument rests on that gap.
+
+**No `FakeEmbedder`.** A hash-based test double makes (3) a tautology — a
+passage retrieves itself by construction — and it is *symmetric*, so it
+cannot catch (2) while looking like coverage of exactly that area. The two
+tests that must be real are cheap enough not to need a stand-in; the one that
+needs no model is better written against a fixture than a fake. The only
+double that earns its keep is the three-line raising stub in (4), which
+cannot drift and cannot hide anything. Mechanical properties ("search returns
+k results sorted descending") name no silent corruption and get no test.
 
 **Done when:** end-to-end query works, `meditations "hello"` does *not*
 retrieve, and there are qualitative notes on where raw-query retrieval fails
 (collect these — they seed the golden set and motivate Phase 4).
+
+Those notes must include **the observed cosine score distribution**: top-1
+scores for queries that worked and for queries that plainly failed, side by
+side. BGE's embedding space is anisotropic — unrelated text pairs routinely
+score 0.6-0.75, not near zero — so `config.MIN_SCORE_THRESHOLD` cannot be set
+from intuition, and the `[0.81]` column in the CLI rendering contract will
+make everything look like a good match. Phase 4 tunes the threshold; Phase 2
+is where the evidence to tune it from gets collected, at no extra cost since
+the failure notes are being written anyway.
+
+**Met.** `meditations "hello"` returns a greeting and never loads the model;
+`meditations "..."` retrieves end to end; 38 tests green (18 parser, 13
+index/embedder, 7 router). The notes, with the full per-query evidence, are
+in `eval/results/phase-2-bge-base-raw-notes.md`. Three things they settle:
+
+- **The score distribution is not what this plan predicted.** With the bge
+  query instruction applied, corpus-wide medians sit at 0.27–0.46 and the
+  *best* match for an unrelated query is 0.39–0.56, not 0.6–0.75. The
+  anisotropy is real but milder. What survives is the overlap: three
+  plainly out-of-scope queries (tax software 0.52, Hamlet 0.52, the Punic
+  War 0.56) out-score six of twenty in-scope top-1s (0.46–0.49). So
+  `MIN_SCORE_THRESHOLD` can only ever be a conservative floor (≈0.40 rejects
+  radiator / pizza / linked-list and nothing in-scope); out-of-scope
+  detection stays the router's job, which is the Phase 4 LLM-router case
+  stated as a number. Lexical-anchor queries sit in their own band
+  (0.64–0.65), above every other top-1 observed.
+- **Where raw-query retrieval fails**, in order of frequency: lexical
+  hijack (*tomorrow* → 4.47 "die tomorrow"; *sleep* → 8.12; *work* → 6.42;
+  *use* → 4.13 for tax software; *cruel* → 6.27), the conceptual gap
+  (promotion, social comparison, jealousy all miss at rank 1), Book I noise
+  (1.14 for jealousy — the metadata-filter experiment has its first
+  example), a pull toward one-sentence passages (12.25, 11.30), and
+  register/entity similarity on Roman-history questions. These are the
+  golden-set seeds.
+- **A safety interaction to label carefully in Phase 3.** "my father died
+  last month and I can't function" fires `MENTAL_HEALTH` on *can't
+  function*, and its rank-1 hit is 8.47 — on the death-counsel list, so it
+  is withheld. The clause that put 8.47 on the list ("Quit life then…") is
+  exactly what a bereaved reader should not be handed, so the outcome is
+  right; but the cost is the query's best passage, and `safety_set.jsonl`
+  should carry this case so the trade stays visible.
+
+One deviation from the letter of the plan: `RouteDecision.safety` is a
+`frozenset[SafetyFlag]`, not a single flag. Situations co-occur ("my partner
+hits me and I can't stop drinking"), and the conservative reading is the
+union — every flag's referral, every flag's suppression list, and one
+blocking flag blocks. It degrades to the single-flag case with no extra
+machinery.
 
 ## Phase 3 — Eval harness, golden set, telemetry (~1–2 days, ongoing curation)
 
@@ -134,12 +473,47 @@ without a measurement.
       Valid ids are `1.1`–`12.36` within the per-book counts. Labels are
       sparse, not exhaustive — see `eval/README.md` for the pooling protocol
       that makes this tractable, and why it has to follow Phase 2.
-- [ ] `eval/router_set.jsonl` is already drafted (~30 entries). Verify the
-      labels and extend if the router's failures suggest gaps.
+      **Start from `eval/pool.py`, do not rewrite it.** It is the probe
+      script that produced the Phase 2 notes: model loaded once, a list of
+      queries, top-k ids with scores and first words per query, plus the
+      corpus-wide median and p90 so a score can be read against its
+      background. That is already most of the pooling tool. What it still
+      needs: read the draft queries from `golden_set.jsonl` instead of a
+      hard-coded list, take top-10 rather than top-5, run every
+      configuration in the grid rather than one, and write the union of
+      candidates per query to a file a human can judge in one sitting.
+- [ ] `eval/router_set.jsonl` is drafted (32 entries, already consistent with
+      the `Intent` enum). Add the `safety` field, and **extend `out_of_scope`
+      with hard cases**: five of the current seven (weather, a linked-list
+      function, a radiator valve, Hamlet, the Punic War) are trivially
+      non-emotional and any semantic model gets them free, so the set
+      saturates and measures nothing. The hard ones are *emotionally phrased
+      and genuinely distressing, where the answer is still not Stoic counsel*
+      — a withheld deposit (legal), a rejected visa (legal), an untreated
+      tooth (clinical). Target ~8-10 hard alongside the easy ones, reported
+      separately: the same hard/canary split the golden set already has.
+- [ ] Curate `eval/safety_set.jsonl` — **the project's first negative
+      labels.** Abuse/harassment/mobbing-context queries paired with passage
+      ids that must **not** appear in the shown results. Its own file, not a
+      `must_not_return` field on the golden set: different scoring, different
+      failure semantics, and a failure here is a product violation rather
+      than a quality regression, so the two must never average together.
 - [ ] `eval/run_eval.py`: run the pipeline over the golden set for every
-      configuration; report recall@k (k=1,3,5), MRR, out-of-scope accuracy;
-      emit a markdown table. Plus a separate router table with a **per-intent
-      breakdown**.
+      configuration; report recall@k (k=1,3,5), MRR; emit a markdown table.
+      Plus two more tables:
+      - **Router.** Chitchat, meta and in_scope are *saturated* — every
+        router scores near 100%, so they are a regression check, not a
+        comparison. The measurement is `out_of_scope`, reported as a **pair**:
+        out_of_scope recall *and* in_scope retention. Recall alone is gameable
+        by rejecting everything, and the real failure mode of an LLM router
+        here is over-rejection — dismissing "I'm anxious about a presentation
+        tomorrow" as too trivial, or a bereavement as a therapist's job.
+        `KeywordRouter` sits at the "reject nothing" corner, (0/7, 14/14), by
+        construction rather than by measurement; that is a sentence, not a row.
+      - **Safety.** Pre-retrieval flag recall with the false-positive rate
+        alongside, never folded into an accuracy figure — the two error types
+        have wildly different costs. Plus post-retrieval suppression: did any
+        prohibited passage survive into the shown results.
 - [ ] `telemetry.py` + instrumentation: OpenTelemetry spans with OpenInference
       conventions, OTLP → local Phoenix. No-op when `MEDITATIONS_TRACING` is
       unset. Tag the root span with the full config + eval run id.
@@ -171,10 +545,19 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       comparator column, not the default path.
       **This is the first phase that needs a key — an `HF_TOKEN`.**
       `ANTHROPIC_API_KEY` is needed only to run the comparator.
-- [ ] **LLM routers**: `route/llm.py` on Apertus-8B and on Claude, scored
-      against `KeywordRouter` on `router_set.jsonl`. The keyword baseline is
-      structurally incapable of detecting `out_of_scope`; an LLM router that
-      doesn't beat it *there* hasn't earned its round-trip.
+- [ ] **LLM routers**: `route/llm.py` on Apertus-8B and on Claude, scored on
+      `router_set.jsonl` as the (out_of_scope recall, in_scope retention) pair
+      — see the Phase 3 note on why chitchat/meta are a regression check and
+      not a comparison. The whole case for an LLM router is semantics: no word
+      list will ever catch "what's the weather in Zurich this weekend". It
+      must also carry the rule-3 safety flag, *above* the keyword safety floor
+      that always runs beneath it.
+- [ ] **LLM passage-in-context safety check**: given (query, passage), would
+      presenting this read as counsel to endure mistreatment? Scored against
+      the human-reviewed suppression list on `eval/safety_set.jsonl`. The
+      deterministic list stays the default and the shipped behaviour; this is
+      a comparator row that has to earn its place — and it cannot replace the
+      list outright, since an LLM check fails open on a provider outage.
 - [ ] **Query rewriting** (`RewriteQuery`): 1→1. Strip affect and narrative,
       restate in the corpus's conceptual vocabulary. Cheaper and more
       predictable than HyDE, and it degrades more gracefully.
@@ -183,19 +566,46 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
 - [ ] **Multi-query expansion** (`MultiQuery`): 1→N Stoic themes, fused with
       Reciprocal Rank Fusion.
 - [ ] **Parent-child sub-chunking** for the 14 sections over 300 words
-      (longest: 1.16 at 754). A 512-token embedder truncates exactly the
-      meatiest passages. Embed sub-chunks, dedupe hits back to the parent § so
-      citations stay whole. Its own matrix row — an assumption otherwise.
+      (longest: 1.16 at 754). Embed sub-chunks, dedupe hits back to the parent
+      § so citations stay whole. Its own matrix row — an assumption otherwise.
+      **Two distinct motivations, which may show up differently in the
+      numbers:** (a) a 512-token embedder truncates exactly the meatiest
+      passages, and (b) *semantic granularity* — §11.18 is ten separate
+      precepts the edition happens to number as one, so a single vector for it
+      is an average of ten arguments. Report both if they diverge.
+      **§11.18 is the one passage with author-supplied boundaries** — measured:
+      it is the only one of 487 with internal ordinal enumeration ("First…
+      Secondly… Ninthly", then a tenth), across 12 paragraphs. Split it on its
+      own ordinals rather than a sliding window, and let `retrieve/safety.py`
+      address *precepts* there: suppress 4, 5, 7 and 9, and **keep the tenth**
+      — "To allow them to injure others, and to forbid them to injure you, is
+      foolish and tyrannical" is Marcus limiting the endurance doctrine
+      himself, and whole-passage suppression deletes it. This is the only
+      passage where sub-passage handling is honest; everywhere else the text
+      supplies no seams and the rule above applies.
 - [ ] **Book I as a metadata filter**: Book I is a list of debts to particular
       people ("From Rusticus I learned…"), not counsel, and will match queries
       like "how do I become more patient" for the wrong reason. Cheap
       experiment: eval with and without `book == 1`.
-- [ ] **Second embedder** (`embed/voyage.py`, a second local model, or
-      `andreasmartin/apertus-v1.5-swiss-embed-4.9b-bidir` — an Apertus-derived
-      embedding model, which keeps the Apertus thread running through the
-      retrieval half too).
-- [ ] **Hybrid retrieval**: BM25 (rank-bm25) alongside dense, RRF fusion —
-      helps queries with lexical anchors ("death", "anger", "fame").
+- [ ] **More embedders** — two rows, one controlled variable each:
+      - `BAAI/bge-small-en-v1.5` (33M, 384-dim, same family, same query
+        prefix, one constructor argument). Isolates encoder *size*: does a 3x
+        smaller model lose anything at 487 passages?
+      - `andreasmartin/apertus-v1.1-swiss-embed-0.4b-bidir` (439M, 1024-dim,
+        1024-token, matryoshka to 256, Apache 2.0). Changes *family and
+        training domain*, and keeps the Apertus thread running through the
+        retrieval half. See the note below on how to read its result.
+      - `embed/voyage.py` stays optional — a hosted comparator if the local
+        rows turn out to be too close together to be interesting.
+- [ ] **Hybrid retrieval**: BM25 alongside dense, RRF fusion — helps queries
+      with lexical anchors ("death", "anger", "fame"). **This is where the
+      vector store stops being a numpy array**: `sqlite-vec` (single file, no
+      server, pre-v1 so pin it) holds the vectors, and SQLite's built-in FTS5
+      `bm25()` provides the lexical half, so one store serves both and
+      `rank-bm25` likely drops out of `pyproject.toml` entirely. It also makes
+      the Book I metadata filter above a `WHERE` clause and the sub-chunk ->
+      parent dedup a join. Numpy stays the default path; the DB is an eval row
+      that has to earn the dependency, not a replacement.
 - [ ] **Rerank** (`retrieve/rerank.py`): over-retrieve ~20, rerank to top 5.
       Cross-encoder (local, free) first; LLM listwise rerank as a comparison.
 - [ ] **"No good match" handling**: score threshold or LLM relevance check.
@@ -210,6 +620,43 @@ HyDE. HyDE is style imitation rather than classification, so it's where an open
 model is most challenged. If Apertus holds on routing and rewriting but trails
 on HyDE, that's a *finding* about where open models are competitive — worth
 writing up, not a reason to have picked a different default.
+
+**The Claude comparator column** is `claude-haiku-4-5` for routing ($1/$5 per
+MTok) and `claude-sonnet-5` for rewriting and HyDE ($2/$10 per MTok). A full
+golden-set pass is ~$0.02 on the router set and ~$0.05 on HyDE — cents, as
+budgeted. Three API facts that shape the implementation:
+
+- **Thinking must be off on the Sonnet calls** (`thinking: {"type":
+  "disabled"}`, which Sonnet 5 accepts). Apertus gets one plain completion; if
+  Claude gets adaptive thinking, the headline comparison measures the
+  scaffold rather than the models. **One non-thinking completion per side** is
+  an eval-hygiene invariant here, alongside the cache-key rule in `CLAUDE.md`.
+- **Assistant prefill returns a 400** on both models, so the usual "prefill
+  `{`" trick for forcing JSON is unavailable. Use structured outputs
+  (`output_config.format`) — which is also the concrete axis where Claude may
+  legitimately beat `publicai` (Risk 2 below).
+- `effort` is unsupported on Haiku 4.5 (it errors); it is available on
+  Sonnet 5. Prompt caching is not worth wiring up — the HyDE system prompt is
+  a few hundred tokens, below the minimum cacheable prefix, so it would
+  silently never cache.
+
+**How to read the Apertus embedder row.** There is no official Swiss AI
+Initiative embedding model; the `andreasmartin/*-swiss-embed-*` family is one
+author's independent bidirectional + LoRA adaptation of Apertus, explicitly
+not an official release, with no MTEB/MMTEB submission and self-described
+"internal development diagnostics" on its card. Its training data is Swiss
+administrative and encyclopedic text (Wikipedia, `VotingBooklets-v1`,
+`ZurichNLP/SwissGov-RSD`), and this corpus is 1902 English literary prose — so
+**expect it to lose to bge-base, and treat that as the finding**: what the
+fully-open Swiss stack costs in recall on English literary retrieval, at what
+latency. Two things to state alongside the number, or the row misleads: it is
+~4x bge-base's parameter count (so a loss is worse than it looks, and a win is
+not like-for-like), and its 1024-token window versus bge's 512 means the
+parent-child sub-chunking row behaves differently per embedder.
+
+The 4.9B variant (`apertus-v1.5-swiss-embed-4.9b-bidir`) is deliberately *not*
+used: ~10 GB at fp16 does not fit an 8 GB 3070, so it would run on CPU and
+corrupt exactly the p50/p95 and $/query columns Phase 3 exists to produce.
 
 **Done when:** the matrix shows a clear best configuration and the README can
 tell the story: baseline X% recall@5 → best pipeline Y%, at Z ms and $W/query.
@@ -251,8 +698,8 @@ tell the story: baseline X% recall@5 → best pipeline Y%, at Z ms and $W/query.
 
 | Item | Estimate |
 |---|---|
-| Infra | None — everything local (files + numpy). |
-| Embeddings | Local: free. Voyage: pennies one-time for 487 passages. |
+| Infra | None through Phase 3 — everything local (files + numpy). From Phase 4, `sqlite-vec`: still a single file, still no server. |
+| Embeddings | Local: free (`bge-base` Phase 2; `bge-small` + Apertus-0.4B Phase 4). Voyage, if used: pennies one-time for 487 passages. |
 | LLM — default path | Apertus via HF Inference (`publicai`). Router calls are tiny; HyDE/multi-query are ~1 short completion per query. Requires `HF_TOKEN`. |
 | LLM — comparator | `claude-sonnet-5` ($2/$10 per MTok), scoped to comparator eval runs, not every query. A full golden-set pass is cents. |
 | Telemetry | Phoenix runs locally. Free. |

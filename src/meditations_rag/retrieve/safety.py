@@ -70,8 +70,10 @@ def suppressed_ids(flags: frozenset[SafetyFlag]) -> frozenset[str]:
 
 
 # Why a withheld passage is withheld — one sentence per LIST, not per flag,
-# since two flags share the death-counsel list. Rendered verbatim by the
-# front end after "N passages withheld:".
+# since two flags share the death-counsel list. For diagnostics and the eval
+# harness, NOT for users: telling a MENTAL_HEALTH-flagged reader that a
+# passage "speaks of leaving life as a welcome thing" points them at exactly
+# the text the list withholds. The CLI shows it only under --debug.
 SUPPRESSION_REASON: dict[SafetyFlag, str] = {
     SafetyFlag.ABUSE: "counsels bearing with the conduct of others",
     SafetyFlag.MENTAL_HEALTH: "speaks of leaving life as a welcome thing",

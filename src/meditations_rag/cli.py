@@ -148,6 +148,9 @@ def _add_query_parser(sub: argparse._SubParsersAction, config) -> argparse.Argum
     p.add_argument("--llm", default=None, help="LLM provider (see llm/; Phase 4)")
     p.add_argument("--scores", action="store_true",
                    help="also print the cosine score of each passage")
+    p.add_argument("--debug", action="store_true",
+                   help="append routing and safety diagnostics (flags fired, withheld "
+                        "ids and why) — for development and eval, not for users")
     return p
 
 
@@ -308,24 +311,31 @@ def _render_referral(flags) -> str:
 
 
 def _withheld_notice(result) -> str:
-    """Say plainly what was withheld and why. The why is per list (see
-    retrieve/safety.py); this composes the sentence."""
+    """Say that passages were withheld, and no more. The reason is
+    deliberately NOT shown: for a reader flagged MENTAL_HEALTH, "it speaks of
+    leaving life as a welcome thing" is a signpost to exactly the text the
+    list exists to keep away from them. Ids and reasons are available with
+    --debug (and on QueryResult.withheld for the eval harness)."""
+    n = len(result.withheld)
+    return f"{n} passage{'s' if n != 1 else ''} withheld."
+
+
+def _debug_block(result) -> str:
+    """Diagnostics for development and eval: everything the user-facing
+    rendering leaves out on purpose."""
     from meditations_rag.retrieve.safety import withheld_reasons
 
-    n = len(result.withheld)
-    why = " or ".join(withheld_reasons(result.safety, result.withheld)) or (
-        "is not advice for this situation"
-    )
-    subject = "it" if n == 1 else "each"
-    # The ids are deliberately not printed: they stay on QueryResult.withheld
-    # for the eval harness, but a referral is not the place to hand someone a
-    # pointer to the exact passage that was withheld from them.
-    return textwrap.fill(
-        f"{n} passage{'s' if n != 1 else ''} withheld: {subject} {why}, "
-        "which is not advice for this situation. Nothing was pulled in to replace "
-        f"{'it' if n == 1 else 'them'}.",
-        WRAP,
-    )
+    lines = [f"[debug] intent: {result.intent.value}"]
+    flags = ", ".join(f.value for f in sorted(result.safety, key=lambda f: f.value)) or "none"
+    lines.append(f"[debug] safety flags: {flags}")
+    if result.queries:
+        lines.append("[debug] embedded: " + " | ".join(repr(q) for q in result.queries))
+    if result.withheld:
+        reasons = "; ".join(withheld_reasons(result.safety, result.withheld))
+        lines.append(f"[debug] withheld: {', '.join(result.withheld)} — {reasons}")
+    if result.no_strong_match:
+        lines.append("[debug] no_strong_match: True")
+    return "\n".join(lines)
 
 
 def _preview(p) -> str:
@@ -366,10 +376,12 @@ def cmd_query(args: argparse.Namespace) -> None:
     except KeyError as exc:  # UnknownEmbedderError, raised lazily inside run_query
         raise CLIError(exc.args[0]) from None
 
-    print(render_result(result, show_all=args.all, show_scores=args.scores))
+    print(render_result(result, show_all=args.all, show_scores=args.scores,
+                        debug=args.debug))
 
 
-def render_result(result, *, show_all: bool = False, show_scores: bool = False) -> str:
+def render_result(result, *, show_all: bool = False, show_scores: bool = False,
+                  debug: bool = False) -> str:
     """The rendering contract; a pure function so it can be eyeballed in
     tests and reused by anything that is not a terminal."""
     out: list[str] = []
@@ -382,18 +394,18 @@ def render_result(result, *, show_all: bool = False, show_scores: bool = False) 
         if not result.safety:
             out.append("Hello. Describe what is troubling you and I will look for "
                        "what Marcus Aurelius wrote that speaks to it.")
-        return "\n\n".join(out)
+        return _finish(out, result, debug)
     if result.intent is Intent.META:
         out.append(_META_TEXT.rstrip())
-        return "\n\n".join(out)
+        return _finish(out, result, debug)
     if result.intent is Intent.OUT_OF_SCOPE:
         out.append(_OUT_OF_SCOPE_TEXT.rstrip())
-        return "\n\n".join(out)
+        return _finish(out, result, debug)
 
     # IN_SCOPE.
     if not result.retrieved:
         # A blocking safety flag: referral only, by design.
-        return "\n\n".join(out)
+        return _finish(out, result, debug)
 
     if result.no_strong_match:
         out.append("No strong match found — Marcus may be silent on this. "
@@ -435,4 +447,10 @@ def render_result(result, *, show_all: bool = False, show_scores: bool = False) 
                     f"one in full, or `meditations show {first}` to read one)")
     if tail:
         out.append("\n".join(tail))
+    return _finish(out, result, debug)
+
+
+def _finish(out: list[str], result, debug: bool) -> str:
+    if debug:
+        out.append(_debug_block(result))
     return "\n\n".join(out)

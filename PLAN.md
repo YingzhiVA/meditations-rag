@@ -269,8 +269,8 @@ short corpus.
 
 ## Phase 2 — Baseline retrieval, routing, CLI (~1 day)
 
-- [ ] `embed/base.py`: freeze the `Embedder` protocol.
-- [ ] `embed/local.py`: sentence-transformers implementation. **One model in
+- [x] `embed/base.py`: freeze the `Embedder` protocol.
+- [x] `embed/local.py`: sentence-transformers implementation. **One model in
       this phase: `BAAI/bge-base-en-v1.5`** (109M params, 768-dim, 512-token
       window), registered as **`bge-base`**. Uncomment `numpy` and
       `sentence-transformers` (which pulls the CUDA torch wheel, ~2.5 GB).
@@ -284,7 +284,7 @@ short corpus.
       By Phase 4 there are three local embedders and "local" distinguishes
       none of them; the string is also baked into `data/index/<name>/` and
       into every committed eval results file, so it is cheapest to settle now.
-- [ ] `index/vector_index.py`: embed all passages, persist per embedder under
+- [x] `index/vector_index.py`: embed all passages, persist per embedder under
       `data/index/`. Search = exact cosine via numpy matmul — 487 vectors
       needs no ANN library. (See Phase 5 for the measured justification rather
       than the assertion.) **The embedder owns L2 normalization; the index
@@ -292,7 +292,7 @@ short corpus.
       re-normalizing. Both layers currently claim the job, which is harmless
       while every embedder is sentence-transformers and a silent quality bug
       the day one isn't — an assert turns that into a clear error instead.
-- [ ] `route/base.py`: freeze the `Intent` enum, the `SafetyFlag` enum
+- [x] `route/base.py`: freeze the `Intent` enum, the `SafetyFlag` enum
       (`ABUSE`, `MENTAL_HEALTH`, `ADDICTION`, `SELF_HARM`,
       `MEDICAL_EMERGENCY`), and the `Router` protocol. **`route()` returns
       `RouteDecision(intent, safety)`, not a bare `Intent`** — the two are
@@ -301,7 +301,7 @@ short corpus.
       `SELF_HARM` and `MEDICAL_EMERGENCY` suppress retrieval entirely, so the
       flag has to reach the pipeline, not just the renderer. Frozen here, so
       Phase 4's LLM routers are written against it from the start.
-- [ ] `route/keyword.py`: `KeywordRouter` — free, deterministic, no network.
+- [x] `route/keyword.py`: `KeywordRouter` — free, deterministic, no network.
       Two jobs, and note that "baseline the LLM must beat" is **not** one of
       them (see the Phase 3 note on why that comparison is uninformative):
       (a) make the CLI work in Phase 2 before any LLM exists, and (b) be the
@@ -332,7 +332,7 @@ short corpus.
         "my therapist says…" is not a crisis and *hopeless* will catch "I
         feel hopeless about my career", but an unnecessary referral line
         costs almost nothing and a missed one does not.
-- [ ] `retrieve/safety.py`: post-retrieval suppression, **keyed by flag** —
+- [x] `retrieve/safety.py`: post-retrieval suppression, **keyed by flag** —
       the reviewed four (2.1, 4.3, 7.26, 11.18) for `ABUSE`, the
       death-counsel list for `MENTAL_HEALTH` and `ADDICTION`, and nothing for
       `SELF_HARM`/`MEDICAL_EMERGENCY` since those never retrieve. See Scope &
@@ -345,17 +345,21 @@ short corpus.
       zero cost, zero latency, no behaviour change for the queries where none
       of this applies. **No backfill** when passages are suppressed: pulling
       in ranks 6-7 risks surfacing another endurance passage. Show what
-      remains and say plainly that some were withheld.
-- [ ] `retrieve/strategies.py`: `RawQuery` only (identity).
-- [ ] `retrieve/pipeline.py`: route -> strategy -> embed -> search -> top-k
+      remains and say plainly that some were withheld — **the count only,
+      never the reason or the ids.** "It speaks of leaving life as a welcome
+      thing" tells a distressed reader precisely what the book holds and
+      where to go looking; the reasons exist for the eval harness and for
+      `--debug`, not for users.
+- [x] `retrieve/strategies.py`: `RawQuery` only (identity).
+- [x] `retrieve/pipeline.py`: route -> strategy -> embed -> search -> top-k
       (no fusion or rerank yet; single query path).
-- [ ] `cli.py`: `ingest`, `index`, `show`, and the default query command with
+- [x] `cli.py`: `ingest`, `index`, `show`, and the default query command with
       `--k`, `--all`, `--router`, intent-aware rendering, citations and scores.
       The safety flag travels on `QueryResult` and reaches **rendering**: when
       set, the referral leads, and whatever survives suppression is framed as
       reflection rather than counsel. Rule 4 is violated by a *correct*
       retrieval, so it cannot be handled inside the router.
-- [ ] `tests/test_index.py`, `tests/test_route.py`: four invariants, no more.
+- [x] `tests/test_index.py`, `tests/test_route.py`: four invariants, no more.
       See **What Phase 2 tests, and what it deliberately does not** below.
 
 **Why `bge-base-en-v1.5`** and not something longer-context or multilingual:
@@ -412,6 +416,45 @@ from intuition, and the `[0.81]` column in the CLI rendering contract will
 make everything look like a good match. Phase 4 tunes the threshold; Phase 2
 is where the evidence to tune it from gets collected, at no extra cost since
 the failure notes are being written anyway.
+
+**Met.** `meditations "hello"` returns a greeting and never loads the model;
+`meditations "..."` retrieves end to end; 38 tests green (18 parser, 13
+index/embedder, 7 router). The notes, with the full per-query evidence, are
+in `eval/results/phase-2-bge-base-raw-notes.md`. Three things they settle:
+
+- **The score distribution is not what this plan predicted.** With the bge
+  query instruction applied, corpus-wide medians sit at 0.27–0.46 and the
+  *best* match for an unrelated query is 0.39–0.56, not 0.6–0.75. The
+  anisotropy is real but milder. What survives is the overlap: three
+  plainly out-of-scope queries (tax software 0.52, Hamlet 0.52, the Punic
+  War 0.56) out-score six of twenty in-scope top-1s (0.46–0.49). So
+  `MIN_SCORE_THRESHOLD` can only ever be a conservative floor (≈0.40 rejects
+  radiator / pizza / linked-list and nothing in-scope); out-of-scope
+  detection stays the router's job, which is the Phase 4 LLM-router case
+  stated as a number. Lexical-anchor queries sit in their own band
+  (0.64–0.65), above every other top-1 observed.
+- **Where raw-query retrieval fails**, in order of frequency: lexical
+  hijack (*tomorrow* → 4.47 "die tomorrow"; *sleep* → 8.12; *work* → 6.42;
+  *use* → 4.13 for tax software; *cruel* → 6.27), the conceptual gap
+  (promotion, social comparison, jealousy all miss at rank 1), Book I noise
+  (1.14 for jealousy — the metadata-filter experiment has its first
+  example), a pull toward one-sentence passages (12.25, 11.30), and
+  register/entity similarity on Roman-history questions. These are the
+  golden-set seeds.
+- **A safety interaction to label carefully in Phase 3.** "my father died
+  last month and I can't function" fires `MENTAL_HEALTH` on *can't
+  function*, and its rank-1 hit is 8.47 — on the death-counsel list, so it
+  is withheld. The clause that put 8.47 on the list ("Quit life then…") is
+  exactly what a bereaved reader should not be handed, so the outcome is
+  right; but the cost is the query's best passage, and `safety_set.jsonl`
+  should carry this case so the trade stays visible.
+
+One deviation from the letter of the plan: `RouteDecision.safety` is a
+`frozenset[SafetyFlag]`, not a single flag. Situations co-occur ("my partner
+hits me and I can't stop drinking"), and the conservative reading is the
+union — every flag's referral, every flag's suppression list, and one
+blocking flag blocks. It degrades to the single-flag case with no extra
+machinery.
 
 ## Phase 3 — Eval harness, golden set, telemetry (~1–2 days, ongoing curation)
 

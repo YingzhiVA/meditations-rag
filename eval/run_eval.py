@@ -2,7 +2,7 @@
 
 Usage (planned):
     python eval/run_eval.py                      # full grid
-    python eval/run_eval.py --embedder local --strategy raw hyde   # subset
+    python eval/run_eval.py --embedder bge-base --strategy raw hyde   # subset
     python eval/run_eval.py --routers-only       # just the router table
 
 THIS FILE IS AUTHORITATIVE for quality numbers. Phoenix (see

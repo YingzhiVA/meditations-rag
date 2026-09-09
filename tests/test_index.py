@@ -84,9 +84,13 @@ def test_row_id_alignment(index_root):
     hits = vi.search(_unit([0.0, 1.0, 0.0]), idx, k=2)
     assert [h.passage_id for h in hits] == ["7.2", "11.18"]
 
-    # k is honoured and clipped to the corpus size.
+    # k is honoured and clipped to the corpus size; a non-positive k is a
+    # caller bug and must not quietly return nothing.
     assert len(vi.search(_unit([1.0, 0.0, 0.0]), idx, k=1)) == 1
     assert len(vi.search(_unit([1.0, 0.0, 0.0]), idx, k=50)) == 4
+    for bad in (0, -1):
+        with pytest.raises(ValueError, match="positive"):
+            vi.search(_unit([1.0, 0.0, 0.0]), idx, k=bad)
 
 
 def test_search_by_name_loads_from_disk(index_root):

@@ -216,6 +216,7 @@ def search(query_vec: Vector, index: LoadedIndex | str, k: int) -> list[SearchHi
     """Top-k by cosine similarity: scores = vectors @ query_vec (both are
     unit-norm, so dot == cosine), argpartition for the top k, then sort those.
     Returns hits sorted by descending score; ties break by row order.
+    k is clipped to the corpus size; k <= 0 raises.
 
     `index` may be a LoadedIndex, or an embedder name to load on the spot."""
     if isinstance(index, str):
@@ -230,7 +231,10 @@ def search(query_vec: Vector, index: LoadedIndex | str, k: int) -> list[SearchHi
             "the embedder owns normalization"
         )
     if k <= 0:
-        return []
+        # A non-positive k is a caller bug (an over-retrieve subtraction gone
+        # negative, say), and an empty result would read as recall 0 in the
+        # eval rather than as the bug it is. k > len(index) is fine and clips.
+        raise ValueError(f"k must be positive, got {k}")
 
     scores = index.vectors @ q
     k = min(k, len(index))

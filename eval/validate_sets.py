@@ -27,6 +27,7 @@ an error.
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 import sys
@@ -53,6 +54,65 @@ ROUTER_FIELDS = {"query", "intent", "safety", "tier", "note"}
 SAFETY_FIELDS = {"query", "flags", "must_not_return", "tier", "note"}
 
 ID_RE = re.compile(r"^(\d{1,2})\.(\d{1,3})$")
+
+# --- Curation vocabularies --------------------------------------------------
+# DELIBERATELY NOT ENUMS IN THE PACKAGE, unlike Intent and SafetyFlag. Those
+# are frozen in route/base.py because the pipeline BRANCHES on them; these two
+# never reach the pipeline at all. They are curation metadata, checked here so
+# the coverage report means something and nowhere else.
+#
+# The strictness is asymmetric on purpose:
+#
+#   failure_mode  CLOSED (error). Four of the five observations in
+#                 eval/results/phase-2-bge-base-raw-notes.md §2, and the axis
+#                 Phase 4's experiments are indexed against — HyDE attacks the
+#                 conceptual gap, the Book I filter attacks Book I noise,
+#                 sub-chunking attacks the short-passage pull. A fifth value
+#                 is a typo, or it is a new empirical finding that belongs in
+#                 a results file before it becomes a label.
+#
+#                 The fifth Phase 2 mode, register/entity, is deliberately
+#                 ABSENT: the notes call it "a routing failure", and it lives
+#                 as hard out_of_scope entries in router_set.jsonl. Leaving it
+#                 here would fire the coverage warning below forever, which
+#                 only teaches you to ignore warnings.
+#
+#   theme         OPEN (warn). The nine come from eval/README.md, which also
+#                 says to grow the set by query TYPE when Phase 4 error
+#                 analysis exposes a gap — so a tenth theme is a legitimate
+#                 event, not an error. The warning exists to separate "I am
+#                 adding a theme" from "I misspelled one"; when you mean it,
+#                 add it to this set in the same commit.
+THEMES = frozenset({
+    "mortality", "anger", "others' faults", "reputation", "control",
+    "impermanence", "duty", "pain", "distraction",
+})
+FAILURE_MODES = frozenset({
+    "conceptual gap", "lexical hijack", "book i noise", "short-passage pull",
+})
+
+
+def norm_vocab(value: object) -> str:
+    """Case, whitespace and curly apostrophes folded away, so "Others' Faults"
+    and "others' faults" are one bucket rather than two. Nothing cleverer:
+    a near-miss should be reported, not silently repaired."""
+    return " ".join(str(value).replace("\u2019", "'").casefold().split())
+
+
+def check_vocab(rep: Report, n: int, field: str, raw: object,
+                vocab: frozenset[str], strict: bool) -> str | None:
+    """Report an off-vocabulary value and return its normalised key. Unknown
+    values are still counted, so the coverage report shows what was written
+    rather than hiding it."""
+    key = norm_vocab(raw)
+    if not key:
+        return None      # empty placeholder in a skeleton row; not yet filled
+    if key not in vocab:
+        close = difflib.get_close_matches(key, sorted(vocab), n=1, cutoff=0.6)
+        hint = (f" — did you mean {close[0]!r}?" if close
+                else f" — known: {', '.join(sorted(vocab))}")
+        (rep.error if strict else rep.warn)(n, f"unknown {field} {raw!r}{hint}")
+    return key
 
 
 class Report:
@@ -116,7 +176,9 @@ def check_id(rep: Report, line: int, pid: object, known: set[str] | None) -> boo
         rep.error(line, f"passage id must be a string, got {type(pid).__name__}: {pid!r}")
         return False
     if pid == "PLACEHOLDER":
-        rep.warn(line, "PLACEHOLDER id — unlabelled, the harness will skip this entry")
+        rep.error(line, "PLACEHOLDER mixed in with real gold ids — drop it; a partly "
+                        "labelled entry scores as labelled and the placeholder is "
+                        "silently treated as a passage that never matches")
         return False
     m = ID_RE.match(pid)
     if not m:
@@ -201,7 +263,7 @@ def validate_golden(path: Path, known: set[str] | None) -> Report:
     tiers: Counter[str] = Counter()
     themes: Counter[str] = Counter()
     modes: Counter[str] = Counter()
-    labelled = oos = 0
+    labelled = oos = unlabelled = 0
 
     for n, obj in entries:
         if "gold_ids" not in obj:
@@ -210,21 +272,57 @@ def validate_golden(path: Path, known: set[str] | None) -> Report:
         ids = str_list(rep, n, obj, "gold_ids")
         if ids is None:
             continue
-        tier = check_tier(rep, n, obj, {"hard", "canary"}, "hard")
+        # Three tiers, not two. "out_of_scope" exists because `gold_ids: []`
+        # is otherwise ambiguous between a DELIBERATE no-match fixture and an
+        # entry nobody has labelled yet — and the two are opposites: one is
+        # the oos_accuracy denominator, the other has to be excluded from
+        # every metric. Curation makes the second state normal for days at a
+        # time, so the harness cannot infer it from emptiness alone.
+        tier = check_tier(rep, n, obj, {"hard", "canary", "out_of_scope"}, "hard")
         tiers[tier] += 1
         if "theme" in obj:
-            themes[str(obj["theme"])] += 1
+            # Themes apply to both tiers: the canary line should span concerns
+            # too, or a regression only shows up in one corner of the corpus.
+            key = check_vocab(rep, n, "theme", obj["theme"], THEMES, strict=False)
+            if key:
+                themes[key] += 1
         if "failure_mode" in obj:
-            modes[str(obj["failure_mode"])] += 1
+            key = check_vocab(rep, n, "failure_mode", obj["failure_mode"],
+                              FAILURE_MODES, strict=True)
+            # A failure_mode is a hypothesis about why BASELINE RETRIEVAL MISSES
+            # this query, and a canary is by definition one every configuration
+            # gets right — so the field means nothing there. It is an error and
+            # not a style note because it silently satisfies the coverage check
+            # below: a canary tagged "lexical hijack" makes the hijack axis look
+            # covered while no hard case actually tests it, which is exactly the
+            # experiment-with-nothing-to-measure that check exists to catch.
+            if tier != "hard":
+                if key:
+                    rep.error(n, f"failure_mode on a non-hard entry ({tier}) — a failure "
+                                 "mode says "
+                                 "why baseline MISSES a query, and only hard cases are "
+                                 "chosen to be missed; drop the key (keep 'theme')")
+            elif key:
+                modes[key] += 1
 
-        if not ids:
-            # Empty gold_ids is the no-match fixture: it exercises the POST-
-            # retrieval threshold, a different mechanism from the router's
-            # pre-retrieval rejection (see route/base.py). Not a missing label.
+        if tier == "out_of_scope":
+            # The no-match fixture: it exercises the POST-retrieval threshold,
+            # a different mechanism from the router's pre-retrieval rejection
+            # (see route/base.py). Not a missing label.
+            if ids:
+                rep.error(n, f"tier 'out_of_scope' carries gold ids {ids} — the fixture "
+                             "asserts that NOTHING should be returned; if a passage "
+                             "genuinely fits, the entry is 'hard'")
             oos += 1
-            if tier == "canary":
-                rep.warn(n, "empty gold_ids on a canary — canaries are the easy hits, "
-                            "an out-of-scope fixture is neither hard nor canary")
+            continue
+        # Two ways to say "not labelled yet": [] and the ["PLACEHOLDER"]
+        # convention the scaffold shipped with (run_eval.py skips those too).
+        # Both must land in the same bucket, or the progress line silently
+        # under-reports a set that is half done.
+        if not ids or all(pid == "PLACEHOLDER" for pid in ids):
+            unlabelled += 1
+            if ids:
+                rep.warn(n, "PLACEHOLDER id — unlabelled, the harness will skip this entry")
             continue
 
         ok = [check_id(rep, n, pid, known) for pid in ids]
@@ -242,7 +340,8 @@ def validate_golden(path: Path, known: set[str] | None) -> Report:
 
     rep.info("")
     rep.info(f"  {len(entries)} entries: {tiers['hard']} hard, {tiers['canary']} canary, "
-             f"{oos} out-of-scope fixtures ({labelled} fully labelled)")
+             f"{oos} out-of-scope fixtures")
+    rep.info(f"  {labelled} labelled, {unlabelled} awaiting labels")
     if tiers["hard"] and tiers["hard"] < 20:
         rep.warn(None, f"{tiers['hard']} hard entries; the plan asks for ~20")
     if tiers["canary"] and tiers["canary"] < 5:
@@ -255,6 +354,10 @@ def validate_golden(path: Path, known: set[str] | None) -> Report:
                            "only one theme should not be able to look like a general win")
     if modes:
         rep.info(f"  failure modes: {dict(sorted(modes.items()))}")
+        absent = sorted(FAILURE_MODES - set(modes))
+        if absent:
+            rep.warn(None, f"no entries for failure mode(s): {absent} — the Phase 4 "
+                           "technique aimed at each has nothing to measure without one")
     return rep
 
 

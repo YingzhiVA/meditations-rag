@@ -13,3 +13,7 @@ __pycache__/
 
 # Secrets (ANTHROPIC_API_KEY / VOYAGE_API_KEY live in the environment or here)
 .env
+
+# Golden-set curation worksheet: a scratch tool for generating the queries.
+# Its durable content (failure modes, dead cells) lives in eval/README.md.
+eval/golden_set_grid.md

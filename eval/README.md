@@ -25,16 +25,34 @@ One JSON object per line (comments aren't valid in JSONL, hence this README):
   bounds is a labeling error and the harness should say so rather than scoring
   it as a miss.
 - Multiple ids allowed — several passages can be legitimately right; scoring is
-  hit-ANY. Empty list marks an out-of-scope query (exercises the no-match path).
-- `tier`: `"hard"` or `"canary"`. **Hard** cases are the evaluation — modern
+  hit-ANY. One to three you are confident about; a fourth only dilutes.
+- `tier`: `"hard"`, `"canary"` or `"out_of_scope"`. **Hard** cases are the evaluation — modern
   phrasing with little lexical overlap, where configurations plausibly
   disagree. **Canaries** are the easy lexical-anchor queries every
   configuration should get; they are a regression check, not a comparison, and
   the harness reports them on their own line rather than folding them into
   recall@k. A canary that starts failing means something broke, not that the
-  set got harder. Absent, `tier` is treated as `"hard"`.
+  set got harder. **`out_of_scope`** marks a no-match fixture: `gold_ids: []`
+  asserting the post-retrieval threshold should reject everything. It is a
+  third tier rather than an inference from an empty list because `[]` is
+  otherwise ambiguous between *deliberately no-match* and *not labelled yet*,
+  and those are opposites — one is the `oos_accuracy` denominator, the other
+  must be excluded from every metric. Curation makes the second state normal
+  for days at a time. Absent, `tier` is treated as `"hard"`.
+- `theme` and `failure_mode`: optional curation metadata, read only by
+  `validate_sets.py`'s coverage report — see **Two axes** below. Unlike
+  `Intent` and `SafetyFlag` they are not enums in the package, because nothing
+  in the pipeline branches on them. `failure_mode` is a closed vocabulary (an
+  unknown value is an error); `theme` is open (a warning), since the set is
+  meant to grow by query type. Canaries take `theme` but never
+  `failure_mode` — a failure mode says why baseline *misses* a query, and a
+  canary is one every configuration hits.
 - `note`: why this case is in the set / what it tests. For humans, ignored
   by the harness.
+
+Run `.venv/bin/python eval/validate_sets.py` while curating: it checks ids
+against `config.EXPECTED_PER_BOOK_COUNTS`, catches `gold_id` for `gold_ids`,
+and reports theme/failure-mode coverage as the set fills in.
 
 ## Curating the golden set (Phase 3)
 
@@ -108,6 +126,80 @@ Note when labeling: Book I is a list of debts to particular people ("From
 Rusticus I learned…") rather than counsel, so it rarely deserves a gold label
 even when it matches lexically. Whether excluding Book I from the index helps is
 itself a Phase 4 experiment.
+
+## Two axes: theme and failure mode
+
+Spreading the hard cases across **themes** is necessary and not sufficient.
+Themes describe what a query is *about*; they say nothing about *why baseline
+retrieval misses it*, and that is what Phase 4's techniques are aimed at. HyDE
+and rewriting attack the conceptual gap; the Book I metadata filter attacks
+Book I noise; sub-chunking attacks the short-passage pull. A hard set
+containing no Book I noise cases makes that experiment measure nothing.
+
+The four modes are the retrieval failures observed in
+`results/phase-2-bge-base-raw-notes.md` §2:
+
+| mode | what happens | observed |
+|---|---|---|
+| **conceptual gap** | no lexical overlap at all; needs the modern situation mapped onto the corpus's vocabulary | promotion (0.476), social comparison (0.459), jealousy (0.472) all miss at rank 1 |
+| **lexical hijack** | a mundane modern word matches a loaded corpus word and drags the whole ranking | *tomorrow* → 4.47 "die tomorrow"; *sleep* → 8.12; *work* → 6.42; *use* → 4.13; *cruel* → 6.27 |
+| **Book I noise** | a proper noun or kinship term pulls the "From Rusticus I learned…" debt list, which is not counsel | "my father has dementia" → **1.2** "the famous memory of my father" at rank 2 |
+| **short-passage pull** | one-sentence sections win on cosine because there is less text to dilute the match | 12.25, 11.30 recur across unrelated queries |
+
+**How to write each one.** For a **conceptual gap**, describe the situation in
+the words you would use to a friend and resist any abstraction the corpus
+might share — the test is that no content word in the query appears in the
+gold passage. For a **hijack**, put a loaded corpus word in a mundane modern
+sentence. For **Book I noise**, name a person or a relative; the trigger is
+entity match, *not* self-improvement phrasing ("how do I become more
+patient" was tested and does not reliably fire). For a **short-passage
+pull**, keep the query broad and abstract.
+
+A fifth Phase 2 mode, **register/entity** (antique register and proper nouns
+matching on *who and when* rather than on the question), is deliberately not a
+golden-set mode. The Phase 2 note ends *"Nothing post-retrieval fixes this; it
+is a routing failure"* — so it belongs in `router_set.jsonl`, where the Punic
+War query already sits.
+
+**Themes are not uniformly hard.** The corpus is dense on **mortality** (14%
+of passages speak of death) and strong on **pain** — Phase 2 lists both under
+*"Where it works"*. Almost any query on those lands on something apt, so no
+failure mode reliably bites and a second hard case behaves like a canary. Give
+each one hard case and one canary; spend the freed budget where baseline
+actually breaks.
+
+### Cells that were tried and died
+
+Each was a plausible reading of the Phase 2 notes that did not survive contact
+with the retriever. Kept so they are not re-derived.
+
+- **mortality × lexical hijack.** The intended trap was *tomorrow* → 4.47, but
+  4.47 *is* a mortality passage, so a mortality query landing there is
+  arguably correct and the label would be contestable. Rescue attempts with
+  words pointing elsewhere (*sleep*, *work*, *use*) all still returned apt
+  mortality passages. **A hijack needs the query's real subject to have no
+  strong match**, so one surface word wins by default; mortality always has a
+  strong match. The trap works on an anxiety query instead: "I'm anxious about
+  a presentation tomorrow" → 4.47 at rank 1.
+- **pain × register/entity.** Clinical phrasing was meant to miss the
+  corpus's literary register. It does not: "6 out of 10 most days" returns
+  7.64, 4.50, 7.33 — the apt passages.
+- **reputation × register/entity.** Modern proper nouns (`LinkedIn`,
+  `Instagram`) have no counterpart in a 1902 translation, so they dilute
+  rather than attract; the residual failure is the plain conceptual gap.
+
+### Ranks inside the window are noisier than they look
+
+Top-1 is stable, but ranks 2–5 routinely sit within ~0.01 of each other and
+reshuffle on trivial rewording. "I'm jealous of my friend's success" puts 1.14
+at rank 3; adding a full stop moves it to rank 6; expanding *I'm* to *I am*
+drops it out of the top 7 — against a four-way tie inside 0.0006. Therefore:
+
+- **recall@5 (hit-ANY) is the robust metric**; reordering inside the window
+  cannot change it.
+- **MRR is softer than it looks**, depending on the exact rank of the first hit.
+- **"it moved from rank 3 to rank 5" is not a finding** in error analysis.
+  Only in-window versus out-of-window is.
 
 ## router_set.jsonl format
 

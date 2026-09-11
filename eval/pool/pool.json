@@ -1,0 +1,3668 @@
+[
+ {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "line": 1,
+  "tier": "hard",
+  "theme": "mortality",
+  "failure_mode": "conceptual gap",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.41170060634613037,
+    0.47737815976142883
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "8.36",
+    "best": 0.5537353754043579,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5537
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.21",
+    "best": 0.551566481590271,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.5516
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.17",
+    "best": 0.5429190993309021,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5429
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.14",
+    "best": 0.5350507497787476,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5351
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.49",
+    "best": 0.5349469184875488,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.5349
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.26",
+    "best": 0.5305544137954712,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5306
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.49",
+    "best": 0.5265400409698486,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5265
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.4",
+    "best": 0.5225605964660645,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.5226
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.32",
+    "best": 0.5214393138885498,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.5214
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.47",
+    "best": 0.5175133943557739,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.5175
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I said something cruel and I can't take it back.",
+  "line": 2,
+  "tier": "hard",
+  "theme": "anger",
+  "failure_mode": "short-passage pull",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.40345871448516846,
+    0.47478100657463074
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "11.30",
+    "best": 0.5396555662155151,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5397
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.27",
+    "best": 0.5187090635299683,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.5187
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.26",
+    "best": 0.5186640620231628,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5187
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.3",
+    "best": 0.5168505311012268,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5169
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "11.34",
+    "best": 0.5155753493309021,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.5156
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.25",
+    "best": 0.5135483741760254,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5135
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.49",
+    "best": 0.513526439666748,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5135
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.31",
+    "best": 0.5108901262283325,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.5109
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "11.19",
+    "best": 0.5080324411392212,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.508
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.64",
+    "best": 0.5079431533813477,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.5079
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "line": 3,
+  "tier": "hard",
+  "theme": "others' faults",
+  "failure_mode": "conceptual gap",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.38991791009902954,
+    0.45249730348587036
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "8.47",
+    "best": 0.5053689479827881,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5054
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.31",
+    "best": 0.49975910782814026,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.4998
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.40",
+    "best": 0.49855858087539673,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.4986
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.36",
+    "best": 0.4917444884777069,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.4917
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.2",
+    "best": 0.49028700590133667,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.4903
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.19",
+    "best": 0.49009501934051514,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4901
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.31",
+    "best": 0.48993927240371704,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4899
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.21",
+    "best": 0.48705893754959106,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4871
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.20",
+    "best": 0.48546579480171204,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4855
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.3",
+    "best": 0.4849822223186493,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.485
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I have low self-esteem. How I can improve that?",
+  "line": 4,
+  "tier": "hard",
+  "theme": "reputation",
+  "failure_mode": "lexical hijack",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.4045802652835846,
+    0.474140465259552
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "5.5",
+    "best": 0.5785402059555054,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5785
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.30",
+    "best": 0.5783032178878784,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.5783
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.4",
+    "best": 0.5714931488037109,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5715
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.3",
+    "best": 0.5467664003372192,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5468
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.27",
+    "best": 0.5398480296134949,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.5398
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.16",
+    "best": 0.5331575870513916,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5332
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.53",
+    "best": 0.5313050746917725,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5313
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.2",
+    "best": 0.5283138155937195,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.5283
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.16",
+    "best": 0.5220209360122681,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.522
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.42",
+    "best": 0.5196630954742432,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.5197
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "line": 5,
+  "tier": "hard",
+  "theme": "others' faults",
+  "failure_mode": "lexical hijack",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.3273793160915375,
+    0.38405951857566833
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "6.42",
+    "best": 0.49113887548446655,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.4911
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.25",
+    "best": 0.48192352056503296,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.4819
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.26",
+    "best": 0.46604007482528687,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.466
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.30",
+    "best": 0.4555869698524475,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.4556
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "11.2",
+    "best": 0.4378305673599243,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.4378
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.4",
+    "best": 0.42838752269744873,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4284
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.6",
+    "best": 0.4258466362953186,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4258
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.17",
+    "best": 0.42223474383354187,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4222
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.29",
+    "best": 0.42137038707733154,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4214
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.22",
+    "best": 0.41772499680519104,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4177
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "line": 6,
+  "tier": "hard",
+  "theme": "others' faults",
+  "failure_mode": "lexical hijack",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.363943874835968,
+    0.4212034344673157
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "9.11",
+    "best": 0.4836800694465637,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.4837
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.12",
+    "best": 0.47665879130363464,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.4767
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.11",
+    "best": 0.46970146894454956,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.4697
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "11.33",
+    "best": 0.4677841067314148,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.4678
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.12",
+    "best": 0.4674573540687561,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.4675
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.26",
+    "best": 0.46519559621810913,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4652
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.4",
+    "best": 0.4642465114593506,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4642
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "11.29",
+    "best": 0.45806610584259033,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4581
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.30",
+    "best": 0.4572058618068695,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4572
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.3",
+    "best": 0.4571038782596588,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4571
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "line": 7,
+  "tier": "hard",
+  "theme": "reputation",
+  "failure_mode": "conceptual gap",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.4234274625778198,
+    0.49865010380744934
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "12.4",
+    "best": 0.588975191116333,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.589
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.25",
+    "best": 0.5743951797485352,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.5744
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.32",
+    "best": 0.5676555633544922,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5677
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.3",
+    "best": 0.5615978837013245,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5616
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.43",
+    "best": 0.551276683807373,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.5513
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.30",
+    "best": 0.55085289478302,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5509
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "11.19",
+    "best": 0.5416702032089233,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5417
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.26",
+    "best": 0.5406498908996582,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.5406
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.22",
+    "best": 0.539555549621582,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.5396
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "11.9",
+    "best": 0.533618688583374,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.5336
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "line": 8,
+  "tier": "hard",
+  "theme": "control",
+  "failure_mode": "lexical hijack",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.3563896715641022,
+    0.4221195578575134
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "6.31",
+    "best": 0.5276821255683899,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5277
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.42",
+    "best": 0.501011848449707,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.501
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.12",
+    "best": 0.48746299743652344,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.4875
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.7",
+    "best": 0.4676339626312256,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.4676
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.8",
+    "best": 0.4668814241886139,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.4669
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.47",
+    "best": 0.4623003602027893,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4623
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.26",
+    "best": 0.4615062475204468,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4615
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.4",
+    "best": 0.4613165855407715,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4613
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.26",
+    "best": 0.4611380994319916,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4611
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.1",
+    "best": 0.45417723059654236,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4542
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "line": 9,
+  "tier": "hard",
+  "theme": "control",
+  "failure_mode": "conceptual gap",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.3846370577812195,
+    0.44843631982803345
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "10.22",
+    "best": 0.5417066812515259,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5417
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.21",
+    "best": 0.5245029330253601,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.5245
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.4",
+    "best": 0.5168635845184326,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5169
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.31",
+    "best": 0.5127249956130981,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5127
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.26",
+    "best": 0.5020016431808472,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.502
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.12",
+    "best": 0.5006661415100098,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5007
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.27",
+    "best": 0.49078455567359924,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4908
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.3",
+    "best": 0.48694559931755066,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4869
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.13",
+    "best": 0.486865371465683,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4869
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.32",
+    "best": 0.48631948232650757,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4863
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "line": 10,
+  "tier": "hard",
+  "theme": "others' faults",
+  "failure_mode": "lexical hijack",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.3897066116333008,
+    0.4584214985370636
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "11.9",
+    "best": 0.5484896302223206,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5485
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.32",
+    "best": 0.5373004674911499,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.5373
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "11.19",
+    "best": 0.5222603678703308,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5223
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.71",
+    "best": 0.5155390501022339,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5155
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.28",
+    "best": 0.5120484828948975,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.512
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.37",
+    "best": 0.5034676790237427,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5035
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.29",
+    "best": 0.5000128149986267,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.5",
+    "best": 0.49909624457359314,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4991
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.40",
+    "best": 0.49838775396347046,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4984
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.28",
+    "best": 0.49515771865844727,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4952
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I'm jealous of my friend's success.",
+  "line": 11,
+  "tier": "hard",
+  "theme": "control",
+  "failure_mode": "book I noise",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.3344101905822754,
+    0.3964184522628784
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "7.27",
+    "best": 0.46956419944763184,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.4696
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.25",
+    "best": 0.46265709400177,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.4627
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.16",
+    "best": 0.4483336806297302,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.4483
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.5",
+    "best": 0.44375139474868774,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.4438
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.1",
+    "best": 0.4428711533546448,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.4429
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "1.14",
+    "best": 0.442409485578537,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4424
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.74",
+    "best": 0.4420772194862366,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4421
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.27",
+    "best": 0.4410795569419861,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4411
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.6",
+    "best": 0.439514696598053,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4395
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.26",
+    "best": 0.43632909655570984,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4363
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "line": 12,
+  "tier": "hard",
+  "theme": "impermanence",
+  "failure_mode": "lexical hijack",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.44769006967544556,
+    0.5177565217018127
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "6.32",
+    "best": 0.5784326791763306,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5784
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.31",
+    "best": 0.5763943195343018,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.5764
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.9",
+    "best": 0.5746114253997803,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5746
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.3",
+    "best": 0.5721317529678345,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5721
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.54",
+    "best": 0.5698975324630737,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.5699
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.5",
+    "best": 0.5667283535003662,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5667
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.49",
+    "best": 0.5596919655799866,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5597
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.8",
+    "best": 0.5592161417007446,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.5592
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.40",
+    "best": 0.5498363375663757,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.5498
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.1",
+    "best": 0.5479070544242859,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.5479
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "line": 13,
+  "tier": "hard",
+  "theme": "impermanence",
+  "failure_mode": "Conceptual Gap",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.3648295998573303,
+    0.4153805077075958
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "4.49",
+    "best": 0.4872957170009613,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.4873
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.28",
+    "best": 0.47775307297706604,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.4778
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.47",
+    "best": 0.476718932390213,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.4767
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.48",
+    "best": 0.4554118514060974,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.4554
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.56",
+    "best": 0.4553523063659668,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.4554
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.14",
+    "best": 0.4521483778953552,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4521
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.26",
+    "best": 0.4504912495613098,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4505
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.36",
+    "best": 0.4498043656349182,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4498
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.3",
+    "best": 0.44850924611091614,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4485
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.32",
+    "best": 0.44538643956184387,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4454
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "line": 14,
+  "tier": "hard",
+  "theme": "control",
+  "failure_mode": "conceptual gap",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.35950392484664917,
+    0.42303869128227234
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "8.54",
+    "best": 0.4963282346725464,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.4963
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.9",
+    "best": 0.4743932783603668,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.4744
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.49",
+    "best": 0.4724584221839905,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.4725
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.27",
+    "best": 0.4713793992996216,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.4714
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.8",
+    "best": 0.46587738394737244,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.4659
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "1.9",
+    "best": 0.4614529013633728,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4615
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.67",
+    "best": 0.45750561356544495,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4575
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "11.16",
+    "best": 0.4563688039779663,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4564
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.28",
+    "best": 0.45615553855895996,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4562
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.2",
+    "best": 0.4550553262233734,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4551
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "line": 15,
+  "tier": "hard",
+  "theme": "pain",
+  "failure_mode": "Book I noise",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.37815845012664795,
+    0.43879207968711853
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "9.21",
+    "best": 0.5195693969726562,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5196
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "1.2",
+    "best": 0.5016176700592041,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.5016
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.21",
+    "best": 0.4909301996231079,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.4909
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.47",
+    "best": 0.49061697721481323,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.4906
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.2",
+    "best": 0.4884576201438904,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.4885
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.18",
+    "best": 0.48776113986968994,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4878
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.32",
+    "best": 0.48448675870895386,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4845
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.34",
+    "best": 0.4815027117729187,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4815
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.14",
+    "best": 0.4808419346809387,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4808
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.2",
+    "best": 0.47812873125076294,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4781
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "line": 16,
+  "tier": "hard",
+  "theme": "duty",
+  "failure_mode": "lexical hijack",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.3948436379432678,
+    0.4558522403240204
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "7.27",
+    "best": 0.5281655788421631,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5282
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.12",
+    "best": 0.5245202779769897,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.5245
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.41",
+    "best": 0.5197229385375977,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5197
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.4",
+    "best": 0.5089632272720337,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.509
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.7",
+    "best": 0.5011216998100281,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.5011
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.24",
+    "best": 0.49681365489959717,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4968
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.47",
+    "best": 0.49627915024757385,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4963
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.12",
+    "best": 0.494467169046402,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4945
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.26",
+    "best": 0.4910334348678589,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.491
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.8",
+    "best": 0.49074751138687134,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4907
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "My chronic back pain makes me bitter.",
+  "line": 17,
+  "tier": "hard",
+  "theme": "pain",
+  "failure_mode": "conceptual gap",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.3550640940666199,
+    0.41982942819595337
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "7.64",
+    "best": 0.5348837375640869,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5349
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.28",
+    "best": 0.49467918276786804,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.4947
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.40",
+    "best": 0.4867705702781677,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.4868
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.57",
+    "best": 0.4863002300262451,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.4863
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.33",
+    "best": 0.47581738233566284,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.4758
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "11.19",
+    "best": 0.46259933710098267,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4626
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.3",
+    "best": 0.4575381875038147,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4575
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.12",
+    "best": 0.45618605613708496,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4562
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.21",
+    "best": 0.45203644037246704,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.452
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.2",
+    "best": 0.45031362771987915,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4503
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "line": 18,
+  "tier": "hard",
+  "theme": "distraction",
+  "failure_mode": "conceptual gap",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.38113707304000854,
+    0.448543518781662
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "11.19",
+    "best": 0.49683189392089844,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.4968
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.24",
+    "best": 0.4951234459877014,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.4951
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.36",
+    "best": 0.4942626357078552,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.4943
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "3.1",
+    "best": 0.49366676807403564,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.4937
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.10",
+    "best": 0.49177634716033936,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.4918
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.21",
+    "best": 0.4913511276245117,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4914
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.36",
+    "best": 0.4886655807495117,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4887
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.23",
+    "best": 0.4868867099285126,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4869
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.4",
+    "best": 0.4841293394565582,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4841
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.47",
+    "best": 0.4840468466281891,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.484
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "line": 19,
+  "tier": "hard",
+  "theme": "duty",
+  "failure_mode": "lexical hijack",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.3073795437812805,
+    0.3697822391986847
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "2.4",
+    "best": 0.49427494406700134,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.4943
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.22",
+    "best": 0.4190879762172699,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.4191
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.3",
+    "best": 0.41605252027511597,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.4161
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.28",
+    "best": 0.4138261675834656,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.4138
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.42",
+    "best": 0.4134014844894409,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.4134
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.28",
+    "best": 0.4126017987728119,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.4126
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.11",
+    "best": 0.409832239151001,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.4098
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.21",
+    "best": 0.40714317560195923,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.4071
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.54",
+    "best": 0.4024132490158081,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4024
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.27",
+    "best": 0.40180230140686035,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4018
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "line": 20,
+  "tier": "hard",
+  "theme": "duty",
+  "failure_mode": "lexical hijack",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.38332629203796387,
+    0.45664238929748535
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "7.27",
+    "best": 0.5753123760223389,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.5753
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.4",
+    "best": 0.5218837857246399,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.5219
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.5",
+    "best": 0.5209041237831116,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5209
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.47",
+    "best": 0.510140061378479,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5101
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.7",
+    "best": 0.5064002275466919,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.5064
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.23",
+    "best": 0.5033490061759949,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5033
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.26",
+    "best": 0.5031119585037231,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5031
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.30",
+    "best": 0.5024644136428833,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.5025
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.31",
+    "best": 0.4992530345916748,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.4993
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.26",
+    "best": 0.4982900619506836,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.4983
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "How do I stop fearing death",
+  "line": 21,
+  "tier": "canary",
+  "theme": "mortality",
+  "failure_mode": "",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.42581623792648315,
+    0.5154046416282654
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "8.58",
+    "best": 0.6497197151184082,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.6497
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.21",
+    "best": 0.6392039656639099,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.6392
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.32",
+    "best": 0.6063216328620911,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.6063
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.2",
+    "best": 0.595334529876709,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5953
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.56",
+    "best": 0.5901926159858704,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.5902
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.3",
+    "best": 0.5867324471473694,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5867
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.24",
+    "best": 0.5777363181114197,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5777
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.36",
+    "best": 0.577691912651062,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.5777
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.2",
+    "best": 0.5748932361602783,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.5749
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.12",
+    "best": 0.5744017362594604,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.5744
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "How to deal with anger",
+  "line": 22,
+  "tier": "canary",
+  "theme": "anger",
+  "failure_mode": "",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.4251480996608734,
+    0.5078438520431519
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "10.30",
+    "best": 0.642632246017456,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.6426
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "5.28",
+    "best": 0.609969437122345,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.61
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.26",
+    "best": 0.5952364206314087,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5952
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "11.9",
+    "best": 0.5924270153045654,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5924
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.64",
+    "best": 0.580622673034668,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.5806
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.31",
+    "best": 0.5729738473892212,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.573
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.58",
+    "best": 0.5549050569534302,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5549
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.3",
+    "best": 0.5513969659805298,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.5514
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.40",
+    "best": 0.550708532333374,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.5507
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.29",
+    "best": 0.5480599403381348,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.5481
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "On fame and being remembered after death",
+  "line": 23,
+  "tier": "canary",
+  "theme": "reputation",
+  "failure_mode": "",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.42639127373695374,
+    0.5042276382446289
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "4.19",
+    "best": 0.6519888639450073,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.652
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.33",
+    "best": 0.6191794276237488,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.6192
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.27",
+    "best": 0.5822415947914124,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5822
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "3.10",
+    "best": 0.5786539316177368,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5787
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.2",
+    "best": 0.5764596462249756,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.5765
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.30",
+    "best": 0.5712019205093384,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5712
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.17",
+    "best": 0.5632018446922302,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5632
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.44",
+    "best": 0.5563430190086365,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.5563
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.32",
+    "best": 0.553179144859314,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.5532
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.1",
+    "best": 0.5516444444656372,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.5516
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "on how to live with discomfort and pain",
+  "line": 24,
+  "tier": "canary",
+  "theme": "pain",
+  "failure_mode": "",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.4832095801830292,
+    0.5593028664588928
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "7.64",
+    "best": 0.7153029441833496,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.7153
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.33",
+    "best": 0.677654504776001,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.6777
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.28",
+    "best": 0.6443338394165039,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.6443
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.7",
+    "best": 0.6236701011657715,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.6237
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.36",
+    "best": 0.6160410642623901,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.616
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.40",
+    "best": 0.6043518781661987,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.6044
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.15",
+    "best": 0.6023997664451599,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.6024
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.12",
+    "best": 0.601832926273346,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.6018
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.8",
+    "best": 0.6018311977386475,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.6018
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.2",
+    "best": 0.600019097328186,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.6
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "How to be calm and clear-minded?",
+  "line": 25,
+  "tier": "canary",
+  "theme": "control",
+  "failure_mode": "",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.45958560705184937,
+    0.5339623689651489
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "8.51",
+    "best": 0.6530779600143433,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.6531
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.24",
+    "best": 0.640825629234314,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.6408
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.31",
+    "best": 0.621857225894928,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.6219
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.22",
+    "best": 0.6175222396850586,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.6175
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.11",
+    "best": 0.6127086877822876,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.6127
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "3.5",
+    "best": 0.590533971786499,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5905
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.5",
+    "best": 0.5887778401374817,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5888
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.29",
+    "best": 0.5884996056556702,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.5885
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "10.2",
+    "best": 0.5879497528076172,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.5879
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "2.9",
+    "best": 0.5863616466522217,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.5864
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ },
+ {
+  "query": "How to deal with change?",
+  "line": 26,
+  "tier": "canary",
+  "theme": "impermanence",
+  "failure_mode": "",
+  "gold_ids": [],
+  "intents": [
+   "in_scope"
+  ],
+  "flags": [],
+  "stats": {
+   "bge-base": [
+    0.43097877502441406,
+    0.5045483708381653
+   ]
+  },
+  "failures": [],
+  "candidates": [
+   {
+    "id": "7.18",
+    "best": 0.6702542304992676,
+    "by": {
+     "bge-base/raw": [
+      1,
+      0.6703
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.21",
+    "best": 0.6009784936904907,
+    "by": {
+     "bge-base/raw": [
+      2,
+      0.601
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "4.36",
+    "best": 0.5976577997207642,
+    "by": {
+     "bge-base/raw": [
+      3,
+      0.5977
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.58",
+    "best": 0.5919408202171326,
+    "by": {
+     "bge-base/raw": [
+      4,
+      0.5919
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.35",
+    "best": 0.5764492750167847,
+    "by": {
+     "bge-base/raw": [
+      5,
+      0.5764
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "8.6",
+    "best": 0.5578629374504089,
+    "by": {
+     "bge-base/raw": [
+      6,
+      0.5579
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "12.17",
+    "best": 0.554122805595398,
+    "by": {
+     "bge-base/raw": [
+      7,
+      0.5541
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "7.8",
+    "best": 0.5520683526992798,
+    "by": {
+     "bge-base/raw": [
+      8,
+      0.5521
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "6.11",
+    "best": 0.5510624647140503,
+    "by": {
+     "bge-base/raw": [
+      9,
+      0.5511
+     ]
+    },
+    "withheld": false,
+    "new": true
+   },
+   {
+    "id": "9.32",
+    "best": 0.5492851734161377,
+    "by": {
+     "bge-base/raw": [
+      10,
+      0.5493
+     ]
+    },
+    "withheld": false,
+    "new": true
+   }
+  ]
+ }
+]

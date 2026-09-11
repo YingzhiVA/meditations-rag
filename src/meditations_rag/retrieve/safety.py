@@ -49,7 +49,7 @@ ABUSE_SUPPRESSED = frozenset({"2.1", "4.3", "7.26", "11.18"})
 # Death-counsel four: counsel or license leaving life, or frame death as
 # welcome or preferable to continuing. Merely observing mortality is not a
 # hazard — 14% of the corpus does that.
-DEATH_COUNSEL_SUPPRESSED = frozenset({"5.29", "8.47", "9.3", "10.8"})
+DEATH_COUNSEL_SUPPRESSED = frozenset({"5.29", "8.47", "9.3", "10.8", "10.36"})
 
 SUPPRESSION: dict[SafetyFlag, frozenset[str]] = {
     SafetyFlag.ABUSE: ABUSE_SUPPRESSED,

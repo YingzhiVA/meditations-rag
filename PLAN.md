@@ -151,6 +151,9 @@ small enough to be worth having:
 | 8.47 | "Quit life then, in the same kindly spirit as though you had done it" |
 | 9.3 | "Despise not death; but receive it well content"; ends "Haste, death! lest I, too, should forget myself" |
 | 10.8 | "or else depart from life altogether… **having done at least one thing in life well, by so leaving it**" |
+| 10.36 | "...how many more reasons are there why a multitude
+would rejoice to be rid of me? You will reflect on this when dying, and depart
+with the less regret when you consider:..." |
 
 Struck: **8.58** — "do not cease to live" reads as the opposite sentiment.
 **10.31, 12.27, 12.33** — matched only on "smoke"/"smoke and ashes", the

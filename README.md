@@ -118,7 +118,7 @@ data/                    (gitignored) raw text, passages, indexes
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install -e .
+.venv/bin/python -m pip install -e ".[dev]"
 git config core.hooksPath .githooks   # enable the branch-protection hook
 ```
 

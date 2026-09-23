@@ -464,7 +464,7 @@ machinery.
 This phase is deliberately BEFORE the advanced techniques: no improvement
 without a measurement.
 
-- [ ] Curate `eval/golden_set.jsonl`: ~25 entries — about 20 `hard` cases
+- [x] Curate `eval/golden_set.jsonl`: ~25 entries — about 20 `hard` cases
       (modern phrasing, little lexical overlap, where configs plausibly
       disagree) and about 5 `canary` cases (easy lexical anchors every config
       should get, reported separately as a regression check rather than folded
@@ -485,7 +485,7 @@ without a measurement.
       hard-coded list, take top-10 rather than top-5, run every
       configuration in the grid rather than one, and write the union of
       candidates per query to a file a human can judge in one sitting.
-- [ ] `eval/router_set.jsonl` is drafted (32 entries, already consistent with
+- [x] `eval/router_set.jsonl` is drafted (32 entries, already consistent with
       the `Intent` enum). Add the `safety` field, and **extend `out_of_scope`
       with hard cases**: five of the current seven (weather, a linked-list
       function, a radiator valve, Hamlet, the Punic War) are trivially
@@ -501,7 +501,7 @@ without a measurement.
       `must_not_return` field on the golden set: different scoring, different
       failure semantics, and a failure here is a product violation rather
       than a quality regression, so the two must never average together.
-- [ ] `eval/run_eval.py`: run the pipeline over the golden set for every
+- [x] `eval/run_eval.py`: run the pipeline over the golden set for every
       configuration; report recall@k (k=1,3,5), MRR; emit a markdown table.
       Plus two more tables:
       - **Router.** Chitchat, meta and in_scope are *saturated* — every
@@ -522,7 +522,7 @@ without a measurement.
       unset. Tag the root span with the full config + eval run id.
 - [ ] Add **p50/p95 latency and $/query columns** to the matrix, sourced from
       those spans.
-- [ ] Record the Phase 2 baseline numbers. This is the "before" picture.
+- [x] Record the Phase 2 baseline numbers. This is the "before" picture.
 
 **Done when:** one command prints the comparison matrix with baseline rows, and
 a traced run is legible as a waterfall in Phoenix.

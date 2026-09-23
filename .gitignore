@@ -17,3 +17,9 @@ __pycache__/
 # Golden-set curation worksheet: a scratch tool for generating the queries.
 # Its durable content (failure modes, dead cells) lives in eval/README.md.
 eval/golden_set_grid.md
+
+# Pooling worksheets: regenerable from pool.py, and their judgements land in
+# golden_set.jsonl. candidates.md IS tracked — it is the evidence behind the
+# labels, and the index that produced it is not in the repo.
+eval/pool/side-by-side.md
+eval/pool/candidates-new.md

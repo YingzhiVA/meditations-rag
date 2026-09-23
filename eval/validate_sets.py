@@ -264,6 +264,7 @@ def validate_golden(path: Path, known: set[str] | None) -> Report:
     themes: Counter[str] = Counter()
     modes: Counter[str] = Counter()
     labelled = oos = unlabelled = 0
+    per_query: list[int] = []
 
     for n, obj in entries:
         if "gold_ids" not in obj:
@@ -328,12 +329,14 @@ def validate_golden(path: Path, known: set[str] | None) -> Report:
         ok = [check_id(rep, n, pid, known) for pid in ids]
         if all(ok):
             labelled += 1
+            per_query.append(len(ids))
         dupes = [p for p, c in Counter(ids).items() if c > 1]
         if dupes:
             rep.warn(n, f"repeated id(s) in gold_ids: {dupes}")
-        if len(ids) > 3:
-            rep.warn(n, f"{len(ids)} gold ids — eval/README.md asks for one to three you "
-                        "are confident about; scoring is hit-ANY, so extras only dilute")
+        if len(ids) > 6:
+            rep.warn(n, f"{len(ids)} gold ids — scoring is hit-ANY, so a query with this "
+                        "many is close to unmissable and stops discriminating between "
+                        "configurations")
         if any(isinstance(p, str) and p.startswith("1.") for p in ids):
             rep.note(n, "Book I label — it is a list of debts to particular people, so it "
                         "rarely deserves a gold label even when it matches (eval/README.md)")
@@ -342,6 +345,12 @@ def validate_golden(path: Path, known: set[str] | None) -> Report:
     rep.info(f"  {len(entries)} entries: {tiers['hard']} hard, {tiers['canary']} canary, "
              f"{oos} out-of-scope fixtures")
     rep.info(f"  {labelled} labelled, {unlabelled} awaiting labels")
+    if per_query:
+        # Reported, not policed. Under hit-ANY, recall rises with the number of
+        # gold ids, so this number is needed to read recall@k at all: 75% against
+        # 3.7 labels per query is not the same result as 75% against 1.5.
+        rep.info(f"  gold ids per scored query: mean {sum(per_query)/len(per_query):.1f} "
+                 f"(min {min(per_query)}, max {max(per_query)})")
     if tiers["hard"] and tiers["hard"] < 20:
         rep.warn(None, f"{tiers['hard']} hard entries; the plan asks for ~20")
     if tiers["canary"] and tiers["canary"] < 5:

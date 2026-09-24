@@ -134,8 +134,21 @@ _SAFETY_PATTERNS: dict[SafetyFlag, tuple[str, ...]] = {
         r"stroke", r"seizure\w*", r"unconscious", r"passed out", r"fainted",
         r"bleeding", r"blood loss", r"poison\w*", r"allergic reaction",
         r"anaphyla\w*", r"emergency", r"ambulance", r"\b911\b", r"\b112\b",
-        r"\b999\b", r"\b144\b", r"numb (?:on one side|arm|face)",
-        r"slurred speech", r"severe (?:pain|headache|injury|burn)",
+        r"\b999\b", r"\b144\b",
+        # Stroke, BE FAST. Symptoms come in either word order ("numb arm",
+        # "arm has gone numb"), so both are matched.
+        r"numb (?:on one side|arm|face|hand|leg)",
+        r"(?:arm|leg|hand|face|side of my (?:body|face)) (?:has |have |is |went |gone |feels? |felt )*(?:numb|limp|paraly[sz]ed)",
+        r"(?:face|mouth|smile)(?: \S+){0,5} droop\w*",
+        r"(?:can't|cannot|cant) (?:lift|move|feel) my (?:left |right )?(?:arm|leg|hand|face)",
+        r"(?:can't|cannot|cant) see out of", r"(?:lost|losing) (?:my )?(?:vision|sight)",
+        r"slurred speech", r"slurring", r"words (?:are |keep )?(?:coming out )?(?:wrong|garbled|jumbled)",
+        # Heart attack (AHA warning signs). Not bare "tight" or "pressure":
+        # anxious users describe their bodies that way, and this flag blocks
+        # retrieval, so those are left to the LLM router.
+        r"(?:crushing|squeezing)(?: \S+){0,2} (?:in|on|across) my chest",
+        r"(?:spreading|radiating) (?:down |to |into )?my (?:left )?(?:arm|jaw|neck|back)",
+        r"severe (?:pain|headache|injury|burn)",
         r"broken (?:bone|arm|leg)", r"concussion",
     ),
     SafetyFlag.ABUSE: (

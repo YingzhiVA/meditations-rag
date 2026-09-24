@@ -98,6 +98,18 @@ passages on enduring pain, which is exactly what `eval/router_set.jsonl`
 flags as prohibited. The safety floor must catch it directly, since the
 fallback cannot.
 
+**The floor stays beneath the LLM router; it is not a baseline for it to
+beat.** The keyword safety floor keeps running beneath every router, and the
+flags are the union of the two, so a floor miss comes back whenever the
+provider is down. It therefore covers common, unambiguous phrasings, and a
+miss there gets fixed in the floor when it is found. It stops short of
+paraphrase, because every widened pattern risks blocking retrieval for
+someone who only overslept. The long tail (indirect disclosure, sarcasm,
+phrasings no word list anticipates) is where the Phase 4 LLM router earns its
+safety row, reported as the recall of the floor plus the LLM router against
+the floor alone. Intent is the opposite case: `OUT_OF_SCOPE` stays out of the
+keyword router on purpose, so that gap belongs to the LLM router entirely.
+
 ### Why post-retrieval safety can be a reviewed artifact
 
 The corpus is closed and fixed at 487 passages, so the passages that counsel

@@ -107,15 +107,26 @@ _META_NOUN_RE = re.compile(r"\b(?:" + "|".join(re.escape(n) for n in META_NOUNS)
 
 _SAFETY_PATTERNS: dict[SafetyFlag, tuple[str, ...]] = {
     SafetyFlag.SELF_HARM: (
-        r"suicid\w*", r"kill(?:ing)? myself", r"end (?:my|it) (?:all|life)",
-        r"end my own life", r"take my (?:own )?life", r"want(?:ed)? to die",
+        r"suicid\w*", r"kill(?:ing)? myself", r"end(?:ing)? (?:my|it) (?:all|life)",
+        r"end(?:ing)? my own life", r"take my (?:own )?life", r"want(?:ed)? to die",
         r"wish(?:ed)? i (?:was|were) dead", r"better off dead",
         r"(?:don't|do not|dont) want to (?:live|be alive|be here|exist|wake up)",
-        r"(?:no|not) (?:point|reason) (?:in |to )?(?:living|go(?:ing)? on|be(?:ing)? alive)",
-        r"(?:not|isn't|isnt) worth living", r"self[- ]?harm\w*", r"self[- ]?injur\w*",
+        r"(?:no|not|what's the|whats the|what is the) (?:point|reason) (?:in |to |of )?(?:living|go(?:ing)? on|be(?:ing)? alive|carry(?:ing)? on)",
+        # Unanchored on negation: it is often several words away ("I don't
+        # think my life is worth living"). A positive "life is worth living"
+        # also fires, which is the high-recall trade.
+        r"worth living", r"(?:life|living|going on)(?: is| isn't| isnt| is not| is no longer| not)? worth it",
+        # Passive ideation (C-SSRS item 1). Not bare "not wake up", which
+        # fires on oversleeping and would block retrieval for it.
+        r"(?:and|to) (?:not|never) wake up",
+        # Bare "ending it" is ideation; "ending it with someone" is a breakup.
+        r"(?:about|of|considering) ending (?:it|things)(?! with)",
+        r"self[- ]?harm\w*", r"self[- ]?injur\w*",
         r"hurt(?:ing)? myself", r"cut(?:ting)? myself", r"harm(?:ing)? myself",
         r"(?:jump|jumping) off", r"overdos\w*", r"hang myself",
-        r"disappear forever", r"everyone (?:would be|is) better (?:off )?without me",
+        r"disappear forever", r"(?:better|happier) (?:off )?without me",
+        r"(?:better|happier) (?:off )?if i (?:wasn't|weren't|was not|were not) (?:around|here|alive)",
+        r"(?:better|happier) (?:off )?if i (?:was|were) gone",
     ),
     SafetyFlag.MEDICAL_EMERGENCY: (
         r"chest pain\w*", r"shortness of breath", r"(?:can't|cannot|cant) breathe",

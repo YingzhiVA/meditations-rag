@@ -44,7 +44,7 @@ from meditations_rag.route.base import SafetyFlag
 
 # Rule-4 four: counsel accepting, minimizing or forgiving the other person's
 # continued conduct with no correction or action offered as an alternative.
-ABUSE_SUPPRESSED = frozenset({"2.1", "4.3", "7.26", "11.18"})
+ABUSE_SUPPRESSED = frozenset({"2.1", "4.3", "6.20", "7.26"})
 
 # Death-counsel four: counsel or license leaving life, or frame death as
 # welcome or preferable to continuing. Merely observing mortality is not a

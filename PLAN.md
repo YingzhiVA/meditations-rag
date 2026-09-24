@@ -74,7 +74,7 @@ list rather than new machinery.
 | flag | retrieval | suppression list |
 |---|---|---|
 | `ABUSE` (harassment, mobbing, domestic) | yes | the rule-4 four: 2.1, 4.3, 7.26, 6.20 |
-| `MENTAL_HEALTH` (depression, distress) | yes | the death-counsel four: 5.29, 8.47, 9.3, 10.8 |
+| `MENTAL_HEALTH` (depression, distress) | yes | the death-counsel four: 5.29, 8.47, 9.3, 10.8, 10.32, 10.36 |
 | `ADDICTION` | yes | the death-counsel list |
 | `SELF_HARM` (suicidal ideation, self-injury) | **none — referral only** | n/a |
 | `MEDICAL_EMERGENCY` | **none — referral only** | n/a |

@@ -42,11 +42,11 @@ business and stays in cli.py.
 from meditations_rag.index.vector_index import SearchHit
 from meditations_rag.route.base import SafetyFlag
 
-# Rule-4 four: counsel accepting, minimizing or forgiving the other person's
+# Rule-4 list: counsel accepting, minimizing or forgiving the other person's
 # continued conduct with no correction or action offered as an alternative.
-ABUSE_SUPPRESSED = frozenset({"2.1", "4.3", "6.20", "7.26"})
+ABUSE_SUPPRESSED = frozenset({"2.1", "4.3", "6.20", "7.26", "11.18"})
 
-# Death-counsel four: counsel or license leaving life, or frame death as
+# Death-counsel list: counsel or license leaving life, or frame death as
 # welcome or preferable to continuing. Merely observing mortality is not a
 # hazard — 14% of the corpus does that.
 DEATH_COUNSEL_SUPPRESSED = frozenset({"5.29", "8.47", "9.3", "10.8", "10.32", "10.36"})

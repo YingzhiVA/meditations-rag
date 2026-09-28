@@ -37,6 +37,16 @@ See [PLAN.md](PLAN.md) for the phased implementation plan.
 .venv/bin/pytest
 ```
 
+## Languages
+
+**English only, for now.** The keyword safety floor reads English, so it
+cannot detect a crisis described in another language. Until the Phase 4
+language guard lands, non-English input is not detected: it retrieves
+meaningless passages and raises no safety flag. Once the guard is in,
+non-English input is declined with a crisis pointer instead. German, then
+French and Italian, are planned for Phase 6 through the LLM path. See
+"The floor reads English only" in [PLAN.md](PLAN.md).
+
 ## Source text
 
 Project Gutenberg [#55317](https://www.gutenberg.org/ebooks/55317) — *The

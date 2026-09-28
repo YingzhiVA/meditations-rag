@@ -18,6 +18,7 @@ phase-2-baseline
 phase-3-eval
 phase-4-retrieval
 phase-5-bench
+phase-6-multilingual
 ```
 
 A phase branch merges into `main` via PR when its **Done when** criterion in

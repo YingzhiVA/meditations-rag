@@ -110,6 +110,47 @@ safety row, reported as the recall of the floor plus the LLM router against
 the floor alone. Intent is the opposite case: `OUT_OF_SCOPE` stays out of the
 keyword router on purpose, so that gap belongs to the LLM router entirely.
 
+### The floor reads English only, so unreadable input is declined
+
+Nothing stops a user from typing their problem in Polish, and the floor
+cannot read it: "chcę umrzeć" (I want to die) raises no flag, routes
+`IN_SCOPE` and retrieves. The harm is not the nonsense passages that come
+back. It is the missing referral, and a README disclaimer never reaches the
+person who needed it.
+
+**No keyword lists per language.** A German list, then French, then Italian
+does not scale, and German compounds ("Arbeitsplatzmobbing") break the
+`\b`-anchored matching the English floor relies on. The floor stays English,
+permanently. What replaces the per-language lists is **one local
+language-identification check**: offline, no word lists, and it covers every
+language at once.
+
+The rules:
+
+1. **English** gets the pipeline as it is: floor beneath whichever router runs.
+2. **A supported non-English language** needs the LLM: the LLM router
+   classifies it directly, and the strategy translates it (Phase 6). If the
+   provider is down, it is **refused** with an outage message rather than
+   served in a degraded form, because the fallback has no floor that can
+   read it.
+3. **An unsupported language** is **declined**, provider up or not.
+4. **Every decline and refusal carries a static crisis pointer.** We could not
+   read the input, so we cannot rule out that rule 3 applies. The cautious
+   reading is that it might.
+
+**"Supported" means measured.** A language joins `config.SUPPORTED_LANGUAGES`
+only once it has its own safety set scoring the LLM router's flag recall in
+that language. For those languages the LLM router is the *only* safety
+detector, with no floor beneath it. That breaks the "floor always runs
+beneath" principle above, so this is where it is stated, and why the safety
+set is the entry ticket rather than an afterthought. Until Phase 6 the set is
+`("en",)`.
+
+**When the detector is unsure, decline.** It is the floor's asymmetry again:
+wrongly declining English costs a retry, while wrongly accepting another
+language costs a missed referral. The English chitchat exact match runs
+*before* the detector, since "ok" and "hi" are too short to identify.
+
 ### Why post-retrieval safety can be a reviewed artifact
 
 The corpus is closed and fixed at 487 passages, so the passages that counsel
@@ -196,7 +237,7 @@ cutting is synthesis performed with scissors, in a product that says it does
 none — a suppression list of five ids is auditable in a way "the model chose
 these three sentences for this distressed user" is not.
 
-Selective emphasis belongs in **Phase 6 synthesis**, where the output is
+Selective emphasis belongs in **Phase 7 synthesis**, where the output is
 visibly the model's prose citing Marcus rather than Marcus presented as such.
 
 The one legitimate v1 move needs no cutting: Phase 4's sub-chunk index already
@@ -573,7 +614,27 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       not a comparison. The whole case for an LLM router is semantics: no word
       list will ever catch "what's the weather in Zurich this weekend". It
       must also carry the rule-3 safety flag, *above* the keyword safety floor
-      that always runs beneath it.
+      that always runs beneath it. Write its prompt and schema so they do not
+      assume English input: Phase 6 routes German through this same router.
+- [ ] **Language guard** (see "The floor reads English only" under Scope &
+      safety boundaries). It is a pipeline step ahead of the router, not a
+      fifth `Intent`. The enum is frozen and describes what the input *is*;
+      this decides whether it can be read at all. Record the detected
+      language on `QueryResult`. With `SUPPORTED_LANGUAGES == ("en",)`, every
+      confidently non-English input is declined with the static crisis
+      pointer, and anything unsure is declined too, after the English
+      chitchat exact match has had its turn. It lands with the LLM router
+      because it is also the fallback's behaviour, and it is needed now:
+      until then every query runs in what amounts to outage mode.
+      Dependency: `lingua-language-detector` (offline, good on short text).
+      Check it has a wheel for the venv's Python 3.14 before committing to it.
+      **Measured two ways:** false declines over every English input already
+      in the golden, router and safety sets (free, since they exist), and
+      decline recall on a small `eval/language_set.jsonl` of non-English
+      inputs that includes short crisis disclosures ("chcę umrzeć", "je veux
+      mourir"). **Test invariant:** a non-English input never reaches the
+      embedder, asserted with the same raising stub as the Phase 2
+      short-circuit test.
 - [ ] **LLM passage-in-context safety check**: given (query, passage), would
       presenting this read as counsel to endure mistreatment? Scored against
       the human-reviewed suppression list on `eval/safety_set.jsonl`. The
@@ -683,7 +744,7 @@ corrupt exactly the p50/p95 and $/query columns Phase 3 exists to produce.
 **Done when:** the matrix shows a clear best configuration and the README can
 tell the story: baseline X% recall@5 → best pipeline Y%, at Z ms and $W/query.
 
-## Phase 5 — Benchmark, polish & writeup (~1–2 days)
+## Phase 5 — Benchmark, polish, web UI & writeup (~3–4 days)
 
 - [ ] `bench/ann_scaling.py`: **at what corpus size does ANN start to pay?**
       At 487 vectors HNSW cannot win — exact cosine is one matmul, and
@@ -700,7 +761,129 @@ tell the story: baseline X% recall@5 → best pipeline Y%, at Z ms and $W/query.
 - [ ] Repo hygiene: license note (Gutenberg text is public domain; state the
       edition and translator), reproducibility instructions, `HF_TOKEN` setup.
 
-## Phase 6 — Future (explicitly out of scope for v1)
+### Web UI: public, for showcase and outside testing
+
+Brought forward from Phase 7 so that people other than me can use the tool
+and try to break it. It comes *after* the config defaults move to the eval
+winner, so the public sees the tuned pipeline, and after Phase 4's language
+guard, so a non-English crisis disclosure is declined rather than served.
+Opening it to the public changes what the rest of the plan has to guarantee.
+The items below are that list.
+
+- [ ] **Extract the rendering contract** from `cli.py` into `render.py`: the
+      *decisions* (referral first, the framing line under a flag, the
+      withheld count, the intent replies) come back as structured blocks, and
+      the CLI and the web UI only format them. Two front ends that each
+      re-implement rule 3 will drift, and the one that drifts is the public
+      one. **Test invariant:** for every flag combination, the referral block
+      comes first and no withheld id or reason appears outside debug output.
+      A leak here is silent and a product violation, so it meets the Phase 2
+      bar for a test.
+- [ ] **Web front end**: Gradio on a HuggingFace Space. The Space holds
+      `HF_TOKEN` as a secret, the free CPU tier is enough for one query
+      embedding plus a 487-row matmul, Gradio's queue gives a concurrency
+      limit for free, and it keeps the Apertus/HF thread running through the
+      project. It calls `run_query` and nothing else: pipeline config ==
+      experiment config, so the public sees exactly the row the matrix
+      scored. Ship `passages.jsonl` and the index built by the same code, so a
+      cold start never hits Gutenberg, and install the CPU torch wheel, not
+      the 2.5 GB CUDA build.
+- [ ] **"Compare with baseline"**: the Phase 5 worked examples, live. The
+      `raw` row makes no LLM call, so a side-by-side with the tuned pipeline
+      costs one extra embedding.
+- [ ] **Spend cap**: a daily LLM budget, read from the `$/query` accounting
+      Phase 3 already built. Past the cap, the Space runs in outage mode:
+      keyword router and `raw`, English only, non-English refused. That is the
+      same "degrade, and say so" path as Risk 1, so running out of budget
+      needs no new behaviour, only a new trigger. Plus a per-session rate
+      limit.
+- [ ] **Privacy**: people will describe abuse and crisis in this box. By
+      default the Space **stores no query text**. Tracing stays off in the
+      deployment (Phoenix spans carry the input verbatim), and logs record
+      config, latency and flags, not the input. An upfront notice says the
+      query is sent to the LLM provider (Apertus via HF) and that this is not
+      a substitute for professional help.
+- [ ] **Referral text reviewed for strangers.** Until now only I have seen it.
+      The public cannot be assumed to be in any one country, so every
+      referral also carries an international helpline directory, not only
+      local numbers.
+- [ ] **Optional, opt-in feedback**: a per-result "this helped / this missed"
+      that stores the query only with explicit consent. These are candidates
+      for Risk 5's fresh queries, **never golden-set labels as they are**. They
+      go through the same human verification as every other label, in their
+      own commit.
+
+**Prompt injection is bounded by design.** In v1 no LLM text ever reaches the
+user; the LLM only routes and rewrites queries. So an injected query can at
+worst misroute itself, and for English the floor still runs beneath the
+router. Say this in the README rather than leaving it for someone to probe.
+
+**Done when:** the README results section tells the X% → Y% story with the
+ANN crossover; the Space is public and serves the eval-winner config; a query
+through the web UI returns the same `QueryResult` as the CLI for the same
+config; and the spend cap and the outage path have both been triggered on
+purpose and seen to degrade as specified.
+
+## Phase 6 — Multilingual queries, German first (~2–3 days, mostly curation)
+
+After Phase 5 on purpose. It depends on Phase 4's LLM seam and strategies, and
+folding a second language into Phase 4 would double every row before the
+English headline exists.
+
+**Scope: German in, English out.** Passages stay Chrystal's English. Showing a
+German translation would mean aligning a second public-domain edition's
+numbering to these 487 ids, a Phase 1-sized parser project that belongs in
+Phase 7 if anywhere. **Standard German only.** Written Swiss German has no
+standard spelling and would be its own eval row.
+
+**No German keyword lists** (see Scope & safety boundaries). All of the
+language handling goes through the LLM and through the local language guard
+from Phase 4.
+
+- [ ] **Routing on the original text.** The Phase 4 LLM router classifies
+      German input directly. Nothing is translated before routing: a
+      translate-then-route design would put safety detection behind a
+      network call, which is Risk 1's fail-open case in another language.
+- [ ] **Translation lives in the strategy step.** `RewriteQuery`, `HyDEQuery`
+      and `MultiQuery` already take one query and write English in the
+      corpus's vocabulary. Given German, they translate as part of the same
+      call. Only `raw` needs an explicit translate step, which makes German
+      `raw` an LLM-backed row. The completion cache key then has to name the
+      translator, for the same reason it names the llm (`CLAUDE.md`).
+- [ ] **German golden set**: the existing queries, with their passage ids
+      carried over unchanged, **rewritten by a German speaker as they would
+      naturally say them**. They are not machine-translated: LLM-translated
+      German is easy for an LLM to translate back, so the translate step would
+      just be undoing its own work. The hard cases are idioms ("mir wächst
+      alles über den Kopf", "ich bin am Ende"), which is where translation
+      earns its place or doesn't.
+- [ ] **German safety set and router set.** This is the entry ticket: the LLM
+      router is the only safety detector for German, so its flag recall
+      there is reported on its own and never averaged with English.
+- [ ] **German referral text** with regional hotlines (CH 143/147, DE
+      Telefonseelsorge, AT 142).
+- [ ] **Embedder row**: translate → `bge-base` against German embedded
+      directly by a multilingual encoder (`bge-m3`, or the Apertus
+      swiss-embed from Phase 4). Phase 2's reason against a multilingual
+      encoder ("a capability nothing here uses") gets tested against a
+      number.
+- [ ] Add `"de"` to `config.SUPPORTED_LANGUAGES`, in the commit that meets the
+      Done when below and not before.
+
+**The headline is the cross-lingual gap:** recall@5 in German minus recall@5
+in English, on identical labels, per strategy. Label reuse is what makes this
+cheap and clean.
+
+**Done when:** the matrix reports the German gap per strategy; the German
+safety set's flag recall has been reported and reviewed; and with the provider
+unreachable, a German query is refused with the outage message and crisis
+pointer instead of retrieving.
+
+**French and Italian follow the same template, with no new code:** a golden
+set, a safety set, referral text, and one entry in `SUPPORTED_LANGUAGES`.
+That is the scaling argument against keyword lists, stated as work.
+
+## Phase 7 — Future (explicitly out of scope for v1)
 
 - Counsel synthesis: an LLM writes modern advice grounded ONLY in the retrieved
   passages, with inline citations and a refusal path when retrieval confidence
@@ -708,7 +891,6 @@ tell the story: baseline X% recall@5 → best pipeline Y%, at Z ms and $W/query.
 - Full-context baseline: stuff the whole book (~130K tokens, cacheable) into
   one prompt and compare quality/cost vs the RAG pipeline — the "when is RAG
   justified" portfolio argument.
-- Web UI (Streamlit or FastAPI) once retrieval quality is settled.
 - Conversation mode: follow-up questions that refine retrieval. **This is where
   query rewriting pays off properly** — resolving "what about when it's my
   manager?" into a standalone query is the task rewriting was invented for; in
@@ -725,6 +907,7 @@ tell the story: baseline X% recall@5 → best pipeline Y%, at Z ms and $W/query.
 | LLM — default path | Apertus via HF Inference (`publicai`). Router calls are tiny; HyDE/multi-query are ~1 short completion per query. Requires `HF_TOKEN`. |
 | LLM — comparator | `claude-sonnet-5` ($2/$10 per MTok), scoped to comparator eval runs, not every query. A full golden-set pass is cents. |
 | Telemetry | Phoenix runs locally. Free. |
+| Hosting (Phase 5) | HuggingFace Space, free CPU tier. LLM spend bounded by the daily cap; past it the Space runs keyword + `raw` for free. |
 
 Worst case for a full grid run is bounded by the HF side, not the Anthropic
 side — the comparator column is the smaller half of the bill.

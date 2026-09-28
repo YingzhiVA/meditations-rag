@@ -535,7 +535,7 @@ without a measurement.
 - [x] `telemetry.py` + instrumentation: OpenTelemetry spans with OpenInference
       conventions, OTLP → local Phoenix. No-op when `MEDITATIONS_TRACING` is
       unset. Tag the root span with the full config + eval run id.
-- [x] Add **p50/p95 latency and $/query columns** to the matrix. Latency is
+- [x] Add **p50/p95 latency and \$/query columns** to the matrix. Latency is
       wall-clock around `run_query`, which is the end-to-end number; the
       spans give the per-stage breakdown in Phoenix, not a better total.
       Tokens and $/query stay blank until Phase 4 makes an LLM call, since

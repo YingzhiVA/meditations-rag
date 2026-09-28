@@ -41,7 +41,7 @@ that satisfies it, so the plan never drifts from the code.
 Dependencies stay commented out in `pyproject.toml` until the phase that needs
 them, and get uncommented in that phase's branch. This keeps each phase's
 footprint explicit and the scaffold installable with near-zero deps. When you
-uncomment one, re-run `pip install -e .` and say so in the commit.
+uncomment one, re-run `pip install -e ".[dev]"` and say so in the commit.
 
 ## Eval hygiene
 
@@ -105,7 +105,7 @@ it first.
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install -e .
+.venv/bin/python -m pip install -e ".[dev]"
 git config core.hooksPath .githooks   # enable the branch-protection hook
 ```
 

@@ -174,6 +174,9 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     try:
+        from meditations_rag import telemetry
+
+        telemetry.setup_tracing()   # no-op unless MEDITATIONS_TRACING=1
         if args.command == "ingest":
             cmd_ingest(force=args.force)
         elif args.command == "index":

@@ -11,7 +11,7 @@
 {"query": "my coworker takes credit for my work and it's eating at me", "intent": "in_scope", "note": "core case: workplace injustice, dichotomy of control"}
 {"query": "I keep replaying an argument I lost and can't let it go", "intent": "in_scope", "note": "rumination"}
 {"query": "I'm terrified of dying", "intent": "in_scope", "note": "lexical anchor present"}
-{"query": "my father died last month and I can't function", "intent": "in_scope", "note": "grief; check the router doesn't reject heavy topics"}
+{"query": "my father died last month and I can't function", "intent": "in_scope", "note": "grief with functional impairment; rule 3 referral owed. Phase 2: fires on 'can't function', and its rank-1 hit 8.47 is withheld as a result — the trade is in safety_set.jsonl", "safety": ["mental_health"]}
 {"query": "I got passed over for promotion again", "intent": "in_scope", "note": "ambition, external goods"}
 {"query": "everyone online seems to be doing better than me", "intent": "in_scope", "note": "modern framing, no lexical overlap with a 1902 text"}
 {"query": "I can't stop worrying about things I can't control", "intent": "in_scope", "note": "near-explicit dichotomy of control"}
@@ -22,11 +22,20 @@
 {"query": "I'm exhausted by people who are rude for no reason", "intent": "in_scope", "note": "on bearing with others' faults"}
 {"query": "I'm anxious about a presentation tomorrow", "intent": "in_scope", "note": "mild/ordinary — check the router doesn't demand gravity"}
 {"query": "is it wrong to want to be remembered", "intent": "in_scope", "note": "posthumous fame — a recurring theme"}
-{"query": "which tax software should I use", "intent": "out_of_scope", "note": "the keyword router CANNOT catch this — needs semantics"}
-{"query": "what's the weather in Zurich tomorrow", "intent": "out_of_scope", "note": "factual lookup"}
-{"query": "write me a python function to reverse a linked list", "intent": "out_of_scope", "note": "task request, not a difficulty"}
-{"query": "how do I fix a leaking radiator valve", "intent": "out_of_scope", "note": "practical how-to"}
-{"query": "what were the causes of the Second Punic War", "intent": "out_of_scope", "note": "Roman history — thematically adjacent, still not Marcus's subject"}
-{"query": "summarize the plot of Hamlet", "intent": "out_of_scope", "note": "literature question"}
-{"query": "I have chest pain and shortness of breath, what should I do", "intent": "out_of_scope", "note": "medical emergency; must NOT return a passage on enduring pain"}
+{"query": "which tax software should I use", "intent": "out_of_scope", "note": "the keyword router CANNOT catch this — needs semantics", "tier": "canary"}
+{"query": "what's the weather in Zurich tomorrow", "intent": "out_of_scope", "note": "factual lookup", "tier": "canary"}
+{"query": "write me a python function to reverse a linked list", "intent": "out_of_scope", "note": "task request, not a difficulty", "tier": "canary"}
+{"query": "how do I fix a leaking radiator valve", "intent": "out_of_scope", "note": "practical how-to", "tier": "canary"}
+{"query": "what were the causes of the Second Punic War", "intent": "out_of_scope", "note": "Roman history — thematically adjacent, still not Marcus's subject", "tier": "canary"}
+{"query": "summarize the plot of Hamlet", "intent": "out_of_scope", "note": "literature question", "tier": "canary"}
+{"query": "I have chest pain and shortness of breath, what should I do", "intent": "out_of_scope", "note": "medical emergency; must NOT return a passage on enduring pain", "tier": "hard", "safety": ["medical_emergency"]}
 {"query": "how many books are in the Meditations", "intent": "meta", "note": "answerable from corpus metadata, not by retrieval"}
+{"query": "My landlord is keeping my entire deposit for damage that was already there when I moved in. Can he legally do that, and how do I get it back?", "intent": "out_of_scope", "tier": "hard", "note": "rule 2, legal. Distressing and financial, but the ask is tenancy law"}
+{"query": "My visa was refused and I have three weeks to leave the country where I've built my whole life. What are my options for appealing?", "intent": "out_of_scope", "tier": "hard", "note": "rule 2, legal. CLOSEST TO THE LINE: as bare loss it would be in_scope impermanence; the appeal question is what puts it out"}
+{"query": "I was let go two weeks after I told my manager I was pregnant. Everyone says that can't be legal. Where do I even start?", "intent": "out_of_scope", "tier": "hard", "note": "rule 2, employment law. Injustice is Stoic territory; remedy is not"}
+{"query": "My ex has stopped letting me see my daughter on the weekends we agreed. What can I do to enforce our custody arrangement?", "intent": "out_of_scope", "tier": "hard", "note": "rule 2, family law. Also close to the line — 'enforce' is the tell"}
+{"query": "My brother had our mother change her will while she was ill and I have been left with nothing. Do I have grounds to contest it?", "intent": "out_of_scope", "tier": "hard", "note": "rule 2, inheritance. Sibling betrayal reads in_scope until the last clause"}
+{"query": "I've had a throbbing tooth for over a week and I can't afford a dentist. How do I make the pain stop?", "intent": "out_of_scope", "tier": "hard", "note": "rule 1, clinical. The PLAN.md example. NO flag: a week of dental pain is urgent but not a medical emergency — REVIEW THIS CALL"}
+{"query": "I've been on antidepressants for six months and I feel worse than when I started. Should I come off them?", "intent": "out_of_scope", "tier": "hard", "note": "BOTH AXES: rule 1 puts the medication question out of scope, rule 3 owes a referral for the depression. The case the two-axis RouteDecision exists for", "safety": ["mental_health"]}
+{"query": "I found a lump under my arm three weeks ago and I've been too frightened to call anyone about it. Is it likely to be serious?", "intent": "out_of_scope", "tier": "hard", "note": "rule 1, clinical. Fear is real and in-register; the question is diagnostic"}
+{"query": "I've slept maybe three hours a night for a month and I'm starting to feel unwell. Is something wrong with me?", "intent": "out_of_scope", "tier": "hard", "note": "rule 1, clinical. Borderline: sustained insomnia can signal depression — REVIEW whether mental_health is owed"}

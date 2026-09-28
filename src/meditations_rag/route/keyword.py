@@ -107,15 +107,26 @@ _META_NOUN_RE = re.compile(r"\b(?:" + "|".join(re.escape(n) for n in META_NOUNS)
 
 _SAFETY_PATTERNS: dict[SafetyFlag, tuple[str, ...]] = {
     SafetyFlag.SELF_HARM: (
-        r"suicid\w*", r"kill(?:ing)? myself", r"end (?:my|it) (?:all|life)",
-        r"end my own life", r"take my (?:own )?life", r"want(?:ed)? to die",
+        r"suicid\w*", r"kill(?:ing)? myself", r"end(?:ing)? (?:my|it) (?:all|life)",
+        r"end(?:ing)? my own life", r"take my (?:own )?life", r"want(?:ed)? to die",
         r"wish(?:ed)? i (?:was|were) dead", r"better off dead",
         r"(?:don't|do not|dont) want to (?:live|be alive|be here|exist|wake up)",
-        r"(?:no|not) (?:point|reason) (?:in |to )?(?:living|go(?:ing)? on|be(?:ing)? alive)",
-        r"(?:not|isn't|isnt) worth living", r"self[- ]?harm\w*", r"self[- ]?injur\w*",
+        r"(?:no|not|what's the|whats the|what is the) (?:point|reason) (?:in |to |of )?(?:living|go(?:ing)? on|be(?:ing)? alive|carry(?:ing)? on)",
+        # Unanchored on negation: it is often several words away ("I don't
+        # think my life is worth living"). A positive "life is worth living"
+        # also fires, which is the high-recall trade.
+        r"worth living", r"(?:life|living|going on)(?: is| isn't| isnt| is not| is no longer| not)? worth it",
+        # Passive ideation (C-SSRS item 1). Not bare "not wake up", which
+        # fires on oversleeping and would block retrieval for it.
+        r"(?:and|to) (?:not|never) wake up",
+        # Bare "ending it" is ideation; "ending it with someone" is a breakup.
+        r"(?:about|of|considering) ending (?:it|things)(?! with)",
+        r"self[- ]?harm\w*", r"self[- ]?injur\w*",
         r"hurt(?:ing)? myself", r"cut(?:ting)? myself", r"harm(?:ing)? myself",
         r"(?:jump|jumping) off", r"overdos\w*", r"hang myself",
-        r"disappear forever", r"everyone (?:would be|is) better (?:off )?without me",
+        r"disappear forever", r"(?:better|happier) (?:off )?without me",
+        r"(?:better|happier) (?:off )?if i (?:wasn't|weren't|was not|were not) (?:around|here|alive)",
+        r"(?:better|happier) (?:off )?if i (?:was|were) gone",
     ),
     SafetyFlag.MEDICAL_EMERGENCY: (
         r"chest pain\w*", r"shortness of breath", r"(?:can't|cannot|cant) breathe",
@@ -123,8 +134,21 @@ _SAFETY_PATTERNS: dict[SafetyFlag, tuple[str, ...]] = {
         r"stroke", r"seizure\w*", r"unconscious", r"passed out", r"fainted",
         r"bleeding", r"blood loss", r"poison\w*", r"allergic reaction",
         r"anaphyla\w*", r"emergency", r"ambulance", r"\b911\b", r"\b112\b",
-        r"\b999\b", r"\b144\b", r"numb (?:on one side|arm|face)",
-        r"slurred speech", r"severe (?:pain|headache|injury|burn)",
+        r"\b999\b", r"\b144\b",
+        # Stroke, BE FAST. Symptoms come in either word order ("numb arm",
+        # "arm has gone numb"), so both are matched.
+        r"numb (?:on one side|arm|face|hand|leg)",
+        r"(?:arm|leg|hand|face|side of my (?:body|face)) (?:has |have |is |went |gone |feels? |felt )*(?:numb|limp|paraly[sz]ed)",
+        r"(?:face|mouth|smile)(?: \S+){0,5} droop\w*",
+        r"(?:can't|cannot|cant) (?:lift|move|feel) my (?:left |right )?(?:arm|leg|hand|face)",
+        r"(?:can't|cannot|cant) see out of", r"(?:lost|losing) (?:my )?(?:vision|sight)",
+        r"slurred speech", r"slurring", r"words (?:are |keep )?(?:coming out )?(?:wrong|garbled|jumbled)",
+        # Heart attack (AHA warning signs). Not bare "tight" or "pressure":
+        # anxious users describe their bodies that way, and this flag blocks
+        # retrieval, so those are left to the LLM router.
+        r"(?:crushing|squeezing)(?: \S+){0,2} (?:in|on|across) my chest",
+        r"(?:spreading|radiating) (?:down |to |into )?my (?:left )?(?:arm|jaw|neck|back)",
+        r"severe (?:pain|headache|injury|burn)",
         r"broken (?:bone|arm|leg)", r"concussion",
     ),
     SafetyFlag.ABUSE: (

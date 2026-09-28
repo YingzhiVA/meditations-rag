@@ -11,9 +11,9 @@ dependencies = [
     "sentence-transformers",    # Phase 2: local embedder (bge-base-en-v1.5)
     # Phase 3: telemetry. Vendor-neutral instrumentation; Phoenix is just the
     # OTLP backend (dev extra below), so these stay swappable.
-    # "opentelemetry-sdk",
-    # "opentelemetry-exporter-otlp-proto-http",
-    # "openinference-semantic-conventions",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp-proto-http",
+    "openinference-semantic-conventions",
     # Phase 4: LLM providers. huggingface-hub is the DEFAULT path (Apertus,
     # router + query transformation); anthropic is the eval comparator only.
     # "huggingface-hub",
@@ -25,7 +25,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest",                   # Phase 1: parser invariant tests
-    # "arize-phoenix",          # Phase 3: local trace UI — dev tool, not runtime
+    "arize-phoenix",            # Phase 3: local trace UI — dev tool, not runtime
     # "hnswlib",                # Phase 5: bench/ann_scaling.py only
 ]
 

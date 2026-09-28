@@ -99,6 +99,12 @@ class SentenceTransformerEmbedder:
     def dim(self) -> int:
         return self._dim
 
+    @property
+    def device(self) -> str:
+        """Where the model runs, e.g. 'cuda:0' or 'cpu'. Recorded in eval
+        results, since latency is only comparable on the same device."""
+        return str(self._model.device)
+
     def embed_texts(self, texts: list[str]) -> Matrix:
         vectors = self._model.encode(
             list(texts),

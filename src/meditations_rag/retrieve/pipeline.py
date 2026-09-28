@@ -39,10 +39,10 @@ step 6, since 11.18's suppression is by parent), keeping the best-scoring
 sub-chunk's score, so that citations and rendering always speak in whole
 passages regardless of what was embedded.
 
-Telemetry (Phase 3): run_query opens the root CHAIN span via
-telemetry.get_tracer() and tags it with the full config (plus eval_run_id
-when the harness supplies one). Every stage below is a child span. Import
-telemetry, never opentelemetry directly — tracing must stay optional.
+Telemetry (Phase 3): run_query opens the root CHAIN span and tags it with
+the full config (plus eval_run_id when the harness supplies one); every
+stage in _run_query is a child span. Import telemetry, never opentelemetry
+directly — tracing must stay optional, and with it off every span is a no-op.
 
 Returns QueryResult — the render/eval contract. Eval scores retrieval on
 .passages, the router on .intent and .safety, and suppression on .withheld.
@@ -50,7 +50,7 @@ Returns QueryResult — the render/eval contract. Eval scores retrieval on
 
 from dataclasses import asdict, dataclass, field
 
-from meditations_rag import config
+from meditations_rag import config, telemetry
 from meditations_rag.corpus.store import Passage, load_passages
 from meditations_rag.embed.base import Embedder
 from meditations_rag.index.vector_index import LoadedIndex, SearchHit, load_index, search
@@ -124,17 +124,40 @@ def run_query(
     embedder: Embedder | None = None,
     index: LoadedIndex | None = None,
     passages: list[Passage] | None = None,
+    eval_run_id: str | None = None,
 ) -> QueryResult:
     """Execute the flow above. Pure function of (problem, cfg, on-disk
     index): no hidden state, so eval runs are reproducible.
 
     The keyword-only parameters let a caller that runs many queries (the
     eval harness) load the model, index and corpus once and pass them in;
-    they must agree with cfg. The CLI passes nothing and pays the load."""
+    they must agree with cfg. The CLI passes nothing and pays the load.
+    eval_run_id only tags the trace, so a Phoenix trace can be matched to the
+    report that its run produced."""
+    with telemetry.span("query", "CHAIN", input=problem) as root:
+        telemetry.set_metadata(root, {**cfg.as_dict(), "config": cfg.label,
+                                      "eval_run_id": eval_run_id}, tags=[cfg.label])
+        result = _run_query(problem, cfg, router, embedder, index, passages)
+        telemetry.set_output(root, {
+            "intent": result.intent.value,
+            "safety": sorted(f.value for f in result.safety),
+            "shown": [rp.passage.id for rp in result.passages],
+            "withheld": result.withheld,
+            "no_strong_match": result.no_strong_match,
+        })
+        return result
+
+
+def _run_query(problem, cfg, router, embedder, index, passages) -> QueryResult:
     from meditations_rag.route import get_router
 
     router = router or get_router(cfg.router)
-    decision: RouteDecision = router.route(problem)
+    with telemetry.span("route", "CHAIN", input=problem,
+                        **{"meditations.router": router.name}) as sp:
+        decision: RouteDecision = router.route(problem)
+        telemetry.set_output(sp, {"intent": decision.intent.value,
+                                  "safety": sorted(f.value for f in decision.safety),
+                                  "retrieves": decision.retrieves})
 
     if not decision.retrieves:
         return QueryResult(intent=decision.intent, safety=decision.safety)
@@ -143,7 +166,10 @@ def run_query(
     from meditations_rag.retrieve.strategies import get_strategy
 
     strategy = get_strategy(cfg.strategy)
-    queries = strategy.expand(problem)
+    with telemetry.span("strategy.expand", "CHAIN", input=problem,
+                        **{"meditations.strategy": strategy.name}) as sp:
+        queries = strategy.expand(problem)
+        telemetry.set_output(sp, queries)
     if len(queries) != 1:
         raise NotImplementedError(
             "multi-query fusion lands in Phase 4; Phase 2 strategies expand 1 -> 1"
@@ -151,16 +177,38 @@ def run_query(
     if cfg.reranker != "none":
         raise NotImplementedError("rerankers land in Phase 4; Phase 2 knows only 'none'")
 
-    embedder = embedder or get_embedder(cfg.embedder)
-    index = index or load_index(embedder.name, expected_dim=embedder.dim)
+    # Only the CLI reaches this span: the harness passes all three in, so its
+    # traces carry per-query cost and never a model load.
+    if embedder is None or index is None or passages is None:
+        with telemetry.span("load", "CHAIN"):
+            embedder = embedder or get_embedder(cfg.embedder)
+            index = index or load_index(embedder.name, expected_dim=embedder.dim)
+            passages = passages or load_passages()
     if index.embedder != embedder.name:
         raise ValueError(f"index is for {index.embedder!r}, embedder is {embedder.name!r}")
+    by_id = {p.id: p for p in passages}
 
-    hits: list[SearchHit] = search(embedder.embed_query(queries[0]), index, cfg.k)
+    with telemetry.span("embed.query", "EMBEDDING", input=queries[0], **{
+        "embedding.model_name": getattr(embedder, "model_id", embedder.name),
+        "embedding.embeddings.0.embedding.text": queries[0],
+    }):
+        vector = embedder.embed_query(queries[0])
 
-    kept, withheld = apply_suppression(hits, decision.safety)
+    with telemetry.span("index.search", "RETRIEVER", input=queries[0],
+                        **{"meditations.k": cfg.k}) as sp:
+        hits: list[SearchHit] = search(vector, index, cfg.k)
+        telemetry.set_documents(sp, [(h.passage_id, h.score, by_id[h.passage_id].text)
+                                     for h in hits])
 
-    by_id = {p.id: p for p in (passages or load_passages())}
+    # Gated on the flag like apply_suppression itself: no flag, no span.
+    if decision.safety:
+        with telemetry.span("safety.suppress", "GUARDRAIL",
+                            input=sorted(f.value for f in decision.safety)) as sp:
+            kept, withheld = apply_suppression(hits, decision.safety)
+            telemetry.set_output(sp, {"withheld": [h.passage_id for h in withheld]})
+    else:
+        kept, withheld = hits, []
+
     shown = [
         RetrievedPassage(passage=by_id[h.passage_id], score=h.score, rank=r)
         for r, h in enumerate(kept, start=1)

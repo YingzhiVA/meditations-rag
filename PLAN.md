@@ -73,8 +73,8 @@ list rather than new machinery.
 
 | flag | retrieval | suppression list |
 |---|---|---|
-| `ABUSE` (harassment, mobbing, domestic) | yes | the rule-4 four: 2.1, 4.3, 7.26, 11.18 |
-| `MENTAL_HEALTH` (depression, distress) | yes | the death-counsel four: 5.29, 8.47, 9.3, 10.8 |
+| `ABUSE` (harassment, mobbing, domestic) | yes | the rule-4 five: 2.1, 4.3, 6.20, 7.26, 11.18 |
+| `MENTAL_HEALTH` (depression, distress) | yes | the death-counsel six: 5.29, 8.47, 9.3, 10.8, 10.32, 10.36 |
 | `ADDICTION` | yes | the death-counsel list |
 | `SELF_HARM` (suicidal ideation, self-injury) | **none — referral only** | n/a |
 | `MEDICAL_EMERGENCY` | **none — referral only** | n/a |
@@ -98,6 +98,18 @@ passages on enduring pain, which is exactly what `eval/router_set.jsonl`
 flags as prohibited. The safety floor must catch it directly, since the
 fallback cannot.
 
+**The floor stays beneath the LLM router; it is not a baseline for it to
+beat.** The keyword safety floor keeps running beneath every router, and the
+flags are the union of the two, so a floor miss comes back whenever the
+provider is down. It therefore covers common, unambiguous phrasings, and a
+miss there gets fixed in the floor when it is found. It stops short of
+paraphrase, because every widened pattern risks blocking retrieval for
+someone who only overslept. The long tail (indirect disclosure, sarcasm,
+phrasings no word list anticipates) is where the Phase 4 LLM router earns its
+safety row, reported as the recall of the floor plus the LLM router against
+the floor alone. Intent is the opposite case: `OUT_OF_SCOPE` stays out of the
+keyword router on purpose, so that gap belongs to the LLM router entirely.
+
 ### Why post-retrieval safety can be a reviewed artifact
 
 The corpus is closed and fixed at 487 passages, so the passages that counsel
@@ -118,14 +130,15 @@ reverse-engineer):
 > conduct, judgment, or inner state are not hazards — those are precisely what
 > someone under mistreatment may legitimately need.
 
-**The `ABUSE` list — four ids, reviewed.** A regex sweep produced 11
-candidates; all 11 were read in full and 7 struck. Reasons are recorded
+**The `ABUSE` list — five ids, reviewed.** A regex sweep produced 11
+candidates; all 11 were read in full and 7 struck. 6.20 was found later when reading the book from head to toe. Reasons are recorded
 because the strikes are as informative as the keeps:
 
 | id | why it is a hazard |
 |---|---|
 | 2.1 | "…I therefore cannot be hurt by any of these" — minimizes, and it is the conclusion the whole passage builds toward, so there is no cut that removes it |
 | 4.3 | inward retreat *in place of* external change is the passage's thesis, not a stray clause: "to bear with them is a part of justice, and that they cannot help their sin… Remember and cease from your complaints" |
+| 6.20 | "In all good humour we simply keep out of his way...overlook the many injuries which are done to us" suggests forebearance and avoidance, which is almost always impossible in psychological abuse cases. |
 | 7.26 | "Your duty then is to forgive… grant indulgence to him who is still mistaken" — forgiveness with no alternative offered |
 | 11.18 | precepts 4, 5, 7 and 9 (see the Phase 4 refinement — the tenth is a counterweight and must survive) |
 
@@ -136,7 +149,7 @@ concern, it does not counsel accepting the conduct. **1.15** and **9.3** were
 regex noise: a character portrait of Maximus that matched on "forgive", and a
 passage about dying in which "bear with them mildly" is one incidental clause.
 
-**The death-counsel list — four ids, reviewed.** Used by `MENTAL_HEALTH` and
+**The death-counsel list — six ids, reviewed.** Used by `MENTAL_HEALTH` and
 `ADDICTION`. Its own hazard test, and the distinction is what makes the list
 small enough to be worth having:
 
@@ -151,6 +164,11 @@ small enough to be worth having:
 | 8.47 | "Quit life then, in the same kindly spirit as though you had done it" |
 | 9.3 | "Despise not death; but receive it well content"; ends "Haste, death! lest I, too, should forget myself" |
 | 10.8 | "or else depart from life altogether… **having done at least one thing in life well, by so leaving it**" |
+| 10.32 | "Only do you determine to live no longer if you cannot be such a man; for neither does reason require, in
+that case, that you should." |
+| 10.36 | "...how many more reasons are there why a multitude
+would rejoice to be rid of me? You will reflect on this when dying, and depart
+with the less regret when you consider:..." |
 
 Struck: **8.58** — "do not cease to live" reads as the opposite sentiment.
 **10.31, 12.27, 12.33** — matched only on "smoke"/"smoke and ashes", the
@@ -159,7 +177,7 @@ smoky-house metaphor.
 
 That test is also the reason `SELF_HARM` cannot use a list at all: the line
 between "counsels leaving life" and "observes that all things pass" is
-checkable across four passages and not across 68, and in acute crisis the
+checkable across six passages and not across 68, and in acute crisis the
 consoling ones are not safe either.
 
 Note 9.3 appears here having been struck from the `ABUSE` list — the clearest
@@ -175,7 +193,7 @@ fragment shown under "Book 2, §1" misrepresents what the reader has read;
 the seams usually are not there (in 2.1 the problematic line *is* the
 conclusion the argument earns, so no cut leaves both halves meaningful); and
 cutting is synthesis performed with scissors, in a product that says it does
-none — a suppression list of four ids is auditable in a way "the model chose
+none — a suppression list of five ids is auditable in a way "the model chose
 these three sentences for this distressed user" is not.
 
 Selective emphasis belongs in **Phase 6 synthesis**, where the output is
@@ -333,7 +351,7 @@ short corpus.
         feel hopeless about my career", but an unnecessary referral line
         costs almost nothing and a missed one does not.
 - [x] `retrieve/safety.py`: post-retrieval suppression, **keyed by flag** —
-      the reviewed four (2.1, 4.3, 7.26, 11.18) for `ABUSE`, the
+      the reviewed five (2.1, 4.3, 6.20, 7.26, 11.18) for `ABUSE`, the
       death-counsel list for `MENTAL_HEALTH` and `ADDICTION`, and nothing for
       `SELF_HARM`/`MEDICAL_EMERGENCY` since those never retrieve. See Scope &
       safety boundaries for the hazard test, the strikes, and why 9.3 is on
@@ -461,7 +479,7 @@ machinery.
 This phase is deliberately BEFORE the advanced techniques: no improvement
 without a measurement.
 
-- [ ] Curate `eval/golden_set.jsonl`: ~25 entries — about 20 `hard` cases
+- [x] Curate `eval/golden_set.jsonl`: ~25 entries — about 20 `hard` cases
       (modern phrasing, little lexical overlap, where configs plausibly
       disagree) and about 5 `canary` cases (easy lexical anchors every config
       should get, reported separately as a regression check rather than folded
@@ -482,7 +500,7 @@ without a measurement.
       hard-coded list, take top-10 rather than top-5, run every
       configuration in the grid rather than one, and write the union of
       candidates per query to a file a human can judge in one sitting.
-- [ ] `eval/router_set.jsonl` is drafted (32 entries, already consistent with
+- [x] `eval/router_set.jsonl` is drafted (32 entries, already consistent with
       the `Intent` enum). Add the `safety` field, and **extend `out_of_scope`
       with hard cases**: five of the current seven (weather, a linked-list
       function, a radiator valve, Hamlet, the Punic War) are trivially
@@ -492,13 +510,13 @@ without a measurement.
       — a withheld deposit (legal), a rejected visa (legal), an untreated
       tooth (clinical). Target ~8-10 hard alongside the easy ones, reported
       separately: the same hard/canary split the golden set already has.
-- [ ] Curate `eval/safety_set.jsonl` — **the project's first negative
+- [x] Curate `eval/safety_set.jsonl` — **the project's first negative
       labels.** Abuse/harassment/mobbing-context queries paired with passage
       ids that must **not** appear in the shown results. Its own file, not a
       `must_not_return` field on the golden set: different scoring, different
       failure semantics, and a failure here is a product violation rather
       than a quality regression, so the two must never average together.
-- [ ] `eval/run_eval.py`: run the pipeline over the golden set for every
+- [x] `eval/run_eval.py`: run the pipeline over the golden set for every
       configuration; report recall@k (k=1,3,5), MRR; emit a markdown table.
       Plus two more tables:
       - **Router.** Chitchat, meta and in_scope are *saturated* — every
@@ -514,12 +532,16 @@ without a measurement.
         alongside, never folded into an accuracy figure — the two error types
         have wildly different costs. Plus post-retrieval suppression: did any
         prohibited passage survive into the shown results.
-- [ ] `telemetry.py` + instrumentation: OpenTelemetry spans with OpenInference
+- [x] `telemetry.py` + instrumentation: OpenTelemetry spans with OpenInference
       conventions, OTLP → local Phoenix. No-op when `MEDITATIONS_TRACING` is
       unset. Tag the root span with the full config + eval run id.
-- [ ] Add **p50/p95 latency and $/query columns** to the matrix, sourced from
-      those spans.
-- [ ] Record the Phase 2 baseline numbers. This is the "before" picture.
+- [x] Add **p50/p95 latency and \$/query columns** to the matrix. Latency is
+      wall-clock around `run_query`, which is the end-to-end number; the
+      spans give the per-stage breakdown in Phoenix, not a better total.
+      Tokens and $/query stay blank until Phase 4 makes an LLM call, since
+      printing 0.00 for a pipeline that spends nothing would read as a
+      measurement.
+- [x] Record the Phase 2 baseline numbers. This is the "before" picture.
 
 **Done when:** one command prints the comparison matrix with baseline rows, and
 a traced run is legible as a waterfall in Phoenix.

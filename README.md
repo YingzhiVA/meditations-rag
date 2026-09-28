@@ -118,7 +118,7 @@ data/                    (gitignored) raw text, passages, indexes
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install -e .
+.venv/bin/python -m pip install -e ".[dev]"
 git config core.hooksPath .githooks   # enable the branch-protection hook
 ```
 
@@ -159,6 +159,9 @@ $ meditations "..." --strategy hyde --llm apertus   # Phase 4
 $ python eval/run_eval.py            # Phase 3: the comparison matrix + router table
 
 # with tracing:
-$ phoenix serve &
+$ phoenix serve &                    # UI at http://localhost:6006, project "meditations-rag"
+                                     # first start downloads a ~26 MB runtime from GitHub into
+                                     # ~/.phoenix/wasm and can sit silent for minutes; later starts take seconds
 $ MEDITATIONS_TRACING=1 meditations "..."
+$ MEDITATIONS_TRACING=1 python eval/run_eval.py   # filter on metadata['eval_run_id'] from the report stamp
 ```

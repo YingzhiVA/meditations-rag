@@ -602,7 +602,7 @@ allowing multiple gold ids per query and scoring hit-any.
 
 Each item lands as a new row/column in the eval matrix. Implement in order:
 
-- [ ] **LLM provider seam first**, since everything below depends on it:
+- [x] **LLM provider seam first**, since everything below depends on it:
       `llm/base.py` (protocol), `llm/hf.py` (Apertus via HuggingFace —
       the default), `llm/__init__.py` (registry). `llm/claude.py` becomes the
       comparator column, not the default path.
@@ -920,12 +920,17 @@ side — the comparator column is the smaller half of the bill.
    Mitigation: every LLM-backed component degrades rather than fails — the
    router falls back to `KeywordRouter`, and the CLI says so rather than
    silently downgrading.
-2. **Structured-output support on `publicai` is unverified.** `MultiQuery` and
-   the LLM router both depend on `complete_json`. Mitigation in `llm/hf.py`:
-   attempt `response_format`, fall back to prompt-instructed JSON with tolerant
+2. **Structured-output support on `publicai`.** `MultiQuery` and the LLM
+   router both depend on `complete_json`. Mitigation in `llm/hf.py`: attempt
+   `response_format`, fall back to prompt-instructed JSON with tolerant
    parsing and one retry, and log which path fired. Claude's structured output
    *is* guaranteed — one concrete axis where the comparator may legitimately
    win.
+   **First evidence (2026-09-28):** a smoke call to each of Apertus-8B and
+   -70B with a single-enum schema was honoured on the `response_format` path,
+   no fallback. One call each on the simplest schema, so the risk is reduced,
+   not closed: every `CallRecord` carries `json_path`, and the eval runs
+   report the split on the real schemas.
 3. **Apertus HyDE register quality.** Style imitation is the hardest ask of the
    default model. See the Phase 4 note — a loss here is a result, not a defeat.
 4. **Golden-set subjectivity** — mitigated by multi-label hit-any scoring.

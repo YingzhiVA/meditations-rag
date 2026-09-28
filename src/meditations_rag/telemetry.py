@@ -225,6 +225,22 @@ def set_metadata(span, metadata: Mapping[str, object], tags: list[str] = ()) -> 
         span.set_attribute(sa.TAG_TAGS, list(tags))
 
 
+def set_llm(span, *, model: str, provider: str, input_tokens: int,
+            output_tokens: int) -> None:
+    """Model and token counts on an LLM span — what Phoenix sums into cost
+    per trace, and so per configuration."""
+    if not span.is_recording():
+        return
+    sa, _ = _keys()
+    span.set_attributes({
+        sa.LLM_MODEL_NAME: model,
+        sa.LLM_PROVIDER: provider,
+        sa.LLM_TOKEN_COUNT_PROMPT: input_tokens,
+        sa.LLM_TOKEN_COUNT_COMPLETION: output_tokens,
+        sa.LLM_TOKEN_COUNT_TOTAL: input_tokens + output_tokens,
+    })
+
+
 def set_documents(span, docs: list[tuple[str, float, str]]) -> None:
     """(id, score, content) per retrieved document, in rank order — what
     Phoenix renders as the retriever's document list."""

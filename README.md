@@ -143,18 +143,24 @@ torch (~2.5 GB); the first `meditations index` then downloads the
 `bge-base-en-v1.5` weights (~440 MB) into the HuggingFace cache. Both are
 one-time. The index is 487 × 768 float32 and builds in a couple of seconds.
 
-The default *LLM* path (Phase 4 onward) needs a **HuggingFace token**:
+The LLM path (Phase 4 onward) needs keys. Put them in `.env`, which is
+gitignored and loaded by `config.py`; rotating a key is then one edited line:
 
+```sh
+cp .env.example .env    # then fill in the values
 ```
-export HF_TOKEN=hf_...
-```
+
+- `HF_TOKEN` for the default path. A fine-grained token with only "Make calls
+  to Inference Providers" is enough. Alternatively `hf auth login`, which
+  stores a token outside the repo that `huggingface_hub` finds by itself.
+- `ANTHROPIC_API_KEY` is optional, and only needed to run the Claude
+  comparator column of the eval matrix.
+
+A variable already exported in your shell takes precedence over `.env`.
 
 The default Apertus models (`Apertus-8B/70B-Instruct-2509`) are **ungated** —
 no terms to accept, no access request. Switching `config.py` to an
 `Apertus-v1.5-*` model would add that step.
-
-`ANTHROPIC_API_KEY` is optional and only needed to run the Claude comparator
-column of the eval matrix.
 
 ## CLI
 

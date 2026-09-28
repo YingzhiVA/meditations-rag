@@ -16,8 +16,8 @@ dependencies = [
     "openinference-semantic-conventions",
     # Phase 4: LLM providers. huggingface-hub is the DEFAULT path (Apertus,
     # router + query transformation); anthropic is the eval comparator only.
-    # "huggingface-hub",
-    # "anthropic",
+    "huggingface-hub",
+    "anthropic>=1,<2",          # 1.x: sampling params only via extra_body
     # "voyageai",               # Phase 4: second embedder for comparison
     # "rank-bm25",              # Phase 4: hybrid retrieval
 ]

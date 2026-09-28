@@ -7,9 +7,35 @@ embedder, or the LLM provider is a one-line change.
 import os
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_dotenv(path: Path) -> None:
+    """Read KEY=VALUE lines from the gitignored .env into os.environ, so API
+    keys live in one file that rotating a key means editing (see
+    .env.example). Real environment variables always win: setdefault never
+    overwrites. Stdlib only — `export ` prefixes, # comments and surrounding
+    quotes are handled, and nothing fancier is needed for two keys."""
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.removeprefix("export ").split("=", 1)
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        if value:
+            os.environ.setdefault(key.strip(), value)
+
+
+# Before anything reads the environment (tracing flags below, the SDKs later).
+_load_dotenv(REPO_ROOT / ".env")
+
 # --- Paths -----------------------------------------------------------------
 # data/ is gitignored; every artifact under it is reproducible from source.
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+DATA_DIR = REPO_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"            # cached Gutenberg download
 PASSAGES_PATH = DATA_DIR / "passages.jsonl"  # output of `meditations ingest`
 INDEX_DIR = DATA_DIR / "index"        # one subdir per embedder name
@@ -66,12 +92,24 @@ HF_ROUTER_MODEL = "swiss-ai/Apertus-8B-Instruct-2509"
 
 # Comparator on the eval grid, NOT the default path. Sonnet rather than Opus:
 # these calls are short and cheap, and the interesting question is whether the
-# open model holds up, not how good a frontier model can be.
+# open model holds up, not how good a frontier model can be. Same split as the
+# Apertus pair: Sonnet for generation and judgement, Haiku for routing.
 CLAUDE_MODEL = "claude-sonnet-5"
-CLAUDE_EFFORT = "low"        # output_config={"effort": ...}; short calls
+CLAUDE_ROUTER_MODEL = "claude-haiku-4-5"
+# output_config={"effort": ...} on Sonnet only: Haiku 4.5 rejects the field.
+CLAUDE_EFFORT = "low"
 
 # Query transformation outputs are short; keep the cap tight. Provider-neutral.
 LLM_MAX_TOKENS = 1024
+# Per attempt. The router sits on the latency path of every query, so a hung
+# provider has to turn into a keyword fallback in seconds, not minutes.
+LLM_TIMEOUT_S = 30.0
+
+# Completion cache for eval runs (CLAUDE.md, "Network and cost"). Keyed by
+# llm name + model + the full prompt, so switching providers or editing a
+# prompt can never serve a stale completion. Off unless the harness enables
+# it; the CLI always goes to the provider.
+LLM_CACHE_DIR = DATA_DIR / "cache" / "llm"
 
 # --- Router (Phase 2 interface, Phase 4 LLM impls) --------------------------
 # Pre-retrieval intent classification: not every input warrants a meditation.

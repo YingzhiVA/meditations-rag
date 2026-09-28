@@ -1,29 +1,91 @@
 """Pluggable LLM providers.
 
 In v1 the LLM is used ONLY on the query side (routing, HyDE, multi-query
-expansion, query rewriting, optional listwise rerank) — never to write advice.
-Counsel synthesis is Phase 6 and will get its own module here when it comes.
+expansion, query rewriting, optional listwise rerank) and to judge passages
+in the safety comparator — never to write advice. Counsel synthesis is
+Phase 7 and will get its own module here when it comes.
 
 Same registry pattern as embed/ and route/: every provider implements
 base.LLMClient, so the CLI (--llm) and the eval grid pick providers by name.
 The provider is a comparison axis, not a fixed dependency — the point is to
 show whether an open model holds up at these tasks, with numbers.
 
-Default is Apertus (hf.py); Claude Sonnet (claude.py) is the comparator.
+Default is Apertus (hf.py); Claude (claude.py) is the comparator. Two entries
+per provider, because generation and classification have different
+cost/latency profiles and should not share a model: the router runs on every
+query, HyDE only on real problems.
+
+    apertus       Apertus-70B   generation, judgement
+    apertus-8b    Apertus-8B    routing
+    claude        Sonnet 5      generation, judgement (comparator)
+    claude-haiku  Haiku 4.5     routing (comparator)
+
+Registry key == LLMClient.name == eval row suffix, as with embedders.
 """
 
+from collections.abc import Callable
+from pathlib import Path
 
-def get_llm(name: str):
-    """Return an LLMClient instance by registry name.
+from meditations_rag import config
+from meditations_rag.llm.base import LLMClient, LLMError
 
-    Phase 4: {
-        "apertus":    hf.HFClient(config.HF_GEN_MODEL),     # 70B, generation
-        "apertus-8b": hf.HFClient(config.HF_ROUTER_MODEL),  # 8B, classification
-        "claude":     claude.ClaudeClient(),                # comparator
-    }
 
-    Two Apertus entries because generation and classification have different
-    cost/latency profiles and should not share a model: the router runs on
-    every query, HyDE runs only on real problems.
-    """
-    raise NotImplementedError("Phase 4: implement registry")
+def _hf(name: str, model: str) -> Callable[[], LLMClient]:
+    def make() -> LLMClient:
+        from meditations_rag.llm.hf import HFClient
+
+        return HFClient(name, model)
+    return make
+
+
+def _claude(name: str, model: str) -> Callable[[], LLMClient]:
+    def make() -> LLMClient:
+        from meditations_rag.llm.claude import ClaudeClient
+
+        return ClaudeClient(name, model)
+    return make
+
+
+_REGISTRY: dict[str, Callable[[], LLMClient]] = {
+    "apertus": _hf("apertus", config.HF_GEN_MODEL),
+    "apertus-8b": _hf("apertus-8b", config.HF_ROUTER_MODEL),
+    "claude": _claude("claude", config.CLAUDE_MODEL),
+    "claude-haiku": _claude("claude-haiku", config.CLAUDE_ROUTER_MODEL),
+}
+
+LLM_NAMES: tuple[str, ...] = tuple(_REGISTRY)
+
+_cache_dir: Path | None = None
+
+
+class UnknownLLMError(KeyError):
+    """No LLM provider is registered under that name."""
+
+
+def enable_cache(directory: Path = config.LLM_CACHE_DIR) -> None:
+    """Serve every client get_llm returns from now on through the on-disk
+    completion cache (llm/cache.py). Called once by the eval harness; the CLI
+    never calls it, so interactive queries always reach the provider."""
+    global _cache_dir
+    _cache_dir = directory
+
+
+def get_llm(name: str) -> LLMClient:
+    """Return an LLMClient by registry name. Raises LLMError when the
+    provider is not configured (no token) — a setup error for the caller to
+    report, as distinct from an outage, which surfaces per call."""
+    try:
+        factory = _REGISTRY[name]
+    except KeyError:
+        raise UnknownLLMError(
+            f"unknown llm {name!r}; known: {', '.join(LLM_NAMES)}"
+        ) from None
+    client = factory()
+    if _cache_dir is not None:
+        from meditations_rag.llm.cache import CachedClient
+
+        client = CachedClient(client, _cache_dir)
+    return client
+
+
+__all__ = ["LLM_NAMES", "LLMClient", "LLMError", "UnknownLLMError", "enable_cache", "get_llm"]

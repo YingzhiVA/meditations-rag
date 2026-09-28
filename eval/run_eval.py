@@ -69,6 +69,7 @@ from meditations_rag import config
 from meditations_rag.corpus.store import load_passages
 from meditations_rag.embed import EMBEDDER_NAMES, get_embedder
 from meditations_rag.index.vector_index import load_index
+from meditations_rag import telemetry
 from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
 from meditations_rag.retrieve.strategies import STRATEGY_NAMES
 from meditations_rag.route import ROUTER_NAMES, get_router
@@ -137,7 +138,7 @@ def gold_rank(result, gold_ids: list[str]) -> int | None:
     return None
 
 
-def run_config(cfg, hard, canary, oos, resources) -> dict:
+def run_config(cfg, hard, canary, oos, resources, run_id=None) -> dict:
     """One grid cell over every scored entry. Returns metrics plus the
     per-query records the error-analysis file is built from."""
     emb, idx, passages = resources[cfg.embedder]
@@ -145,7 +146,8 @@ def run_config(cfg, hard, canary, oos, resources) -> dict:
     for tier, entries in (("hard", hard), ("canary", canary), ("out_of_scope", oos)):
         for e in entries:
             t0 = time.perf_counter()
-            res = run_query(e["query"], cfg, embedder=emb, index=idx, passages=passages)
+            res = run_query(e["query"], cfg, embedder=emb, index=idx, passages=passages,
+                            eval_run_id=run_id)
             latencies.append((time.perf_counter() - t0) * 1000)
             gold = e.get("gold_ids", [])
             records.append({
@@ -212,7 +214,7 @@ def run_routers(names, entries) -> list[dict]:
 
 # --- safety -----------------------------------------------------------------
 
-def run_safety(names, entries, cfg, resources) -> list[dict]:
+def run_safety(names, entries, cfg, resources, run_id=None) -> list[dict]:
     """Two independent axes, reported side by side and never merged.
 
     PRE-retrieval: did the owed flag fire (recall), and did one fire when
@@ -241,7 +243,7 @@ def run_safety(names, entries, cfg, resources) -> list[dict]:
             if banned:
                 checked += 1
                 res = run_query(e["query"], cfg, router=router, embedder=emb,
-                                index=idx, passages=passages)
+                                index=idx, passages=passages, eval_run_id=run_id)
                 if banned & {rp.passage.id for rp in res.passages}:
                     survived += 1
         rows.append({"router": name, "per_flag": dict(per_flag), "fp": fp,
@@ -345,6 +347,10 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=None,
                     help="write the report here (default eval/results/<stamp>.md)")
     args = ap.parse_args()
+    telemetry.setup_tracing()   # no-op unless MEDITATIONS_TRACING=1
+    # One id for the whole run: it names the default report file and tags
+    # every trace, so Phoenix can be filtered to the run behind a report.
+    run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
 
     golden_p = args.golden or EVAL_DIR / "golden_set.jsonl"
     router_p = EVAL_DIR / "router_set.jsonl"
@@ -358,6 +364,7 @@ def main() -> int:
     except OSError:
         rev = ""
     stamp = {"generated": dt.datetime.now().isoformat(timespec="seconds"),
+             "eval run id": run_id,
              "git": rev or "unknown", "corpus md5": md5(PASSAGES_FILE),
              "golden_set md5": md5(golden_p), "router_set md5": md5(router_p),
              "safety_set md5": md5(safety_p),
@@ -373,14 +380,14 @@ def main() -> int:
                           if k in ("model_id", "sentence_transformers", "torch", "numpy")})
         for cfg in build_grid(args.embedder, args.strategy):
             print(f"  {cfg.label} …", flush=True)
-            results.append(run_config(cfg, hard, canary, oos, resources))
+            results.append(run_config(cfg, hard, canary, oos, resources, run_id))
 
     router_rows = run_routers(args.router, router_set) if router_set else []
     safety_rows = []
     if safety_set and resources:
         safety_rows = run_safety(args.router, safety_set,
                                  RetrievalConfig(embedder=args.embedder[0],
-                                                 k=max(KS)), resources)
+                                                 k=max(KS)), resources, run_id)
 
     report = render(results, router_rows, safety_rows, stamp, skipped)
     print("\n" + report)
@@ -389,8 +396,7 @@ def main() -> int:
     # summary, the breakdown is the evidence (CLAUDE.md, "read the per-query
     # breakdown, not the headline delta"). Splitting them across directories
     # on --out is how a scratch run litters eval/results/.
-    tag = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    out = args.out or RESULTS / f"{tag}.md"
+    out = args.out or RESULTS / f"{run_id}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(report, encoding="utf-8")
     detail = out.with_name(out.stem + "-per-query.jsonl")

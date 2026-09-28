@@ -532,11 +532,15 @@ without a measurement.
         alongside, never folded into an accuracy figure — the two error types
         have wildly different costs. Plus post-retrieval suppression: did any
         prohibited passage survive into the shown results.
-- [ ] `telemetry.py` + instrumentation: OpenTelemetry spans with OpenInference
+- [x] `telemetry.py` + instrumentation: OpenTelemetry spans with OpenInference
       conventions, OTLP → local Phoenix. No-op when `MEDITATIONS_TRACING` is
       unset. Tag the root span with the full config + eval run id.
-- [ ] Add **p50/p95 latency and $/query columns** to the matrix, sourced from
-      those spans.
+- [x] Add **p50/p95 latency and $/query columns** to the matrix. Latency is
+      wall-clock around `run_query`, which is the end-to-end number; the
+      spans give the per-stage breakdown in Phoenix, not a better total.
+      Tokens and $/query stay blank until Phase 4 makes an LLM call, since
+      printing 0.00 for a pipeline that spends nothing would read as a
+      measurement.
 - [x] Record the Phase 2 baseline numbers. This is the "before" picture.
 
 **Done when:** one command prints the comparison matrix with baseline rows, and

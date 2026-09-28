@@ -116,6 +116,20 @@ def split_golden(entries: list[dict]) -> tuple[list, list, list, int]:
 
 # --- retrieval --------------------------------------------------------------
 
+def describe_device(emb) -> str:
+    """'cuda:0 (NVIDIA GeForce RTX 3070)' or 'cpu'. Stamped like a library
+    version: the p50/p95 columns are only comparable between runs on the same
+    device, and a CPU run would otherwise read as a regression."""
+    device = getattr(emb, "device", None)
+    if device is None:
+        return "n/a (hosted embedder)"
+    if device.startswith("cuda"):
+        import torch
+
+        return f"{device} ({torch.cuda.get_device_name(torch.device(device))})"
+    return device
+
+
 def build_grid(embedders, strategies) -> list[RetrievalConfig]:
     """Derived from the registries, so Phase 4's cells appear with no edit.
 
@@ -378,6 +392,7 @@ def main() -> int:
             resources[name] = (emb, load_index(emb.name, expected_dim=emb.dim), passages)
             stamp.update({k: v for k, v in resources[name][1].meta.items()
                           if k in ("model_id", "sentence_transformers", "torch", "numpy")})
+            stamp["device"] = describe_device(emb)
         for cfg in build_grid(args.embedder, args.strategy):
             print(f"  {cfg.label} …", flush=True)
             results.append(run_config(cfg, hard, canary, oos, resources, run_id))

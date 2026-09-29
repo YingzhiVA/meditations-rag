@@ -170,6 +170,7 @@ $ meditations index                  # embed passages with bge-base, build index
 $ meditations "I keep replaying an argument I lost and can't let it go"
 $ meditations "..." --k 8 --all --scores
 $ meditations "hello"                # routed as chitchat — no retrieval
+$ meditations "..." --router apertus # Phase 4: LLM router (Apertus-8B), keyword floor beneath
 $ meditations show 11.18             # read one passage in full
 $ meditations "..." --strategy hyde --llm apertus   # Phase 4
 $ python eval/run_eval.py            # Phase 3: the comparison matrix + router table

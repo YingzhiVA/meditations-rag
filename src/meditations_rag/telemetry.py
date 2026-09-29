@@ -34,7 +34,9 @@ DESIGN RULES
 SPAN TREE
 ---------
     query                       (CHAIN, root: config metadata, shown ids)
-      ├─ route                  (CHAIN; an LLM router nests its LLM span)
+      ├─ route                  (CHAIN)
+      │    └─ llm.generate      (LLM — LLM routers only; none on a chitchat
+      │                          exact match or with the keyword router)
       ├─ strategy.expand        (CHAIN)
       │    └─ llm.generate      (LLM — HyDE / multi-query / rewrite; Phase 4)
       ├─ load                   (CHAIN — CLI cold start only)
@@ -55,8 +57,11 @@ the traces are decoration; with them they are the cost half of the matrix.
 WHERE SPANS ARE OPENED. At the call sites in retrieve/pipeline.run_query,
 not inside each embedder, index or router: one file carries the
 instrumentation, and every implementation Phase 4 adds is traced with no
-edit. The exception is llm/ (Phase 4), whose token counts only the client
-sees, so its LLM spans will be opened there. A `load` span appears only when
+edit. The exception is llm/, whose token counts only the client sees, so its
+LLM spans are opened there, by llm/base.observed_call around each provider
+round trip. They nest under whichever stage made the call. A call that
+retries (the HF prompt-JSON path) shows as sibling llm.generate spans; a
+completion served from the eval cache opens none. A `load` span appears only when
 run_query builds the model and index itself (the CLI's cold start); the
 harness passes them in, so its traces are pure per-query cost.
 

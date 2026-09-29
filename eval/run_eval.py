@@ -72,7 +72,7 @@ from meditations_rag.index.vector_index import load_index
 from meditations_rag import telemetry
 from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
 from meditations_rag.retrieve.strategies import STRATEGY_NAMES
-from meditations_rag.route import ROUTER_NAMES, get_router
+from meditations_rag.route import LLM_ROUTERS, ROUTER_NAMES, get_router
 from meditations_rag.route.base import SafetyFlag
 
 EVAL_DIR = Path(__file__).resolve().parent
@@ -353,7 +353,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--embedder", nargs="*", default=list(EMBEDDER_NAMES))
     ap.add_argument("--strategy", nargs="*", default=list(STRATEGY_NAMES))
-    ap.add_argument("--router", nargs="*", default=list(ROUTER_NAMES))
+    # LLM routers cost money per query, so they run only when named
+    # (CLAUDE.md: ask before spending). A bare run stays free.
+    ap.add_argument("--router", nargs="*",
+                    default=[n for n in ROUTER_NAMES if n not in LLM_ROUTERS],
+                    help=f"routers to score; LLM routers ({', '.join(sorted(LLM_ROUTERS))}) "
+                         "only when named")
     ap.add_argument("--routers-only", action="store_true")
     ap.add_argument("--golden", type=Path, default=None,
                     help="labelled set to score against (default eval/golden_set.jsonl)")

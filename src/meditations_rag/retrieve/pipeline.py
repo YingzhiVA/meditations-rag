@@ -101,7 +101,9 @@ class QueryResult:
     the eval harness score the router from the same call it scores
     retrieval from. `withheld` names the passages the safety list removed
     (ids only — they are withheld, so they are not carried as text).
-    `queries` is what was actually embedded, for diagnostics."""
+    `queries` is what was actually embedded, for diagnostics.
+    `router_fallback` is RouteDecision.fallback passed through: set when an
+    LLM router lost its provider and the keyword router decided instead."""
 
     intent: Intent
     safety: frozenset[SafetyFlag] = field(default_factory=frozenset)
@@ -109,6 +111,7 @@ class QueryResult:
     withheld: list[str] = field(default_factory=list)
     no_strong_match: bool = False
     queries: list[str] = field(default_factory=list)
+    router_fallback: str | None = None
 
     @property
     def retrieved(self) -> bool:
@@ -144,6 +147,7 @@ def run_query(
             "shown": [rp.passage.id for rp in result.passages],
             "withheld": result.withheld,
             "no_strong_match": result.no_strong_match,
+            "router_fallback": result.router_fallback,
         })
         return result
 
@@ -157,10 +161,12 @@ def _run_query(problem, cfg, router, embedder, index, passages) -> QueryResult:
         decision: RouteDecision = router.route(problem)
         telemetry.set_output(sp, {"intent": decision.intent.value,
                                   "safety": sorted(f.value for f in decision.safety),
-                                  "retrieves": decision.retrieves})
+                                  "retrieves": decision.retrieves,
+                                  "fallback": decision.fallback})
 
     if not decision.retrieves:
-        return QueryResult(intent=decision.intent, safety=decision.safety)
+        return QueryResult(intent=decision.intent, safety=decision.safety,
+                           router_fallback=decision.fallback)
 
     from meditations_rag.embed import get_embedder
     from meditations_rag.retrieve.strategies import get_strategy
@@ -222,4 +228,5 @@ def _run_query(problem, cfg, router, embedder, index, passages) -> QueryResult:
         withheld=[h.passage_id for h in withheld],
         no_strong_match=no_strong_match,
         queries=queries,
+        router_fallback=decision.fallback,
     )

@@ -20,15 +20,28 @@ def _keyword() -> Router:
     return KeywordRouter()
 
 
-# Phase 2: the keyword router. Phase 4 adds
-#   "apertus": LLMRouter(get_llm("apertus-8b")),
-#   "claude":  LLMRouter(get_llm("claude")),
-# and the keyword router stays as their fallback and their safety floor.
+def _llm(name: str, llm_name: str) -> Callable[[], Router]:
+    def make() -> Router:
+        from meditations_rag.llm import get_llm
+        from meditations_rag.route.llm import LLMRouter
+
+        return LLMRouter(name, get_llm(llm_name))
+    return make
+
+
+# The keyword router is the LLM routers' fallback and, beneath them, their
+# safety floor. Each LLM router runs on its provider's classification model.
 _REGISTRY: dict[str, Callable[[], Router]] = {
     "keyword": _keyword,
+    "apertus": _llm("apertus", "apertus-8b"),
+    "claude": _llm("claude", "claude-haiku"),
 }
 
 ROUTER_NAMES: tuple[str, ...] = tuple(_REGISTRY)
+# Routers that make a network call per query, and so cost money. The eval
+# harness grids over these only when asked by name (CLAUDE.md: ask before
+# spending).
+LLM_ROUTERS: frozenset[str] = frozenset({"apertus", "claude"})
 
 
 class UnknownRouterError(KeyError):
@@ -36,7 +49,9 @@ class UnknownRouterError(KeyError):
 
 
 def get_router(name: str) -> Router:
-    """Return a Router instance by registry name."""
+    """Return a Router instance by registry name. An LLM router whose
+    provider has no credentials raises llm.LLMError here, at construction:
+    a missing key is a setup error, not an outage to fall back through."""
     try:
         factory = _REGISTRY[name]
     except KeyError:

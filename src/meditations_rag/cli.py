@@ -57,10 +57,11 @@ Three subcommands + a default query mode (argparse; stdlib is enough):
 UX notes:
 - Missing artifacts produce actionable errors ("run `meditations ingest`
   first"), not tracebacks.
-- Phase 4 strategies and LLM routers hit the network — print a brief
-  "expanding query..." status line so latency is explained. If an LLM router
-  falls back after a provider error, say so quietly rather than silently
-  degrading; the user should know they got the keyword path.
+- Phase 4 strategies and LLM routers hit the network — a brief status line
+  on stderr ("routing with apertus...") explains the latency. If an LLM
+  router falls back after a provider error, the rendering ends with one
+  quiet line saying so; the reason is under --debug. A missing API key is a
+  setup error and exits with one line, not a fallback.
 - Tracing (Phase 3): call telemetry.setup_tracing() once at startup. It is
   a no-op unless MEDITATIONS_TRACING=1, so this costs nothing by default.
 """
@@ -89,6 +90,7 @@ examples:
   meditations ingest
   meditations index --embedder bge-base
   meditations "my manager keeps taking credit for my work"
+  meditations "my manager keeps taking credit for my work" --router apertus
   meditations show 4.7
 """
 
@@ -329,6 +331,8 @@ def _debug_block(result) -> str:
     from meditations_rag.retrieve.safety import withheld_reasons
 
     lines = [f"[debug] intent: {result.intent.value}"]
+    if result.router_fallback:
+        lines.append(f"[debug] router fallback: {result.router_fallback}")
     flags = ", ".join(f.value for f in sorted(result.safety, key=lambda f: f.value)) or "none"
     lines.append(f"[debug] safety flags: {flags}")
     if result.queries:
@@ -352,9 +356,10 @@ def _preview(p) -> str:
 def cmd_query(args: argparse.Namespace) -> None:
     from meditations_rag.corpus.store import CorpusMissingError
     from meditations_rag.index.vector_index import IndexCorruptError, IndexMissingError
+    from meditations_rag.llm.base import LLMError
     from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
     from meditations_rag.retrieve.strategies import UnknownStrategyError
-    from meditations_rag.route import UnknownRouterError
+    from meditations_rag.route import LLM_ROUTERS, UnknownRouterError
 
     if args.llm is not None:
         raise CLIError("--llm lands in Phase 4; no LLM-backed strategies or routers yet")
@@ -368,9 +373,15 @@ def cmd_query(args: argparse.Namespace) -> None:
         router=args.router,
         k=args.k,
     )
+    if cfg.router in LLM_ROUTERS:
+        # The round trip is the slow part of the query; say so rather than
+        # leave the user watching a silent cursor.
+        print(f"routing with {cfg.router}...", file=sys.stderr, flush=True)
     try:
         result = run_query(args.query, cfg)
     except (CorpusMissingError, IndexMissingError, IndexCorruptError) as exc:
+        raise CLIError(str(exc)) from None
+    except LLMError as exc:  # no credentials for an LLM router: a setup error
         raise CLIError(str(exc)) from None
     except (UnknownStrategyError, UnknownRouterError) as exc:
         raise CLIError(exc.args[0]) from None
@@ -454,6 +465,11 @@ def render_result(result, *, show_all: bool = False, show_scores: bool = False,
 
 
 def _finish(out: list[str], result, debug: bool) -> str:
+    if result.router_fallback:
+        # Quiet but not silent: the user should know they got the keyword
+        # path. The reason (an HTTP error, a timeout) is for --debug.
+        out.append("(The language-model router was unavailable, so keyword "
+                   "matching classified this message.)")
     if debug:
         out.append(_debug_block(result))
     return "\n\n".join(out)

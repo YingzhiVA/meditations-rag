@@ -101,10 +101,17 @@ class RouteDecision:
     conservative reading is the union: every flag's referral is owed, every
     flag's suppression list applies, and one blocking flag blocks. Empty
     when nothing fired — the common case, and the zero-cost path through
-    retrieve/safety.py."""
+    retrieve/safety.py.
+
+    `fallback` is set (to the reason) when an LLM router lost its provider
+    and config.ROUTER_FALLBACK decided instead. Added in Phase 4 without
+    touching the two axes: the CLI owes the user a quiet note that they got
+    the keyword path, and the eval owes the reader a count, since a router
+    row measured during an outage is the keyword row under another name."""
 
     intent: Intent
     safety: frozenset[SafetyFlag] = field(default_factory=frozenset)
+    fallback: str | None = None
 
     @property
     def retrieves(self) -> bool:

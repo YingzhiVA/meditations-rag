@@ -650,11 +650,16 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       |---|---|---|---|---|---|
       | `keyword` | (0%, 100%) | 0/10 | 17/20 | — | — |
       | `apertus` (8B) | (12%, 100%) | 0/10 | 17/20 | 1.2 s / 2.5 s | n/a |
-      | `apertus-70b` | (94%, 100%) | 9/10 | 18/20 | 1.1 s / 7.3 s | n/a |
+      | `apertus-70b` | (94%, 100%) | 9/10 | 18/20 | 1.1 s / 7.3 s | ≈$0.0004* |
       | `claude` (Haiku) | (100%, 100%) | 10/10 | 20/20 | 0.8 s / 1.3 s | $0.0009 |
 
       (`apertus-70b` from `eval/results/phase-4-routers-70b.md`; the other
       rows reproduce identically there from the completion cache.)
+      \*Billed, not computed: the HF invoice for the whole 70B run was
+      $0.03 over 68 queries (63 calls, ~40k tokens, 97% input). publicai
+      publishes no per-token rate and the bill does not split input from
+      output, so `config.LLM_PRICES_PER_MTOK` stays without an Apertus entry
+      and the report's own $/q column stays blank for it.
 
       **Apertus-8B adds latency and almost nothing else.** It rejects only
       the two most obvious asks (a linked-list function, a radiator valve),

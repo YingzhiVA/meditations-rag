@@ -60,7 +60,7 @@ class Intent(str, Enum):
 
     CHITCHAT = "chitchat"          # "hello", "thanks", "how are you"
     META = "meta"                  # "what can you do", "how does this work"
-    IN_SCOPE = "in_scope"          # a real problem worth retrieving for
+    IN_SCOPE = "in_scope"          # a real problem, or what the book says on a topic
     OUT_OF_SCOPE = "out_of_scope"  # a real question, but not Marcus's subject
 
 

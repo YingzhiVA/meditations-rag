@@ -19,7 +19,10 @@ be wrong about it, so the LLM is not asked.
 THE PROMPT is written from the four scope rules and the SafetyFlag table in
 PLAN.md ("Scope & safety boundaries") — not from eval/router_set.jsonl, which
 it is scored against. Tune it against the set and the set stops measuring
-anything. Two things it does on purpose:
+anything. The one post-hoc change, the content-question clauses in meta /
+in_scope / out_of_scope, followed a SPEC decision recorded in PLAN.md
+("Questions about what the book says are IN_SCOPE"), not an eval miss.
+Two things it does on purpose:
   - It does not assume English. Phase 6 routes German through this same
     router with no translation step, so the definitions are about meaning,
     and the model is told the message may be in any language.
@@ -61,16 +64,20 @@ intent: exactly one of
 - chitchat: a greeting, thanks, acknowledgement or goodbye, with no \
 difficulty described.
 - meta: a question about this tool itself: what it does, how it works, which \
-book, edition or translation it uses, how it cites passages.
+edition or translation it uses, how it cites passages, who wrote them, how \
+the book is divided. Not a question about what the book says on a topic; \
+that is in_scope.
 - in_scope: the person describes a difficulty, feeling or situation in their \
 own life, or asks how to live or act well: anger, grief, fear, envy, \
 loneliness, conflict with others, work, failure, loss, living with illness or \
 pain, ageing, death, meaning. Small everyday troubles count. Do not reject a \
 message because the trouble seems minor, or because a therapist or a friend \
-could also help with it.
+could also help with it. Also in_scope: asking what Marcus Aurelius or the \
+Meditations says, writes or thinks about a topic, since the answer is passages.
 - out_of_scope: anything else. Factual, practical, technical and creative \
-requests are out_of_scope. So are these two, even when they are phrased with \
-strong emotion:
+requests are out_of_scope, and so are questions about Stoicism in general or \
+about Marcus's life, which this book does not answer. So are these two, even \
+when they are phrased with strong emotion:
   - asking for medical or clinical advice about a physical or mental \
 condition: what is wrong, what to take, what treatment to get;
   - asking for legal advice: rights, what the law allows, how to win a \

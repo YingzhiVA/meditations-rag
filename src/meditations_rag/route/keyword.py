@@ -101,6 +101,16 @@ META_NOUNS = (
 )
 _META_NOUN_RE = re.compile(r"\b(?:" + "|".join(re.escape(n) for n in META_NOUNS) + r")\b")
 
+# A question about what the book SAYS is IN_SCOPE even when it names the book
+# (PLAN.md, "Questions about what the book says are IN_SCOPE"): "What do the
+# Meditations say about grief?" wants passages, not the tool's description.
+# It only overrides the meta signals above; "who wrote these passages" has
+# no "about" and stays META.
+_CONTENT_RE = re.compile(
+    r"\b(?:say|says|said|write|writes|wrote|think|thinks|thought|teach|teaches|"
+    r"taught|believe|believes|believed)\b(?: \S+){0,4}? about\b"
+)
+
 # --- safety: high recall, per flag ----------------------------------------
 # Patterns are matched against the normalised input, so write them in
 # lowercase with straight apostrophes and no terminal punctuation.
@@ -247,7 +257,8 @@ class KeywordRouter:
             return RouteDecision(Intent.CHITCHAT, safety)
         if text in CHITCHAT:
             return RouteDecision(Intent.CHITCHAT, safety)
-        if any(phrase in text for phrase in META_PHRASES) or _META_NOUN_RE.search(text):
+        is_meta = any(phrase in text for phrase in META_PHRASES) or _META_NOUN_RE.search(text)
+        if is_meta and not _CONTENT_RE.search(text):
             return RouteDecision(Intent.META, safety)
         # OUT_OF_SCOPE is unreachable here by design; see module docstring.
         return RouteDecision(Intent.IN_SCOPE, safety)

@@ -40,6 +40,36 @@ not what the corpus *says* but what a benign passage *means* in a context it
 was not retrieved for — which is rule 4, and which is a post-retrieval
 problem (see below).
 
+### Questions about what the book says are `IN_SCOPE`
+
+Added 2026-09-29, when "What does Marcus say about the afterlife?" routed
+`META` under an LLM router. The four intents had no place for **questions
+about the book's content**: they are neither a personal difficulty nor about
+the tool. Answering one with the tool's self-description is useless, and
+answering it with passages is exactly what the tool does. So:
+
+- **`IN_SCOPE`**: what Marcus or the *Meditations* says, writes or thinks
+  about a topic ("What does Marcus say about the afterlife?", "Does he write
+  about grief?"). The answer is passages.
+- **`META`** stays the tool itself: what it does, how it works, which
+  edition or translation, how it cites, who wrote the passages, how the
+  book is divided. Answerable from the tool's description, not by retrieval.
+- **`OUT_OF_SCOPE`**: Stoicism in general ("Did the Stoics believe in an
+  afterlife?") and Marcus's life ("What did he die of?"). The corpus does
+  not answer these, or answers them only by accident, and retrieving would
+  pass Marcus's words off as a survey of a school or a biography.
+
+The line between the first and third is whose words are asked for: Marcus's
+in this book, or anyone else's.
+
+**Why they matter to the Phase 4 strategies.** A content question arrives in a
+frame ("What does Marcus say about…") that `raw` embeds as noise around the
+one word that matters. Stripping that frame is `RewriteQuery`'s job, and
+"the afterlife" fans out into the themes `MultiQuery` exists for (death as
+dispersal into the whole, the gods, what outlasts us). So the golden set
+should gain a few content questions before those rows run, and their
+per-query results reported apart from the problem statements.
+
 ### Two axes, two stages
 
 Rule 3 does not fit the `Intent` enum. It is not a fourth terminal state

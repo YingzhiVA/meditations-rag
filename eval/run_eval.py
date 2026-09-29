@@ -260,6 +260,13 @@ def percentile(sorted_values: list[float], q: float) -> float:
     return sorted_values[max(0, int(q * len(sorted_values)) - 1)]
 
 
+def llm_flags(decision) -> list[str] | None:
+    """The LLM's own flags, before the floor; None when no LLM answered."""
+    if decision.llm_safety is None:
+        return None
+    return sorted(f.value for f in decision.llm_safety)
+
+
 def run_routers(names, entries) -> tuple[list[dict], list[dict]]:
     """(rows, per-query records). Every LLM call a route() makes is sliced
     out of llm.base.CALLS, so the router row carries its own cost."""
@@ -284,6 +291,7 @@ def run_routers(names, entries) -> tuple[list[dict], list[dict]]:
                          "tier": e.get("tier", ""), "expected": expected, "got": got,
                          "correct": got == expected,
                          "safety": sorted(f.value for f in d.safety),
+                         "llm_safety": llm_flags(d),
                          "fallback": d.fallback, **llm_usage(CALLS[start:])})
         rows.append({"router": name, "per_intent": dict(per_intent),
                      "oos_tier": dict(oos_tier), "usage": usage_summary(mine)})
@@ -302,6 +310,13 @@ def run_safety(names, entries, cfg, resources, run_id=None) -> tuple[list[dict],
     run through the real pipeline, so a flag the router MISSES shows up as a
     surviving passage — which is the failure worth catching.
 
+    The union is what ships, so it is the headline. Beside it, for LLM
+    routers, the LLM's OWN flags (RouteDecision.llm_safety) are scored the
+    same way: what the LLM catches without the floor, and whether it
+    over-flags by itself — which the union hides, since it can never fall
+    below the floor's false positives. A query the LLM did not answer (a
+    fallback) counts as the LLM catching nothing.
+
     Cost is sliced around the first route() only: the pipeline's own
     route() for the same query is a cache hit, and counting it would bill
     the query twice."""
@@ -312,6 +327,7 @@ def run_safety(names, entries, cfg, resources, run_id=None) -> tuple[list[dict],
         per_flag = defaultdict(lambda: [0, 0])     # flag -> [caught, owed]
         fp = [0, 0]                                # [fired, n_negatives]
         survived, checked = 0, 0
+        llm_caught, llm_fp = [0, 0], [0, 0]        # LLM alone: [caught, owed], [fired, n_neg]
         mine = []
         for e in entries:
             owed = set(e.get("flags", []))
@@ -319,13 +335,18 @@ def run_safety(names, entries, cfg, resources, run_id=None) -> tuple[list[dict],
             d = router.route(e["query"])
             usage = llm_usage(CALLS[start:])
             got = {f.value for f in d.safety}
+            own = set(llm_flags(d) or [])
             if owed:
                 for f in owed:
                     per_flag[f][1] += 1
                     per_flag[f][0] += f in got
+                    llm_caught[1] += 1
+                    llm_caught[0] += f in own
             else:
                 fp[1] += 1
                 fp[0] += bool(got)
+                llm_fp[1] += 1
+                llm_fp[0] += bool(own)
             banned = set(e.get("must_not_return", []))
             shown_banned: list[str] = []
             if banned:
@@ -337,11 +358,14 @@ def run_safety(names, entries, cfg, resources, run_id=None) -> tuple[list[dict],
             mine.append({"table": "safety", "router": name, "query": e["query"],
                          "tier": e.get("tier", ""), "owed": sorted(owed), "got": sorted(got),
                          "missed": sorted(owed - got),
+                         "llm_safety": llm_flags(d),
                          "false_positive": sorted(got) if not owed else [],
                          "prohibited_shown": shown_banned,
                          "fallback": d.fallback, **usage})
         rows.append({"router": name, "per_flag": dict(per_flag), "fp": fp,
-                     "survived": survived, "checked": checked, "usage": usage_summary(mine)})
+                     "survived": survived, "checked": checked,
+                     "llm_caught": llm_caught, "llm_fp": llm_fp,
+                     "usage": usage_summary(mine)})
         records += mine
     return rows, records
 
@@ -453,13 +477,21 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
         rows = []
         for r in safety_rows:
             flags = "; ".join(f"{f} {c}/{t}" for f, (c, t) in sorted(r["per_flag"].items()))
+            llm = r["router"] in LLM_ROUTERS
             rows.append([f"`{r['router']}`", flags or "—",
                          f"{r['fp'][0]}/{r['fp'][1]}" if r["fp"][1] else "—",
+                         f"{r['llm_caught'][0]}/{r['llm_caught'][1]}" if llm else "—",
+                         f"{r['llm_fp'][0]}/{r['llm_fp'][1]}" if llm else "—",
                          f"{r['survived']}/{r['checked']}" if r["checked"] else "—",
                          *usage_cells(r["router"], r["usage"])])
         L += [table(["router", "flag recall (caught/owed)", "false positives",
+                     "LLM alone: caught/owed", "LLM alone: false positives",
                      "prohibited passages shown", *USAGE_HEADERS], rows), ""]
         L += usage_notes(safety_rows)
+        L += ["*Recall and false positives are for the union with the keyword floor, "
+              "which is what ships. The LLM-alone columns score the LLM's own flags: "
+              "what it catches without the floor, and whether it over-flags by itself, "
+              "which the union hides.*", ""]
         L += ["*Never averaged: a missed referral and an unnecessary one cost "
               "differently. A prohibited passage surviving is a PRODUCT VIOLATION, "
               "not a quality regression.*", ""]

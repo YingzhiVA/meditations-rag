@@ -31,9 +31,13 @@ def _llm(name: str, llm_name: str) -> Callable[[], Router]:
 
 # The keyword router is the LLM routers' fallback and, beneath them, their
 # safety floor. Each LLM router runs on its provider's classification model.
+# "apertus-70b" is the size experiment: same prompt, same provider, the 70B
+# generation model instead of the 8B, so a gap to "apertus" is model size
+# alone (PLAN.md, Phase 4 router result).
 _REGISTRY: dict[str, Callable[[], Router]] = {
     "keyword": _keyword,
     "apertus": _llm("apertus", "apertus-8b"),
+    "apertus-70b": _llm("apertus-70b", "apertus"),
     "claude": _llm("claude", "claude-haiku"),
 }
 
@@ -41,7 +45,7 @@ ROUTER_NAMES: tuple[str, ...] = tuple(_REGISTRY)
 # Routers that make a network call per query, and so cost money. The eval
 # harness grids over these only when asked by name (CLAUDE.md: ask before
 # spending).
-LLM_ROUTERS: frozenset[str] = frozenset({"apertus", "claude"})
+LLM_ROUTERS: frozenset[str] = frozenset({"apertus", "apertus-70b", "claude"})
 
 
 class UnknownRouterError(KeyError):

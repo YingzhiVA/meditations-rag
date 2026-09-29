@@ -38,9 +38,19 @@ WHAT IS MEASURED HERE AND WHAT IS NOT
 Latency is wall-clock around run_query, which IS the end-to-end number;
 telemetry.py's spans add the BREAKDOWN (where the time went), not the total,
 so the p50/p95 columns do not wait on it. Token and $/query columns stay
-blank until Phase 4 gives a strategy that makes an LLM call — printing 0.00
-for a pipeline that spends nothing would read as a measurement rather than an
-absence.
+blank wherever no LLM call is made — printing 0.00 for a pipeline that spends
+nothing would read as a measurement rather than an absence. The first LLM
+calls are the Phase 4 routers, so the router and safety tables carry their
+cost: fallbacks, LLM round-trip p50/p95, tokens and $ per query, all read
+from llm.base.CALLS rather than from the spans. $ is blank for providers
+with no published per-token rate.
+
+LLM COMPLETIONS ARE CACHED ON DISK (llm/cache.py), keyed by llm, model and
+full prompt, so a rerun is free and reproduces the first run. A cached call
+reports the original call's tokens and latency. LLM routers run only when
+named (--router apertus claude), so a bare run never spends. A fallback
+means part of a row is the keyword router under another name; the report
+says so in bold under the table.
 
 EVERY NUMBER IS A FLOOR. Labels are sparse (eval/README.md's pooling
 protocol): an apt passage nobody labelled scores as a miss. Fine for
@@ -62,13 +72,14 @@ import json
 import statistics
 import subprocess
 import time
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
-from meditations_rag import config
+from meditations_rag import config, llm
 from meditations_rag.corpus.store import load_passages
 from meditations_rag.embed import EMBEDDER_NAMES, get_embedder
 from meditations_rag.index.vector_index import load_index
+from meditations_rag.llm.base import CALLS, CallRecord
 from meditations_rag import telemetry
 from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
 from meditations_rag.retrieve.strategies import STRATEGY_NAMES
@@ -206,46 +217,108 @@ def oos_metrics(records: list[dict]) -> dict | None:
 
 # --- routers ----------------------------------------------------------------
 
-def run_routers(names, entries) -> list[dict]:
-    rows = []
+def llm_usage(calls: list[CallRecord]) -> dict:
+    """What one query's LLM calls cost. Cached calls carry the ORIGINAL
+    call's tokens and latency (llm/cache.py), so a rerun reports what the run
+    cost when it was made. usd is None when any call's model has no
+    published rate (config.LLM_PRICES_PER_MTOK) — blank, never a guess."""
+    usd = 0.0
+    for c in calls:
+        rate = config.LLM_PRICES_PER_MTOK.get(c.model)
+        if rate is None:
+            usd = None
+            break
+        usd += (c.input_tokens * rate[0] + c.output_tokens * rate[1]) / 1e6
+    return {"llm_ms": round(sum(c.latency_ms for c in calls), 1),
+            "in_tok": sum(c.input_tokens for c in calls),
+            "out_tok": sum(c.output_tokens for c in calls),
+            "usd": usd if calls else None,
+            "json_paths": [c.json_path for c in calls if c.json_path],
+            "llm_calls": len(calls)}
+
+
+def usage_summary(records: list[dict]) -> dict:
+    """Per-router cost columns. Latency percentiles are over the queries
+    that made a call (an exact chitchat match never does); tokens and $ are
+    averaged over every query, since that is what a query costs on average."""
+    called = [r for r in records if r["llm_calls"]]
+    ms = sorted(r["llm_ms"] for r in called)
+    usd = [r["usd"] for r in called]
+    return {
+        "fallbacks": sum(1 for r in records if r["fallback"]),
+        "n": len(records),
+        "p50": statistics.median(ms) if ms else None,
+        "p95": percentile(ms, 0.95) if ms else None,
+        "tok_q": sum(r["in_tok"] + r["out_tok"] for r in records) / len(records),
+        "usd_q": (sum(usd) / len(records)) if usd and None not in usd else None,
+        "paths": dict(Counter(p for r in records for p in r["json_paths"])),
+    }
+
+
+def percentile(sorted_values: list[float], q: float) -> float:
+    """Nearest-rank, the same rule the retrieval table's p95 column uses."""
+    return sorted_values[max(0, int(q * len(sorted_values)) - 1)]
+
+
+def run_routers(names, entries) -> tuple[list[dict], list[dict]]:
+    """(rows, per-query records). Every LLM call a route() makes is sliced
+    out of llm.base.CALLS, so the router row carries its own cost."""
+    rows, records = [], []
     for name in names:
         router = get_router(name)
         per_intent = defaultdict(lambda: [0, 0])   # intent -> [correct, total]
         oos_tier = defaultdict(lambda: [0, 0])     # hard/canary -> [correct, total]
+        mine = []
         for e in entries:
             expected = e["intent"]
-            got = router.route(e["query"]).intent.value
+            start = len(CALLS)
+            d = router.route(e["query"])
+            got = d.intent.value
             per_intent[expected][1] += 1
             per_intent[expected][0] += got == expected
             if expected == "out_of_scope":
                 t = e.get("tier", "canary")
                 oos_tier[t][1] += 1
                 oos_tier[t][0] += got == expected
+            mine.append({"table": "router", "router": name, "query": e["query"],
+                         "tier": e.get("tier", ""), "expected": expected, "got": got,
+                         "correct": got == expected,
+                         "safety": sorted(f.value for f in d.safety),
+                         "fallback": d.fallback, **llm_usage(CALLS[start:])})
         rows.append({"router": name, "per_intent": dict(per_intent),
-                     "oos_tier": dict(oos_tier)})
-    return rows
+                     "oos_tier": dict(oos_tier), "usage": usage_summary(mine)})
+        records += mine
+    return rows, records
 
 
 # --- safety -----------------------------------------------------------------
 
-def run_safety(names, entries, cfg, resources, run_id=None) -> list[dict]:
+def run_safety(names, entries, cfg, resources, run_id=None) -> tuple[list[dict], list[dict]]:
     """Two independent axes, reported side by side and never merged.
 
     PRE-retrieval: did the owed flag fire (recall), and did one fire when
     none was owed (false positives)? POST-retrieval: did a passage the
     entry names as prohibited survive into the shown results? The second is
     run through the real pipeline, so a flag the router MISSES shows up as a
-    surviving passage — which is the failure worth catching."""
+    surviving passage — which is the failure worth catching.
+
+    Cost is sliced around the first route() only: the pipeline's own
+    route() for the same query is a cache hit, and counting it would bill
+    the query twice."""
     emb, idx, passages = resources[cfg.embedder]
-    rows = []
+    rows, records = [], []
     for name in names:
         router = get_router(name)
         per_flag = defaultdict(lambda: [0, 0])     # flag -> [caught, owed]
         fp = [0, 0]                                # [fired, n_negatives]
         survived, checked = 0, 0
+        mine = []
         for e in entries:
             owed = set(e.get("flags", []))
-            got = {f.value for f in router.route(e["query"]).safety}
+            start = len(CALLS)
+            d = router.route(e["query"])
+            usage = llm_usage(CALLS[start:])
+            got = {f.value for f in d.safety}
             if owed:
                 for f in owed:
                     per_flag[f][1] += 1
@@ -254,15 +327,23 @@ def run_safety(names, entries, cfg, resources, run_id=None) -> list[dict]:
                 fp[1] += 1
                 fp[0] += bool(got)
             banned = set(e.get("must_not_return", []))
+            shown_banned: list[str] = []
             if banned:
                 checked += 1
                 res = run_query(e["query"], cfg, router=router, embedder=emb,
                                 index=idx, passages=passages, eval_run_id=run_id)
-                if banned & {rp.passage.id for rp in res.passages}:
-                    survived += 1
+                shown_banned = sorted(banned & {rp.passage.id for rp in res.passages})
+                survived += bool(shown_banned)
+            mine.append({"table": "safety", "router": name, "query": e["query"],
+                         "tier": e.get("tier", ""), "owed": sorted(owed), "got": sorted(got),
+                         "missed": sorted(owed - got),
+                         "false_positive": sorted(got) if not owed else [],
+                         "prohibited_shown": shown_banned,
+                         "fallback": d.fallback, **usage})
         rows.append({"router": name, "per_flag": dict(per_flag), "fp": fp,
-                     "survived": survived, "checked": checked})
-    return rows
+                     "survived": survived, "checked": checked, "usage": usage_summary(mine)})
+        records += mine
+    return rows, records
 
 
 # --- rendering --------------------------------------------------------------
@@ -276,6 +357,41 @@ def table(headers: list[str], rows: list[list[str]]) -> str:
 
 def pct(x) -> str:
     return f"{100 * x:.0f}%" if x is not None else "—"
+
+
+USAGE_HEADERS = ["fallbacks", "LLM p50 ms", "LLM p95 ms", "tok/q", "$/q"]
+
+
+def usage_cells(router: str, u: dict) -> list[str]:
+    """The cost half of a router row. The keyword router makes no call and
+    cannot fall back, so its cells are blank rather than zero."""
+    if router not in LLM_ROUTERS:
+        return ["—"] * len(USAGE_HEADERS)
+    return [f"{u['fallbacks']}/{u['n']}",
+            f"{u['p50']:.0f}" if u["p50"] is not None else "—",
+            f"{u['p95']:.0f}" if u["p95"] is not None else "—",
+            f"{u['tok_q']:.0f}",
+            f"{u['usd_q']:.5f}" if u["usd_q"] is not None else "—"]
+
+
+def usage_notes(rows: list[dict]) -> list[str]:
+    """What a reader needs to trust the LLM rows: any fallback means part of
+    the row is the keyword router under another name, and the JSON-path
+    split says whether publicai honoured response_format (Risk 2)."""
+    out = []
+    for r in rows:
+        if r["router"] not in LLM_ROUTERS:
+            continue
+        u = r["usage"]
+        paths = ", ".join(f"{k} {v}" for k, v in sorted(u["paths"].items())) or "none"
+        warn = (f" **{u['fallbacks']} of {u['n']} queries fell back to `keyword`; "
+                "those rows are not this router's answers.**" if u["fallbacks"] else "")
+        out.append(f"*`{r['router']}` JSON path: {paths}.{warn}*")
+    if out:
+        out += ["", "*$/q is blank for providers with no published per-token rate "
+                "(publicai). Latency is the LLM round trip on queries that made a call; "
+                "cached completions report the original call's time.*", ""]
+    return out
 
 
 def render(results, router_rows, safety_rows, stamp, skipped) -> str:
@@ -321,9 +437,10 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
                     f"{pct(ins[0] / ins[1])})" if "out_of_scope" in pi and ins else "—")
             rows.append([f"`{r['router']}`", *cells,
                          pct(oos_h[0] / oos_h[1]) + f" ({oos_h[1]})" if oos_h else "—",
-                         pair])
+                         pair, *usage_cells(r["router"], r["usage"])])
         L += [table(["router", *intents, "oos (hard only)",
-                     "(oos recall, in_scope retention)"], rows), ""]
+                     "(oos recall, in_scope retention)", *USAGE_HEADERS], rows), ""]
+        L += usage_notes(router_rows)
         L += ["*The pair is the measurement. Recall alone is gameable by rejecting "
               "everything; the real LLM-router failure is over-rejection. "
               "chitchat/meta/in_scope are a regression check, not a comparison — "
@@ -338,9 +455,11 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
             flags = "; ".join(f"{f} {c}/{t}" for f, (c, t) in sorted(r["per_flag"].items()))
             rows.append([f"`{r['router']}`", flags or "—",
                          f"{r['fp'][0]}/{r['fp'][1]}" if r["fp"][1] else "—",
-                         f"{r['survived']}/{r['checked']}" if r["checked"] else "—"])
+                         f"{r['survived']}/{r['checked']}" if r["checked"] else "—",
+                         *usage_cells(r["router"], r["usage"])])
         L += [table(["router", "flag recall (caught/owed)", "false positives",
-                     "prohibited passages shown"], rows), ""]
+                     "prohibited passages shown", *USAGE_HEADERS], rows), ""]
+        L += usage_notes(safety_rows)
         L += ["*Never averaged: a missed referral and an unnecessary one cost "
               "differently. A prohibited passage surviving is a PRODUCT VIOLATION, "
               "not a quality regression.*", ""]
@@ -367,6 +486,9 @@ def main() -> int:
                     help="write the report here (default eval/results/<stamp>.md)")
     args = ap.parse_args()
     telemetry.setup_tracing()   # no-op unless MEDITATIONS_TRACING=1
+    # Every LLM completion goes through the on-disk cache (CLAUDE.md, "Network
+    # and cost"): a rerun is free and reproduces the first run exactly.
+    llm.enable_cache()
     # One id for the whole run: it names the default report file and tags
     # every trace, so Phoenix can be filtered to the run behind a report.
     run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -402,12 +524,17 @@ def main() -> int:
             print(f"  {cfg.label} …", flush=True)
             results.append(run_config(cfg, hard, canary, oos, resources, run_id))
 
-    router_rows = run_routers(args.router, router_set) if router_set else []
-    safety_rows = []
+    for name in args.router:
+        if name in LLM_ROUTERS:
+            client = get_router(name).client
+            stamp[f"llm ({name} router)"] = f"{client.name} = {client.model}"
+    router_rows, router_records = (run_routers(args.router, router_set)
+                                   if router_set else ([], []))
+    safety_rows, safety_records = [], []
     if safety_set and resources:
-        safety_rows = run_safety(args.router, safety_set,
-                                 RetrievalConfig(embedder=args.embedder[0],
-                                                 k=max(KS)), resources, run_id)
+        safety_rows, safety_records = run_safety(
+            args.router, safety_set, RetrievalConfig(embedder=args.embedder[0], k=max(KS)),
+            resources, run_id)
 
     report = render(results, router_rows, safety_rows, stamp, skipped)
     print("\n" + report)
@@ -423,9 +550,11 @@ def main() -> int:
     with detail.open("w", encoding="utf-8") as fh:
         for r in results:
             for rec in r["records"]:
-                fh.write(json.dumps(rec) + "\n")
+                fh.write(json.dumps({"table": "retrieval", **rec}) + "\n")
+        for rec in router_records + safety_records:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
     print(f"wrote {out}")
-    if results:
+    if results or router_records:
         print(f"wrote {detail}   <- the losses are where the next technique comes from")
     return 0
 

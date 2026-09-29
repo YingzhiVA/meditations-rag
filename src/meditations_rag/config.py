@@ -111,6 +111,14 @@ LLM_TIMEOUT_S = 30.0
 # it; the CLI always goes to the provider.
 LLM_CACHE_DIR = DATA_DIR / "cache" / "llm"
 
+# USD per million tokens (input, output), for the eval's $/query columns.
+# Only models with a published per-token rate: publicai states none for
+# Apertus, so those rows report tokens and leave $ blank rather than guess.
+LLM_PRICES_PER_MTOK: dict[str, tuple[float, float]] = {
+    "claude-sonnet-5": (2.00, 10.00),
+    "claude-haiku-4-5": (1.00, 5.00),
+}
+
 # --- Router (Phase 2 interface, Phase 4 LLM impls) --------------------------
 # Pre-retrieval intent classification: not every input warrants a meditation.
 # See route/base.py for why this does NOT subsume MIN_SCORE_THRESHOLD.

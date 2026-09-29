@@ -646,15 +646,17 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       **Result** (`eval/results/phase-4-routers.md`, 2026-09-29; no
       fallbacks, every call on the structured-output path):
 
-      | router | (oos recall, in_scope retention) | oos hard | safety flags caught | LLM p50 / p95 | $/q |
-      |---|---|---|---|---|---|
-      | `keyword` | (0%, 100%) | 0/10 | 17/20 | — | — |
-      | `apertus` (8B) | (12%, 100%) | 0/10 | 17/20 | 1.2 s / 2.5 s | n/a |
-      | `apertus-70b` | (94%, 100%) | 9/10 | 18/20 | 1.1 s / 7.3 s | ≈$0.0004* |
-      | `claude` (Haiku) | (100%, 100%) | 10/10 | 20/20 | 0.8 s / 1.3 s | $0.0009 |
+      | router | (oos recall, in_scope retention) | oos hard | safety flags caught | LLM alone | LLM p50 / p95 | $/q |
+      |---|---|---|---|---|---|---|
+      | `keyword` | (0%, 100%) | 0/10 | 17/20 | — | — | — |
+      | `apertus` (8B) | (12%, 100%) | 0/10 | 17/20 | 2/20 | 1.2 s / 2.5 s | n/a |
+      | `apertus-70b` | (94%, 100%) | 9/10 | 18/20 | 7/20 | 1.1 s / 7.3 s | ≈$0.0004* |
+      | `claude` (Haiku) | (100%, 100%) | 10/10 | 20/20 | 20/20 | 0.8 s / 1.3 s | $0.0009 |
 
       (`apertus-70b` from `eval/results/phase-4-routers-70b.md`; the other
-      rows reproduce identically there from the completion cache.)
+      rows reproduce identically there from the completion cache. "LLM
+      alone" from `eval/results/phase-4-routers-llm-alone.md`, the same
+      completions rescored: the LLM's own flags before the floor is merged.)
       \*Billed, not computed: the HF invoice for the whole 70B run was
       $0.03 over 68 queries (63 calls, ~40k tokens, 97% input). publicai
       publishes no per-token rate and the bill does not split input from
@@ -692,8 +694,20 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       sweating with a tight chest). A perfect score on 10 hard cases means
       "no error observed", not "no error": the set now needs harder cases to
       tell good routers apart. The false positives (2/8) are the floor's and
-      cannot fall under a union; whether an LLM over-flags on its own is not
-      yet visible, since the per-query file records only the union.
+      cannot fall under a union.
+      **Alone, the Apertus safety rows are the floor.** Scored without the
+      keyword floor, the 8B raises 2 of the 20 owed flags and the 70B 7;
+      Haiku raises all 20 by itself, and none of the three raises a flag on
+      the eight curated negatives. So with Apertus the floor is doing nearly
+      all of the safety work, which is the case for keeping it beneath every
+      router made in numbers, and Apertus's union row should never be read
+      as the model's own safety recall. Haiku does over-flag on its own,
+      but only on router-set entries that were never curated as safety
+      negatives ("I'm terrified of dying", a week-long toothache routed
+      `medical_emergency`, three more `mental_health`), so those are
+      labelling questions before they are errors. "Terrified of dying" is
+      the costly one if it stands: `mental_health` withholds the
+      death-counsel list from a reader asking about exactly that.
 - [ ] **Language guard** (see "The floor reads English only" under Scope &
       safety boundaries). It is a pipeline step ahead of the router, not a
       fifth `Intent`. The enum is frozen and describes what the input *is*;

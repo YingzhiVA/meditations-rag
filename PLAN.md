@@ -634,7 +634,7 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       comparator column, not the default path.
       **This is the first phase that needs a key — an `HF_TOKEN`.**
       `ANTHROPIC_API_KEY` is needed only to run the comparator.
-- [ ] **LLM routers**: `route/llm.py` on Apertus-8B and on Claude, scored on
+- [x] **LLM routers**: `route/llm.py` on Apertus-8B and on Claude, scored on
       `router_set.jsonl` as the (out_of_scope recall, in_scope retention) pair
       — see the Phase 3 note on why chitchat/meta are a regression check and
       not a comparison. The whole case for an LLM router is semantics: no word
@@ -642,6 +642,36 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       must also carry the rule-3 safety flag, *above* the keyword safety floor
       that always runs beneath it. Write its prompt and schema so they do not
       assume English input: Phase 6 routes German through this same router.
+
+      **Result** (`eval/results/phase-4-routers.md`, 2026-09-29; no
+      fallbacks, every call on the structured-output path):
+
+      | router | (oos recall, in_scope retention) | oos hard | safety flags caught | LLM p50 / p95 | $/q |
+      |---|---|---|---|---|---|
+      | `keyword` | (0%, 100%) | 0/10 | 17/20 | — | — |
+      | `apertus` (8B) | (12%, 100%) | 0/10 | 17/20 | 1.2 s / 2.5 s | n/a |
+      | `claude` (Haiku) | (100%, 100%) | 10/10 | 20/20 | 0.8 s / 1.3 s | $0.0009 |
+
+      **Apertus-8B adds latency and almost nothing else.** It rejects only
+      the two most obvious asks (a linked-list function, a radiator valve),
+      files four more factual canaries as `meta` or `chitchat` (tax
+      software, the weather, the Punic War, Hamlet), and routes all ten hard
+      cases `in_scope`. The emotional framing wins every time, and the rule
+      that an ask for medical or legal advice is out of scope never fires. On
+      safety it catches nothing the floor missed: its flags only add
+      `mental_health` to entries already flagged. So the claim this plan made
+      in advance — classification is where a small open model is
+      competitive — is **not** borne out at 8B on this prompt. That is a
+      finding, not a reason to tune the prompt against the set it is scored
+      on; the natural next row is the same prompt on Apertus-70B.
+      **Haiku saturates the set**: no error in 41 routing entries, and it
+      closes exactly the three floor gaps the safety set holds ("life just
+      isn't worth it anymore", drinking "to get through an evening",
+      sweating with a tight chest). A perfect score on 10 hard cases means
+      "no error observed", not "no error": the set now needs harder cases to
+      tell good routers apart. The false positives (2/8) are the floor's and
+      cannot fall under a union; whether an LLM over-flags on its own is not
+      yet visible, since the per-query file records only the union.
 - [ ] **Language guard** (see "The floor reads English only" under Scope &
       safety boundaries). It is a pipeline step ahead of the router, not a
       fifth `Intent`. The enum is frozen and describes what the input *is*;

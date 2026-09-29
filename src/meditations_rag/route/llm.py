@@ -150,4 +150,4 @@ class LLMRouter:
             d = self._fallback.route(problem)
             return RouteDecision(d.intent, d.safety | floor,
                                  fallback=f"{type(exc).__name__}: {exc}"[:300])
-        return RouteDecision(intent, flags | floor)
+        return RouteDecision(intent, flags | floor, llm_safety=flags)

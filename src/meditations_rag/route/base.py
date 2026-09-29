@@ -107,11 +107,18 @@ class RouteDecision:
     and config.ROUTER_FALLBACK decided instead. Added in Phase 4 without
     touching the two axes: the CLI owes the user a quiet note that they got
     the keyword path, and the eval owes the reader a count, since a router
-    row measured during an outage is the keyword row under another name."""
+    row measured during an outage is the keyword row under another name.
+
+    `llm_safety` is diagnostic only: the flags the LLM raised by itself,
+    before the keyword floor was merged into `safety`. None when no LLM
+    answered (the keyword router, the chitchat shortcut, a fallback). Nothing
+    downstream acts on it — the union in `safety` is what ships; it exists
+    so the eval can say what an LLM catches, and over-flags, on its own."""
 
     intent: Intent
     safety: frozenset[SafetyFlag] = field(default_factory=frozenset)
     fallback: str | None = None
+    llm_safety: frozenset[SafetyFlag] | None = None
 
     @property
     def retrieves(self) -> bool:

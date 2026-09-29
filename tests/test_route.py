@@ -158,6 +158,9 @@ def test_llm_router_cannot_remove_a_floor_flag():
     decision = router.route(DISCLOSURE)
     assert SafetyFlag.SELF_HARM in decision.safety
     assert decision.fallback is None
+    # The diagnostic keeps the LLM's own answer apart from the union, so the
+    # eval can attribute this catch to the floor rather than to the LLM.
+    assert decision.llm_safety == frozenset()
 
 
 def test_llm_router_outage_falls_back_visibly_with_floor_intact():
@@ -166,3 +169,4 @@ def test_llm_router_outage_falls_back_visibly_with_floor_intact():
     assert decision.fallback and "503" in decision.fallback
     assert decision.intent is KeywordRouter().route(DISCLOSURE).intent
     assert SafetyFlag.SELF_HARM in decision.safety
+    assert decision.llm_safety is None   # no LLM answered; nothing to attribute

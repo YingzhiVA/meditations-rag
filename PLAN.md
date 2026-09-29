@@ -110,6 +110,32 @@ safety row, reported as the recall of the floor plus the LLM router against
 the floor alone. Intent is the opposite case: `OUT_OF_SCOPE` stays out of the
 keyword router on purpose, so that gap belongs to the LLM router entirely.
 
+**Floor fixes, as found.** "I don't want to go on anymore" (2026-09-28,
+manual testing): the floor had "don't want to live" and "can't go on" but
+not this, and Apertus-8B returned `in_scope` with no flag, so the query
+retrieved with no referral and no death-counsel suppression. That
+cannot wait for the LLM row. The first fix, `SELF_HARM` wherever the phrase
+ended the input, over-fired at once: "…I think I've chosen the wrong major.
+I don't want to go on anymore." means the degree, and `SELF_HARM` blocked
+its retrieval. The words cannot tell that from "I lost my job and my partner
+left me. I don't want to go on anymore."; only meaning can. So the floor
+splits on the one thing it can see, whether there is context:
+
+- the phrase **is the whole message** ("don't want to go on / carry on /
+  keep going", optionally "…anymore", "honestly", "just") -> `SELF_HARM`.
+  With no context the dangerous reading is the likely one, and blocking a
+  bare sentence costs a retry;
+- the phrase **inside a longer message**, or "…like this" -> `MENTAL_HEALTH`,
+  which refers and withholds the death-counsel list without blocking;
+- "don't want to keep living" -> `SELF_HARM` anywhere, as "want to live" is.
+
+The residual gap is deliberate and named: ideation stated with context gets
+the mental-health referral, not the crisis line, and adding `SELF_HARM`
+there is the LLM router's semantic job. Every pattern stops at the end of
+the input or of the thought, so "go on the trip" and "carry on with this
+job" fire nothing. Checked against every query in the three sets (no
+change) and those collision phrasings.
+
 ### The floor reads English only, so unreadable input is declined
 
 Nothing stops a user from typing their problem in Polish, and the floor

@@ -47,6 +47,9 @@ outage costs the user classification quality, never their query, and never
 safety detection: the floor is in the fallback too.
 """
 
+import hashlib
+import json
+
 from meditations_rag.llm.base import LLMClient
 from meditations_rag.route.base import Intent, RouteDecision, Router, SafetyFlag
 from meditations_rag.route.keyword import CHITCHAT, normalise, safety_flags
@@ -115,6 +118,16 @@ SCHEMA = {
 }
 
 
+# Fingerprint of everything the model is told: the system prompt and the
+# schema. Computed, not hand-bumped, so it cannot be forgotten. The eval
+# stamps it per router (eval/run_eval.py), so two rows under different
+# prompts are never read as a comparison of models. History: 49326eaac6
+# (the first prompt, fa1badb), d83b622eb0 (content questions, 6b79266).
+PROMPT_VERSION = hashlib.sha256(
+    (SYSTEM + json.dumps(SCHEMA, sort_keys=True)).encode("utf-8")
+).hexdigest()[:10]
+
+
 def user_message(problem: str) -> str:
     return f"<message>\n{problem}\n</message>"
 
@@ -143,6 +156,10 @@ class LLMRouter:
     @property
     def client(self) -> LLMClient:
         return self._client
+
+    @property
+    def prompt_version(self) -> str:
+        return PROMPT_VERSION
 
     def route(self, problem: str) -> RouteDecision:
         floor = safety_flags(problem)

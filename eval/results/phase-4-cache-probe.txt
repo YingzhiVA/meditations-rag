@@ -1,0 +1,76 @@
+Provider-cache probe, 2026-10-02 (throwaway script, not the harness).
+Apertus-8B-Instruct-2509 via HF -> publicai, the exact router request
+(route/llm.SYSTEM, SCHEMA, response_format json_schema strict), temperature
+0.8, top_p 0.9, bypassing the project's own completion cache. The 8 router
+queries whose apertus-t08 answer differed between phase-4-routers-8b-sampling
+(run1) and phase-4-routers-8b-nocache (run2). Three calls per variant, in
+order; intent (latency ms).
+
+  A  no header                       as run 1
+  B  x-use-cache: false header       as run 2
+  C  a different `user` field per call (extra_body)
+  D  a different `seed` per call (1000, 1001, 1002)
+
+which tax software should I use
+  run1=meta  run2=out_of_scope
+  A no header    meta(2084)  meta(542)  meta(514)
+  B header       meta(469)  meta(1019)  meta(569)
+  C user varies  meta(590)  meta(1157)  meta(461)
+  D seed varies  out_of_scope(1158)  out_of_scope(1589)  out_of_scope(1537)
+
+how do I fix a leaking radiator valve
+  run1=out_of_scope  run2=meta
+  A no header    meta(1771)  meta(507)  meta(455)
+  B header       meta(591)  meta(499)  meta(459)
+  C user varies  meta(463)  meta(807)  meta(816)
+  D seed varies  out_of_scope(1164)  out_of_scope(1277)  out_of_scope(26401)
+
+what were the causes of the Second Punic War
+  run1=meta  run2=out_of_scope
+  A no header    meta(1284)  meta(495)  meta(570)
+  B header       meta(553)  meta(479)  meta(480)
+  C user varies  meta(591)  meta(548)  meta(555)
+  D seed varies  out_of_scope(1127)  meta(1133)  out_of_scope(1934)
+
+summarize the plot of Hamlet
+  run1=meta  run2=out_of_scope
+  A no header    chitchat(1804)  chitchat(475)  chitchat(457)
+  B header       chitchat(509)  chitchat(465)  chitchat(582)
+  C user varies  chitchat(1132)  chitchat(886)  chitchat(502)
+  D seed varies  out_of_scope(1166)  meta(2129)  chitchat(2659)
+
+My visa was refused and I have three weeks to leave the country where
+  run1=in_scope  run2=out_of_scope
+  A no header    in_scope(1149)  in_scope(458)  in_scope(694)
+  B header       in_scope(448)  in_scope(602)  in_scope(510)
+  C user varies  in_scope(589)  in_scope(546)  in_scope(465)
+  D seed varies  out_of_scope(1161)  meta(1250)  out_of_scope(1081)
+
+My brother had our mother change her will while she was ill and I have
+  run1=in_scope  run2=out_of_scope
+  A no header    in_scope(1172)  in_scope(477)  in_scope(465)
+  B header       in_scope(457)  in_scope(637)  in_scope(769)
+  C user varies  in_scope(480)  in_scope(494)  in_scope(505)
+  D seed varies  in_scope(5260)  out_of_scope(1088)  in_scope(1179)
+
+I've had a throbbing tooth for over a week and I can't afford a dentis
+  run1=in_scope  run2=out_of_scope
+  A no header    out_of_scope(1268)  out_of_scope(606)  out_of_scope(494)
+  B header       out_of_scope(468)  out_of_scope(481)  out_of_scope(460)
+  C user varies  out_of_scope(562)  out_of_scope(482)  out_of_scope(490)
+  D seed varies  out_of_scope(1067)  out_of_scope(1225)  in_scope(1060)
+
+What did Marcus Aurelius die of?
+  run1=in_scope  run2=meta
+  A no header    out_of_scope(1954)  out_of_scope(458)  out_of_scope(487)
+  B header       out_of_scope(492)  out_of_scope(451)  out_of_scope(600)
+  C user varies  out_of_scope(577)  out_of_scope(502)  out_of_scope(465)
+  D seed varies  meta(2659)  meta(1802)  meta(1656)
+
+Reading: A = B = C on every query (header and `user` do not matter); A
+matches neither run's answers (run 1's entries, and even run 2's from
+minutes earlier, are gone); D varies with the seed (the seed is honoured)
+and every D call is slow, whereas A/B/C are slow once and then ~0.5 s. A
+prompt-prefix cache would speed D up too (same prompt), so the speed-up is a
+response cache keyed on prompt + sampling parameters (seed included; header
+and `user` not), held for minutes.

@@ -776,7 +776,28 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       The one change at temperature 0 was across days: the chest-pain
       question went from `in_scope` (2026-09-29, before fingerprints were
       recorded) to `out_of_scope` in both fresh calls today (`fp1-nst-nes`).
-      Next: send `x-use-cache: false` on every HF call and repeat.
+
+      **It is a response cache, keyed on the request and short-lived**
+      (`eval/results/phase-4-routers-8b-nocache.md`: same command, our own 8B
+      cache cleared, `x-use-cache: false` sent; then
+      `eval/results/phase-4-cache-probe.txt`). Within the second run the
+      repeats were again identical and ~3x faster, but 8 of 45 temperature-0.8
+      answers differed from the first run, while greedy matched on all 45. A
+      direct probe on those 8 queries settled why: the header and the `user`
+      field change nothing; a different `seed` per call is honoured (Hamlet
+      came back `out_of_scope`, `meta` and `chitchat` on three seeds) and is
+      slow on every call, whereas identical requests are slow once and then
+      ~0.5 s; and neither run's answers were still being served minutes
+      later. A prompt-prefix cache would speed the seeded calls up too, so
+      this is a response cache keyed on prompt + sampling parameters (seed
+      included), held for minutes. Hence:
+      - **greedy is reproducible** across fresh runs on the same day;
+      - **sampling at 0.8 is real and volatile**, and the card's setting
+        does not help routing: two independent samples gave 11% and 39%
+        out_of_scope recall against greedy's 44%. Routing stays greedy;
+      - **repeats must vary the seed** to be independent samples (and, at
+        greedy, to be real recomputations with real latencies). The header
+        does nothing and goes.
 - [ ] **Language guard** (see "The floor reads English only" under Scope &
       safety boundaries). It is a pipeline step ahead of the router, not a
       fifth `Intent`. The enum is frozen and describes what the input *is*;

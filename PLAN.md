@@ -816,7 +816,7 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       sits just under the greedy choice, but a coin flip is not a safety
       mechanism. **Routing is settled greedy.** The `-t08` rows stay
       registered, opt-in, as the record of this experiment.
-- [ ] **Language guard** (see "The floor reads English only" under Scope &
+- [x] **Language guard** (see "The floor reads English only" under Scope &
       safety boundaries). It is a pipeline step ahead of the router, not a
       fifth `Intent`. The enum is frozen and describes what the input *is*;
       this decides whether it can be read at all. Record the detected
@@ -835,6 +835,30 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       mourir"). **Test invariant:** a non-English input never reaches the
       embedder, asserted with the same raising stub as the Phase 2
       short-circuit test.
+
+      **Result** (`eval/results/phase-4-language-guard.md`, lingua 2.2.0,
+      cp314 wheel, threshold 1.2x): **0/97** false declines over the English
+      inputs of the three sets, and **36/36** non-English inputs declined —
+      all 20 crisis disclosures, 11 everyday, 5 short. Lowest English lead
+      1.46x, highest English-to-other ratio on the language set 0.78x
+      ("hallo"). Two things the measurement forced:
+      - **the corpus's names are masked before detection.** "What did Marcus
+        Aurelius die of?" ranked Latin first (0.24 against English 0.07),
+        and content questions are `IN_SCOPE`, so they name Marcus constantly.
+        Names are language-neutral: masked, German, French and Polish
+        questions that name him are still declined, and a Latin sentence is
+        still Latin; dropping Latin from the detector instead misread one
+        as Esperanto. A names-only message ("Marcus Aurelius") is accepted;
+      - **the threshold was read off these same sets,** so the 0/97 and 36/36
+        are not an independent test of it. The fresh-query check before
+        Phase 5 (Risk 5) is.
+      The guard runs before the router, so a declined input never reaches an
+      LLM provider. The test asserts it with a raising router as well as the
+      raising embedder. The keyword floor still runs on a declined input,
+      since it can only add a referral. The crisis pointer stays English for
+      now: local emergency numbers and findahelpline.com (verified: run by
+      ThroughLine, 175+ countries); per-language pointers come with Phase 6's
+      German referral text.
 - [ ] **LLM passage-in-context safety check**: given (query, passage), would
       presenting this read as counsel to endure mistreatment? Scored against
       the human-reviewed suppression list on `eval/safety_set.jsonl`. The

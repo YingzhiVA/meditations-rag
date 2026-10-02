@@ -687,6 +687,9 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       rows reproduce identically there from the completion cache. "LLM
       alone" from `eval/results/phase-4-routers-llm-alone.md`, the same
       completions rescored: the LLM's own flags before the floor is merged.)
+      Router prompt per run (`route/llm.PROMPT_VERSION`, stamped in reports
+      from `1342395` on): `49326eaac6` for `phase-4-routers`, `-70b` and
+      `-llm-alone`; `d83b622eb0` for `-content` and the three 8B runs.
       \*Billed, not computed: the HF invoice for the whole 70B run was
       $0.03 over 68 queries (63 calls, ~40k tokens, 97% input). publicai
       publishes no per-token rate and the bill does not split input from
@@ -838,6 +841,41 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       deterministic list stays the default and the shipped behaviour; this is
       a comparator row that has to earn its place — and it cannot replace the
       list outright, since an LLM check fails open on a provider outage.
+- [ ] **Router prompt iteration, for Apertus.** The router results above
+      leave Apertus well behind Haiku: out_of_scope recall 44% (8B) and 94%
+      (70B), and on its own the 8B raises 2 of 20 owed safety flags, the 70B
+      6-7. This item tries to close that gap with the prompt, **zero-shot
+      only**: no worked examples, so that what is measured is how the model
+      reads definitions, and no example can leak a labelled case into the
+      prompt. Two variants, each its own row and its own `PROMPT_VERSION`:
+      - **intent and safety as two calls**: one schema per call, so the
+        model never weighs a routing label against a safety flag at once.
+        It doubles calls per query, so its latency and tokens are part of
+        the result, not a footnote;
+      - **shorter definitions in plainer language**: the same rules in
+        fewer, simpler words. The current prompt was written for a strong
+        model; the 8B's errors (routing factual asks to `meta`, never firing
+        the medical/legal-advice rule) look like definitions it does not
+        follow, not rules it rejects.
+      **Protocol, settled before the first attempt:**
+      - *development set*: the current `router_set.jsonl` and
+        `safety_set.jsonl`, iterated on freely;
+      - *held-out set*: new entries written from the scope rules before any
+        variant runs (start from the Phase 4 brainstorm: buried legal and
+        medical asks, the dosing question, the hard in_scope mirrors), never
+        looked at per query during iteration and **scored once**, for the
+        final variants only. Both numbers reported; a gain that does not
+        survive the held-out set is not a gain;
+      - iterate on the 8B (free), confirm the best variant on the 70B and
+        Haiku, greedy throughout, `--repeats` with seeds where a difference
+        is close to the noise;
+      - rules and labels stay fixed: a prompt edit may restate the rules,
+        never change them. A rule change is a spec change, made in "Scope &
+        safety boundaries" first, as content questions were;
+      - the winner must also read German (Phase 6 routes German through
+        this same prompt), so nothing in it may lean on English wording.
+      **Done when:** the variants have rows on both sets, and PLAN records
+      which prompt, if any, replaces `d83b622eb0`, and why.
 - [ ] **Query rewriting** (`RewriteQuery`): 1→1. Strip affect and narrative,
       restate in the corpus's conceptual vocabulary. Cheaper and more
       predictable than HyDE, and it degrades more gracefully.

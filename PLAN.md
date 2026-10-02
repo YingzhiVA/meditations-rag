@@ -738,6 +738,29 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       labelling questions before they are errors. "Terrified of dying" is
       the costly one if it stands: `mental_health` withholds the
       death-counsel list from a reader asking about exactly that.
+
+      **After the content-question spec** (`eval/results/phase-4-routers-content.md`,
+      45 router entries, the prompt's intent definitions revised; see
+      "Questions about what the book says are `IN_SCOPE`"):
+
+      | router | (oos recall, in_scope retention) | oos hard | LLM alone (safety) |
+      |---|---|---|---|
+      | `apertus` (8B) | (39%, 100%) | 2/12 | 2/20 |
+      | `apertus-70b` | (94%, 94%) | 11/12 | 6/20, 1 FP |
+      | `claude` (Haiku) | (94%, 94%) | 11/12 | 20/20, 0 FP |
+
+      The case that motivated the spec, "What does Marcus say about the
+      afterlife?", still routes `meta` under both Haiku and the 70B; its
+      sibling "What do the Meditations say about grief?" routes `in_scope`
+      under both, and the keyword router gets both right. Haiku now also
+      routes the sleep-deprivation diagnosis `in_scope`, which it had right
+      before, most likely pulled by the new `in_scope` clause. The 8B's rise
+      is a side effect: dropping "which book" from `meta` moved tax
+      software, the Punic War and Hamlet from `meta` to `out_of_scope`; its
+      one fallback was a read timeout past 30 s. The 70B's own safety flags
+      changed on 4 of 27 entries although the safety section of the prompt
+      did not change — prompt sensitivity or provider nondeterminism, which
+      one run cannot separate. Haiku's did not move.
 - [ ] **Language guard** (see "The floor reads English only" under Scope &
       safety boundaries). It is a pipeline step ahead of the router, not a
       fifth `Intent`. The enum is frozen and describes what the input *is*;

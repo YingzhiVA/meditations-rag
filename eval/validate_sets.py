@@ -1,4 +1,5 @@
-"""Schema and consistency validation for the three labeled sets — Phase 3.
+"""Schema and consistency validation for the labeled sets — Phase 3, plus
+the language set (Phase 4).
 
 Run this while curating, not after. A bad passage id caught at entry 6 costs
 a second; caught at entry 25 it costs a re-read of the book.
@@ -52,6 +53,11 @@ BLOCKING = {f.value for f in SafetyFlag if f.blocks_retrieval}
 GOLDEN_FIELDS = {"query", "gold_ids", "tier", "note", "theme", "failure_mode"}
 ROUTER_FIELDS = {"query", "intent", "safety", "tier", "note"}
 SAFETY_FIELDS = {"query", "flags", "must_not_return", "tier", "note"}
+LANGUAGE_FIELDS = {"query", "lang", "tier", "note"}
+LANGUAGE_TIERS = {"crisis", "everyday", "short"}
+# ISO 639-1, plus the ISO 639-3 codes for languages without a 639-1 code
+# (gsw: Swiss German). A label, so checked for shape only.
+LANG_RE = re.compile(r"^[a-z]{2,3}$")
 
 ID_RE = re.compile(r"^(\d{1,2})\.(\d{1,3})$")
 
@@ -499,10 +505,43 @@ def validate_safety(path: Path, known: set[str] | None) -> Report:
     return rep
 
 
+# --- language_set.jsonl -----------------------------------------------------
+
+def validate_language(path: Path) -> Report:
+    """Non-English inputs the language guard must decline (PLAN.md, Phase 4).
+    Every entry is a decline by construction, so the label is the language,
+    for per-language reporting, and the tier says what a miss would cost:
+    crisis (a missed referral), everyday (nonsense passages), short (too few
+    words to identify — the hardest case for any detector)."""
+    rep = Report(path)
+    entries = load(path, rep)
+    common(rep, entries, LANGUAGE_FIELDS)
+    tiers: Counter[str] = Counter()
+    langs: Counter[str] = Counter()
+    for n, obj in entries:
+        lang = obj.get("lang")
+        if not isinstance(lang, str) or not LANG_RE.match(lang):
+            rep.error(n, f"lang {lang!r} is not an ISO 639 code (e.g. 'de', 'gsw')")
+            continue
+        if lang == "en":
+            rep.error(n, "lang 'en' in the language set — every entry must be non-English; "
+                         "English false declines are measured on the other three sets")
+        langs[lang] += 1
+        tiers[check_tier(rep, n, obj, LANGUAGE_TIERS, "everyday")] += 1
+    rep.info("")
+    rep.info(f"  {len(entries)} entries: {dict(sorted(tiers.items()))}")
+    rep.info(f"  languages: {dict(sorted(langs.items()))}")
+    if not tiers["crisis"]:
+        rep.warn(None, "no crisis entries — the guard exists for the missed referral, "
+                       "so decline recall on crisis disclosures is the number that matters")
+    return rep
+
+
 VALIDATORS = {
     "golden_set.jsonl": lambda p, known: validate_golden(p, known),
     "router_set.jsonl": lambda p, known: validate_router(p),
     "safety_set.jsonl": lambda p, known: validate_safety(p, known),
+    "language_set.jsonl": lambda p, known: validate_language(p),
 }
 
 

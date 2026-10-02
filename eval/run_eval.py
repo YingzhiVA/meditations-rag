@@ -65,6 +65,10 @@ protocol): an apt passage nobody labelled scores as a miss. Fine for
 comparing configurations, which is what the matrix is for; not fine to
 present as an absolute.
 
+THE LANGUAGE GUARD (Phase 4) gets its own table: false declines over every
+English input the three sets hold, and decline recall over
+eval/language_set.jsonl by tier. Both run locally and free on every run.
+
 THE STAMP. Results carry the model id, library versions, the corpus
 fingerprint and the md5 of each labelled set. Embedding numbers move when a
 dependency upgrades and when the corpus is re-parsed, so an unstamped row
@@ -107,6 +111,15 @@ def load_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
     return [json.loads(l) for l in path.open(encoding="utf-8") if l.strip()]
+
+
+def _version(dist: str) -> str:
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version(dist)
+    except PackageNotFoundError:
+        return "not installed"
 
 
 def md5(path: Path) -> str:
@@ -189,7 +202,8 @@ def run_config(cfg, hard, canary, oos, resources, run_id=None) -> dict:
                 "gold_ids": gold, "rank": gold_rank(res, gold) if gold else None,
                 "returned": [rp.passage.id for rp in res.passages],
                 "scores": [round(rp.score, 4) for rp in res.passages],
-                "intent": res.intent.value,
+                "intent": res.intent.value if res.intent else None,
+                "declined": res.declined, "language": res.language,
                 "safety": sorted(f.value for f in res.safety),
                 "no_strong_match": res.no_strong_match,
             })
@@ -378,6 +392,68 @@ def run_safety(names, entries, cfg, resources, run_id=None) -> tuple[list[dict],
                      "usage": usage_summary(mine)})
         records += mine
     return rows, records
+
+
+# --- language guard ---------------------------------------------------------
+
+def run_language(english: list[str], language_set: list[dict]) -> list[dict]:
+    """PLAN.md, Phase 4: the guard measured two ways, both free (local, no
+    model, no network). False declines over every English input the other
+    three sets already hold — each one costs that user a retry. Decline
+    recall over eval/language_set.jsonl by tier — a missed crisis entry is a
+    missed referral. Calls check_language directly: the pipeline adds
+    nothing to the verdict, and this keeps the measurement independent of
+    any router or index."""
+    from meditations_rag.route.language import check_language
+
+    records = []
+    for q in dict.fromkeys(english):
+        v = check_language(q)
+        records.append({"table": "language", "set": "english", "query": q, "tier": "",
+                        "expected_lang": "en", "language": v.language, "reason": v.reason,
+                        "lead": round(v.lead, 3) if v.lead not in (None, float("inf")) else v.lead,
+                        "declined": not v.supported})
+    for e in language_set:
+        v = check_language(e["query"])
+        records.append({"table": "language", "set": "non-english", "query": e["query"],
+                        "tier": e.get("tier", ""), "expected_lang": e.get("lang"),
+                        "language": v.language, "reason": v.reason,
+                        "lead": round(v.lead, 3) if v.lead not in (None, float("inf")) else v.lead,
+                        "declined": not v.supported})
+    return records
+
+
+def render_language(records: list[dict]) -> str:
+    eng = [r for r in records if r["set"] == "english"]
+    non = [r for r in records if r["set"] == "non-english"]
+    L = ["## Language guard", ""]
+    if not records:
+        return "\n".join(L + ["*No language records.*", ""]) + "\n"
+    rows = []
+    fd = [r for r in eng if r["declined"]]
+    rows.append(["false declines (English inputs, all three sets)", f"{len(fd)}/{len(eng)}"])
+    for tier in ("crisis", "everyday", "short"):
+        t = [r for r in non if r["tier"] == tier]
+        if t:
+            rows.append([f"decline recall: {tier}", f"{sum(r['declined'] for r in t)}/{len(t)}"])
+    if non:
+        rows.append(["decline recall: all non-English",
+                     f"{sum(r['declined'] for r in non)}/{len(non)}"])
+    L += [table(["measure", "result"], rows), ""]
+    if fd:
+        L += ["**Falsely declined:** " + "; ".join(
+            f"\"{r['query']}\" ({r['language']}, {r['reason']})" for r in fd), ""]
+    missed = [r for r in non if not r["declined"]]
+    if missed:
+        L += ["**Not declined (read as English):** " + "; ".join(
+            f"\"{r['query']}\" ({r['expected_lang']}, tier {r['tier']})" for r in missed), ""]
+    leads = sorted(r["lead"] for r in eng if r["reason"] == "confident")
+    if leads:
+        L += [f"*Lowest English lead over the runner-up: {leads[0]:.2f}x (threshold "
+              f"{config.LANGUAGE_MIN_RATIO}x). A false decline costs a retry; a missed "
+              "non-English crisis disclosure costs a referral, which is why unsure is "
+              "declined.*", ""]
+    return "\n".join(L) + "\n"
 
 
 # --- rendering --------------------------------------------------------------
@@ -575,6 +651,7 @@ def main() -> int:
     ap.add_argument("--golden", type=Path, default=None,
                     help="labelled set to score against (default eval/golden_set.jsonl)")
     ap.add_argument("--safety-set", type=Path, default=None)
+    ap.add_argument("--language-set", type=Path, default=None)
     ap.add_argument("--out", type=Path, default=None,
                     help="write the report here (default eval/results/<stamp>.md)")
     args = ap.parse_args()
@@ -589,6 +666,7 @@ def main() -> int:
     golden_p = args.golden or EVAL_DIR / "golden_set.jsonl"
     router_p = EVAL_DIR / "router_set.jsonl"
     safety_p = args.safety_set or EVAL_DIR / "safety_set.jsonl"
+    language_p = args.language_set or EVAL_DIR / "language_set.jsonl"
     hard, canary, oos, skipped = split_golden(load_jsonl(golden_p))
     router_set, safety_set = load_jsonl(router_p), load_jsonl(safety_p)
 
@@ -601,7 +679,9 @@ def main() -> int:
              "eval run id": run_id,
              "git": rev or "unknown", "corpus md5": md5(PASSAGES_FILE),
              "golden_set md5": md5(golden_p), "router_set md5": md5(router_p),
-             "safety_set md5": md5(safety_p),
+             "safety_set md5": md5(safety_p), "language_set md5": md5(language_p),
+             "lingua": _version("lingua-language-detector"),
+             "language_min_ratio": config.LANGUAGE_MIN_RATIO,
              "min_score_threshold": config.MIN_SCORE_THRESHOLD}
 
     resources, results = {}, []
@@ -656,7 +736,12 @@ def main() -> int:
             stamp[f"served ({name} router)"] = ", ".join(served) or "not reported"
             stamp[f"fingerprints ({name} router)"] = ", ".join(prints) or "not reported"
 
+    language_records = run_language(
+        [e["query"] for e in load_jsonl(golden_p) + router_set + safety_set],
+        load_jsonl(language_p))
+
     report = render(results, router_rows, safety_rows, stamp, skipped)
+    report += render_language(language_records)
     if args.repeats > 1:
         report += render_stability(router_records, safety_records, args.repeats)
     print("\n" + report)
@@ -673,7 +758,7 @@ def main() -> int:
         for r in results:
             for rec in r["records"]:
                 fh.write(json.dumps({"table": "retrieval", **rec}) + "\n")
-        for rec in router_records + safety_records:
+        for rec in router_records + safety_records + language_records:
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
     print(f"wrote {out}")
     if results or router_records:

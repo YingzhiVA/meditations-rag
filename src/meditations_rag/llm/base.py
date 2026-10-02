@@ -54,6 +54,13 @@ class CallRecord:
     latency_ms: float        # of the provider call, even when served from cache
     json_path: str | None    # complete_json only: 'response_format' | 'prompt' | 'structured'
     cached: bool = False
+    # What the provider says actually ran, as distinct from what was asked
+    # for in `model`: proof a run was served by the requested model and not
+    # a successor, and (system_fingerprint, OpenAI-style) whether the
+    # serving backend changed between two runs. None where the provider
+    # does not report it, and on cache entries written before these existed.
+    served_model: str | None = None
+    fingerprint: str | None = None
 
 
 # Append-only, process-wide. Single-threaded use (CLI, eval harness); a
@@ -113,9 +120,11 @@ class _Call:
         self._t0 = time.perf_counter()
 
     def done(self, output: object, input_tokens: int, output_tokens: int,
-             json_path: str | None = None) -> CallRecord:
+             json_path: str | None = None, *, served_model: str | None = None,
+             fingerprint: str | None = None) -> CallRecord:
         rec = CallRecord(self._name, self._model, input_tokens, output_tokens,
-                         (time.perf_counter() - self._t0) * 1000, json_path)
+                         (time.perf_counter() - self._t0) * 1000, json_path,
+                         served_model=served_model, fingerprint=fingerprint)
         CALLS.append(rec)
         telemetry.set_llm(self._span, model=self._model, provider=self._provider,
                           input_tokens=input_tokens, output_tokens=output_tokens)

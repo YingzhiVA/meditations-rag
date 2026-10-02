@@ -163,7 +163,13 @@ class HFClient:
             text = choice.message.content or ""
             usage = resp.usage
             call.done(text, usage.prompt_tokens if usage else 0,
-                      usage.completion_tokens if usage else 0, json_path)
+                      usage.completion_tokens if usage else 0, json_path,
+                      served_model=resp.model, fingerprint=resp.system_fingerprint)
+        if choice.finish_reason == "content_filter":
+            # Our inputs are often crisis disclosures, exactly what a provider
+            # filter may block. The caller degrades (the router falls back to
+            # the keyword floor); the name makes the cause countable.
+            raise LLMError(f"{self._name}: provider content filter stopped the completion")
         if choice.finish_reason == "length":
             raise LLMError(f"{self._name}: output truncated at max_tokens")
         if not text.strip():

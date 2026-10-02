@@ -1076,6 +1076,14 @@ side — the comparator column is the smaller half of the bill.
    no fallback. One call each on the simplest schema, so the risk is reduced,
    not closed: every `CallRecord` carries `json_path`, and the eval runs
    report the split on the real schemas.
+   **Honoured in practice, not documented (2026-10-02).** Every Apertus
+   call in the Phase 4 router runs (~200) came back schema-valid on the
+   `response_format` path, though no prompt mentions JSON, so the schema
+   does reach the model. But publicAI's own `ChatCompletionRequest` schema
+   lists no `response_format` (nor `seed` or `top_k`): it ends at
+   `tool_choice`. So it can stop working without notice. The schema check
+   plus prompt-JSON retry absorbs that, and the JSON-path line in every
+   report would show the shift.
 3. **Apertus HyDE register quality.** Style imitation is the hardest ask of the
    default model. See the Phase 4 note — a loss here is a result, not a defeat.
 4. **Golden-set subjectivity** — mitigated by multi-label hit-any scoring.

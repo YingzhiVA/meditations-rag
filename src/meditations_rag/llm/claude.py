@@ -113,7 +113,8 @@ class ClaudeClient:
             except self._api_error as exc:
                 raise LLMError(f"{self._name}: provider error: {exc}") from exc
             text = "".join(b.text for b in resp.content if b.type == "text")
-            call.done(text, resp.usage.input_tokens, resp.usage.output_tokens, json_path)
+            call.done(text, resp.usage.input_tokens, resp.usage.output_tokens, json_path,
+                      served_model=resp.model)
         if resp.stop_reason != "end_turn":
             raise LLMError(f"{self._name}: stopped with {resp.stop_reason!r}")
         if not text.strip():

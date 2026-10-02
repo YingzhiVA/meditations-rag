@@ -798,6 +798,21 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       - **repeats must vary the seed** to be independent samples (and, at
         greedy, to be real recomputations with real latencies). The header
         does nothing and goes.
+
+      **With a seed per repeat** (`eval/results/phase-4-routers-8b-seeded.md`,
+      8B, three repeats, our 8B cache cleared): greedy changed 0 of 45
+      intents and 0 of 27 safety answers across three real recomputations,
+      at an unchanged ~1.2 s per call, so greedy routing is deterministic
+      and its latency real. At the card's 0.8 / 0.9, 7 of 45 intents and 7
+      of 27 LLM-alone flag sets changed between repeats; out_of_scope recall
+      was 33%, 17%, 33% — with the two earlier single samples, five
+      independent samples averaging ~27% against greedy's constant 44%.
+      Sampling did raise the 8B's own safety recall (4-7 of 20 against
+      greedy's 2), adding a floor-missed flag to the union in two of three
+      repeats, once at the price of an extra false positive: the right flag
+      sits just under the greedy choice, but a coin flip is not a safety
+      mechanism. **Routing is settled greedy.** The `-t08` rows stay
+      registered, opt-in, as the record of this experiment.
 - [ ] **Language guard** (see "The floor reads English only" under Scope &
       safety boundaries). It is a pipeline step ahead of the router, not a
       fifth `Intent`. The enum is frozen and describes what the input *is*;

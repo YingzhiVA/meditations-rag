@@ -64,7 +64,9 @@ import json
 import logging
 
 from meditations_rag import config
-from meditations_rag.llm.base import LLMError, check_schema, observed_call, parse_json
+from meditations_rag.llm.base import (
+    LLMError, check_schema, current_repeat, observed_call, parse_json,
+)
 
 log = logging.getLogger(__name__)
 
@@ -99,15 +101,8 @@ class HFClient:
         self._name = name
         self._model = model or config.HF_GEN_MODEL
         self._sampling = dict(sampling or config.DEFAULT_SAMPLING)
-        # x-use-cache: false — identical requests were otherwise answered from
-        # a server-side cache (PLAN.md, "Repeats are replayed on this path"):
-        # three repeats at temperature 0.8 came back identical and ~3x faster.
-        # That made repeats measure nothing and repeat latencies fictitious.
-        # Our own completion cache (llm/cache.py) still stops us paying twice;
-        # this only stops the provider from replaying an answer.
         self._client = InferenceClient(provider=config.HF_PROVIDER, api_key=token,
-                                       timeout=config.LLM_TIMEOUT_S,
-                                       headers={"x-use-cache": "false"})
+                                       timeout=config.LLM_TIMEOUT_S)
         # None = untried, True = honoured, False = rejected by the provider.
         self._structured: bool | None = None
 
@@ -165,10 +160,18 @@ class HFClient:
         with observed_call(self._name, self._model, f"hf:{config.HF_PROVIDER}",
                            system, user) as call:
             try:
+                # seed: the provider caches whole responses keyed on prompt +
+                # sampling parameters for minutes, and ignores x-use-cache
+                # (eval/results/phase-4-cache-probe.txt). An eval repeat >= 1
+                # therefore sends its index as the seed, so it is recomputed:
+                # an independent sample when sampling, a real recomputation
+                # with a real latency when greedy. Repeat 0 sends none
+                # (huggingface_hub drops None), so its request is unchanged.
                 resp = self._client.chat_completion(
                     messages=messages, model=self._model, max_tokens=config.LLM_MAX_TOKENS,
                     temperature=self._sampling["temperature"],
-                    top_p=self._sampling["top_p"], response_format=response_format,
+                    top_p=self._sampling["top_p"], seed=current_repeat() or None,
+                    response_format=response_format,
                 )
             except Exception as exc:  # noqa: BLE001 — any SDK/transport error
                 status = getattr(getattr(exc, "response", None), "status_code", None)

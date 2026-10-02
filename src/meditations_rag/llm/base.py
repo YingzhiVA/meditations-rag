@@ -67,6 +67,22 @@ class CallRecord:
 # consumer takes len(CALLS) before a query and slices after it.
 CALLS: list[CallRecord] = []
 
+# Which repeat of an eval run the following calls belong to (0: a normal
+# run). Two consumers: the completion cache keys on it (llm/cache.py), and
+# the HF client sends it as the request seed (llm/hf.py), because the
+# provider caches whole responses keyed on prompt + sampling parameters for
+# minutes: without a different seed a repeat is replayed, not recomputed.
+_repeat = 0
+
+
+def set_repeat(index: int) -> None:
+    global _repeat
+    _repeat = index
+
+
+def current_repeat() -> int:
+    return _repeat
+
 
 def parse_json(text: str) -> dict:
     """Tolerant parse for providers without guaranteed structured output:

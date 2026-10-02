@@ -72,10 +72,10 @@ class UnknownLLMError(KeyError):
 
 def set_repeat(index: int) -> None:
     """Which repeat of an eval run the following calls belong to (see
-    llm/cache.py). 0, the default, is a normal run."""
-    from meditations_rag.llm import cache
+    llm/base.py). 0, the default, is a normal run."""
+    from meditations_rag.llm import base
 
-    cache.set_repeat(index)
+    base.set_repeat(index)
 
 
 def enable_cache(directory: Path = config.LLM_CACHE_DIR) -> None:

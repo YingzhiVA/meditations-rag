@@ -15,8 +15,7 @@ json_path, so the eval report catches it rather than a mocked transport.
 import hashlib
 import json
 
-from meditations_rag import config
-from meditations_rag.llm import cache
+from meditations_rag import config, llm
 from meditations_rag.llm.base import CALLS, observed_call
 from meditations_rag.llm.cache import CachedClient
 
@@ -81,12 +80,12 @@ def test_repeats_and_sampling_get_their_own_entries_and_old_keys_survive(tmp_pat
     sampled.complete("sys", "q")
     assert sampled._inner.calls == 1                 # not served the greedy answer
     try:
-        cache.set_repeat(1)
+        llm.set_repeat(1)
         greedy.complete("sys", "q")
         assert greedy._inner.calls == 2              # repeat 1 is a fresh call
         greedy.complete("sys", "q")
         assert greedy._inner.calls == 2              # and itself reruns free
     finally:
-        cache.set_repeat(0)
+        llm.set_repeat(0)
     greedy.complete("sys", "q")
     assert greedy._inner.calls == 2                  # repeat 0 still hits the original

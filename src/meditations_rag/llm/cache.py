@@ -38,14 +38,7 @@ import json
 from pathlib import Path
 
 from meditations_rag import config
-from meditations_rag.llm.base import CALLS, CallRecord, LLMClient
-
-_repeat = 0
-
-
-def set_repeat(index: int) -> None:
-    global _repeat
-    _repeat = index
+from meditations_rag.llm.base import CALLS, CallRecord, LLMClient, current_repeat
 
 
 class CachedClient:
@@ -79,8 +72,8 @@ class CachedClient:
         parts: list = [self.name, self.model, kind, system, user, schema]
         if self.sampling != config.DEFAULT_SAMPLING:
             parts.append({"sampling": self.sampling})
-        if _repeat:
-            parts.append({"repeat": _repeat})
+        if current_repeat():
+            parts.append({"repeat": current_repeat()})
         blob = json.dumps(parts, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
@@ -93,7 +86,7 @@ class CachedClient:
         start = len(CALLS)
         output = call()   # raises on failure; nothing is written
         entry = {"llm": self.name, "model": self.model, "kind": kind,
-                 "sampling": self.sampling, "repeat": _repeat,
+                 "sampling": self.sampling, "repeat": current_repeat(),
                  "user": user, "output": output,
                  # Every provider call this completion took, retries included.
                  "calls": [{k: v for k, v in vars(r).items() if k != "cached"}

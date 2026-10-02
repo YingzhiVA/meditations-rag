@@ -99,8 +99,15 @@ class HFClient:
         self._name = name
         self._model = model or config.HF_GEN_MODEL
         self._sampling = dict(sampling or config.DEFAULT_SAMPLING)
+        # x-use-cache: false — identical requests were otherwise answered from
+        # a server-side cache (PLAN.md, "Repeats are replayed on this path"):
+        # three repeats at temperature 0.8 came back identical and ~3x faster.
+        # That made repeats measure nothing and repeat latencies fictitious.
+        # Our own completion cache (llm/cache.py) still stops us paying twice;
+        # this only stops the provider from replaying an answer.
         self._client = InferenceClient(provider=config.HF_PROVIDER, api_key=token,
-                                       timeout=config.LLM_TIMEOUT_S)
+                                       timeout=config.LLM_TIMEOUT_S,
+                                       headers={"x-use-cache": "false"})
         # None = untried, True = honoured, False = rejected by the provider.
         self._structured: bool | None = None
 

@@ -761,6 +761,22 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       changed on 4 of 27 entries although the safety section of the prompt
       did not change — prompt sensitivity or provider nondeterminism, which
       one run cannot separate. Haiku's did not move.
+
+      **Repeats are replayed on this path, not sampled again**
+      (`eval/results/phase-4-routers-8b-sampling.md`, 8B at temperature 0 and
+      at the model card's 0.8 / 0.9, three repeats each). At 0.8 all three
+      repeats gave the same answer on every query, down to the same two
+      queries falling back to prompt-JSON each time, while differing from
+      the temperature-0 answers on 7 queries; and every repeat after the
+      first ran about 3x faster (e.g. 1.4 s -> 0.5 s). So identical requests
+      are answered from a server-side cache, HF's or publicAI's: the
+      stability table cannot measure sampling variance on this path, the
+      0.8 row is one sample (11% out_of_scope recall against 44% at 0, for
+      what one sample is worth), and repeat latencies are not latencies.
+      The one change at temperature 0 was across days: the chest-pain
+      question went from `in_scope` (2026-09-29, before fingerprints were
+      recorded) to `out_of_scope` in both fresh calls today (`fp1-nst-nes`).
+      Next: send `x-use-cache: false` on every HF call and repeat.
 - [ ] **Language guard** (see "The floor reads English only" under Scope &
       safety boundaries). It is a pipeline step ahead of the router, not a
       fifth `Intent`. The enum is frozen and describes what the input *is*;

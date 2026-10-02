@@ -234,6 +234,8 @@ def llm_usage(calls: list[CallRecord]) -> dict:
             "out_tok": sum(c.output_tokens for c in calls),
             "usd": usd if calls else None,
             "json_paths": [c.json_path for c in calls if c.json_path],
+            "served_models": sorted({c.served_model for c in calls if c.served_model}),
+            "fingerprints": sorted({c.fingerprint for c in calls if c.fingerprint}),
             "llm_calls": len(calls)}
 
 
@@ -567,6 +569,17 @@ def main() -> int:
         safety_rows, safety_records = run_safety(
             args.router, safety_set, RetrievalConfig(embedder=args.embedder[0], k=max(KS)),
             resources, run_id)
+
+    # What actually served each LLM router, from the providers' own responses:
+    # a substituted model, or a backend change between two runs, shows here
+    # rather than as an unexplained shift in the numbers.
+    for name in args.router:
+        if name in LLM_ROUTERS:
+            recs = [r for r in router_records + safety_records if r["router"] == name]
+            served = sorted({m for r in recs for m in r["served_models"]})
+            prints = sorted({f for r in recs for f in r["fingerprints"]})
+            stamp[f"served ({name} router)"] = ", ".join(served) or "not reported"
+            stamp[f"fingerprints ({name} router)"] = ", ".join(prints) or "not reported"
 
     report = render(results, router_rows, safety_rows, stamp, skipped)
     print("\n" + report)

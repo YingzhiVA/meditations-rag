@@ -128,6 +128,16 @@ LLM_PRICES_PER_MTOK: dict[str, tuple[float, float]] = {
     "claude-haiku-4-5": (1.00, 5.00),
 }
 
+# --- Language guard (Phase 4) ------------------------------------------------
+# The keyword safety floor reads English only (PLAN.md, "The floor reads
+# English only"), so a language joins this tuple only once it has its own
+# safety set scoring the LLM router in that language. Phase 6 adds "de".
+SUPPORTED_LANGUAGES: tuple[str, ...] = ("en",)
+# A supported language is accepted only when it ranks first AND its
+# confidence is at least this multiple of the runner-up's; anything less is
+# "unsure", and unsure is declined. Measured in route/language.py's docstring.
+LANGUAGE_MIN_RATIO = 1.2
+
 # --- Router (Phase 2 interface, Phase 4 LLM impls) --------------------------
 # Pre-retrieval intent classification: not every input warrants a meditation.
 # See route/base.py for why this does NOT subsume MIN_SCORE_THRESHOLD.

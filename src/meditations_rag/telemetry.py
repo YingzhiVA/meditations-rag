@@ -34,6 +34,7 @@ DESIGN RULES
 SPAN TREE
 ---------
     query                       (CHAIN, root: config metadata, shown ids)
+      ├─ language               (GUARDRAIL — a declined input stops here)
       ├─ route                  (CHAIN)
       │    └─ llm.generate      (LLM — LLM routers only; none on a chitchat
       │                          exact match or with the keyword router)

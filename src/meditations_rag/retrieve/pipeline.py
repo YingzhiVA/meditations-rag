@@ -7,8 +7,15 @@ eval harness call, so pipeline config == experiment config.
     run_query(problem, cfg) -> QueryResult
 
 Flow (Phase 2 implements route + the single-query path + safety; Phase 4
-adds fusion, rerank, and the LLM-backed routers/strategies):
+adds the language guard, fusion, rerank, and the LLM-backed routers/strategies):
 
+-1. route/language.check_language(problem): can the input be read at all?
+   A language outside config.SUPPORTED_LANGUAGES, or an unsure detection,
+   is DECLINED here: no router (so no LLM call), no embedding. The keyword
+   safety floor still runs on it — it costs nothing and can only add a
+   referral — and the decline carries a static crisis pointer
+   (retrieve/safety.LANGUAGE_DECLINE). Not a fifth Intent: a declined input
+   was never read, so its intent is None.
 0. router.route(problem) -> RouteDecision(intent, safety). If the intent is
    not IN_SCOPE, or a safety flag blocks retrieval (SELF_HARM,
    MEDICAL_EMERGENCY), return immediately with no retrieval. This is
@@ -103,15 +110,20 @@ class QueryResult:
     (ids only — they are withheld, so they are not carried as text).
     `queries` is what was actually embedded, for diagnostics.
     `router_fallback` is RouteDecision.fallback passed through: set when an
-    LLM router lost its provider and the keyword router decided instead."""
+    LLM router lost its provider and the keyword router decided instead.
+    `language` is what route/language.py detected; `declined` is True when
+    it could not be read, and then `intent` is None: the input was never
+    classified (PLAN.md, the language guard)."""
 
-    intent: Intent
+    intent: Intent | None
     safety: frozenset[SafetyFlag] = field(default_factory=frozenset)
     passages: list[RetrievedPassage] = field(default_factory=list)
     withheld: list[str] = field(default_factory=list)
     no_strong_match: bool = False
     queries: list[str] = field(default_factory=list)
     router_fallback: str | None = None
+    language: str = "en"
+    declined: bool = False
 
     @property
     def retrieved(self) -> bool:
@@ -142,7 +154,9 @@ def run_query(
                                       "eval_run_id": eval_run_id}, tags=[cfg.label])
         result = _run_query(problem, cfg, router, embedder, index, passages)
         telemetry.set_output(root, {
-            "intent": result.intent.value,
+            "intent": result.intent.value if result.intent else None,
+            "language": result.language,
+            "declined": result.declined,
             "safety": sorted(f.value for f in result.safety),
             "shown": [rp.passage.id for rp in result.passages],
             "withheld": result.withheld,
@@ -154,6 +168,16 @@ def run_query(
 
 def _run_query(problem, cfg, router, embedder, index, passages) -> QueryResult:
     from meditations_rag.route import get_router
+    from meditations_rag.route.keyword import safety_flags
+    from meditations_rag.route.language import check_language
+
+    with telemetry.span("language", "GUARDRAIL", input=problem) as sp:
+        verdict = check_language(problem)
+        telemetry.set_output(sp, {"language": verdict.language, "supported": verdict.supported,
+                                  "reason": verdict.reason, "lead": verdict.lead})
+    if not verdict.supported:
+        return QueryResult(intent=None, safety=safety_flags(problem),
+                           language=verdict.language, declined=True)
 
     router = router or get_router(cfg.router)
     with telemetry.span("route", "CHAIN", input=problem,
@@ -166,7 +190,7 @@ def _run_query(problem, cfg, router, embedder, index, passages) -> QueryResult:
 
     if not decision.retrieves:
         return QueryResult(intent=decision.intent, safety=decision.safety,
-                           router_fallback=decision.fallback)
+                           router_fallback=decision.fallback, language=verdict.language)
 
     from meditations_rag.embed import get_embedder
     from meditations_rag.retrieve.strategies import get_strategy
@@ -229,4 +253,5 @@ def _run_query(problem, cfg, router, embedder, index, passages) -> QueryResult:
         no_strong_match=no_strong_match,
         queries=queries,
         router_fallback=decision.fallback,
+        language=verdict.language,
     )

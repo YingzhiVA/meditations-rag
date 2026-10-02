@@ -30,6 +30,14 @@ Phase 4 adds two for the LLM router, both against a fake client (no network):
    that silently measures the keyword router).
 
 LLM classification quality is not tested here; that is the router eval.
+
+Phase 4's language guard adds one more, the invariant PLAN.md names:
+
+5. Non-English input is declined before ANY work: no router (an LLM router
+   would ship the text to a provider) and no embedding. Asserted with the
+   same raising stubs, plus a raising router. Which inputs the detector
+   gets right is measured by the eval (false declines, decline recall), not
+   tested here.
 """
 
 import json
@@ -66,6 +74,15 @@ class _RaisingIndex:
 
     def __getattr__(self, item):
         raise AssertionError(f"index.{item} touched on a short-circuited query")
+
+
+class _RaisingRouter:
+    """Any route() call proves a declined input reached the router."""
+
+    name = "keyword"
+
+    def route(self, problem):
+        raise AssertionError("router called on an input the language guard should decline")
 
 
 @pytest.fixture
@@ -170,3 +187,17 @@ def test_llm_router_outage_falls_back_visibly_with_floor_intact():
     assert decision.intent is KeywordRouter().route(DISCLOSURE).intent
     assert SafetyFlag.SELF_HARM in decision.safety
     assert decision.llm_safety is None   # no LLM answered; nothing to attribute
+
+
+@pytest.mark.parametrize("problem", [
+    "chcę umrzeć",                       # PLAN.md's own example
+    "je veux mourir",
+    "Was sagt Marcus Aurelius über den Tod?",   # the corpus's names do not make it English
+])
+def test_non_english_is_declined_before_router_and_embedder(cfg, problem):
+    result = run_query(problem, cfg, router=_RaisingRouter(),
+                       embedder=_RaisingEmbedder(), index=_RaisingIndex())
+    assert result.declined
+    assert result.intent is None
+    assert result.language != "en"
+    assert not result.retrieved

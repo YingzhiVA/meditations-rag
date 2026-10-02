@@ -119,6 +119,19 @@ REFERRAL: dict[SafetyFlag, str] = {
 
 # Most serious first: when flags co-occur, this is the order their
 # referrals are owed in.
+# Rule 3 when the input could not be read (route/language.py). We cannot rule
+# out a crisis in a language the floor cannot read, so the cautious reading
+# is that there might be one: every decline carries a static crisis pointer
+# (PLAN.md, "The floor reads English only"). English, because we do not know
+# what the reader reads; the numbers and the directory are language-neutral.
+LANGUAGE_DECLINE = (
+    "This tool can only read English for now, so it cannot respond to this "
+    "message. If you are in crisis or thinking about ending your life, please "
+    "contact your local emergency number now (112 across Europe, 911 in North "
+    "America) or a crisis line: findahelpline.com lists free, confidential "
+    "helplines in over 175 countries."
+)
+
 FLAG_ORDER: tuple[SafetyFlag, ...] = (
     SafetyFlag.SELF_HARM,
     SafetyFlag.MEDICAL_EMERGENCY,

@@ -18,6 +18,9 @@ dependencies = [
     # router + query transformation); anthropic is the eval comparator only.
     "huggingface-hub",
     "anthropic>=1,<2",          # 1.x: sampling params only via extra_body
+    # Phase 4: language guard ahead of the router. Offline, no word lists,
+    # one check for every language (PLAN.md, "The floor reads English only").
+    "lingua-language-detector",
     # "voyageai",               # Phase 4: second embedder for comparison
     # "rank-bm25",              # Phase 4: hybrid retrieval
 ]

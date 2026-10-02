@@ -330,7 +330,8 @@ def _debug_block(result) -> str:
     rendering leaves out on purpose."""
     from meditations_rag.retrieve.safety import withheld_reasons
 
-    lines = [f"[debug] intent: {result.intent.value}"]
+    intent = result.intent.value if result.intent else "none (declined)"
+    lines = [f"[debug] language: {result.language}", f"[debug] intent: {intent}"]
     if result.router_fallback:
         lines.append(f"[debug] router fallback: {result.router_fallback}")
     flags = ", ".join(f.value for f in sorted(result.safety, key=lambda f: f.value)) or "none"
@@ -403,6 +404,14 @@ def render_result(result, *, show_all: bool = False, show_scores: bool = False,
     # Rule 3: the referral leads, whatever else follows.
     if result.safety:
         out.append(_render_referral(result.safety))
+
+    if result.declined:
+        # The input could not be read (route/language.py): say so, with the
+        # static crisis pointer, and nothing else — there is no intent.
+        from meditations_rag.retrieve.safety import LANGUAGE_DECLINE
+
+        out.append(textwrap.fill(LANGUAGE_DECLINE, WRAP))
+        return _finish(out, result, debug)
 
     if result.intent is Intent.CHITCHAT:
         if not result.safety:

@@ -40,12 +40,14 @@ See [PLAN.md](PLAN.md) for the phased implementation plan.
 ## Languages
 
 **English only, for now.** The keyword safety floor reads English, so it
-cannot detect a crisis described in another language. Until the Phase 4
-language guard lands, non-English input is not detected: it retrieves
-meaningless passages and raises no safety flag. Once the guard is in,
-non-English input is declined with a crisis pointer instead. German, then
-French and Italian, are planned for Phase 6 through the LLM path. See
-"The floor reads English only" in [PLAN.md](PLAN.md).
+cannot detect a crisis described in another language. A local language check
+(`lingua`, offline) therefore runs before anything else: input that is not
+confidently English is declined, before any router or LLM sees it, with a
+static crisis pointer (local emergency numbers and findahelpline.com), since
+a crisis we cannot read cannot be ruled out. The corpus's proper names are
+masked first, so "What did Marcus Aurelius die of?" still reads as English.
+German, then French and Italian, are planned for Phase 6 through the LLM
+path. See "The floor reads English only" in [PLAN.md](PLAN.md).
 
 ## Source text
 

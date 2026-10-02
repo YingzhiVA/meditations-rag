@@ -52,6 +52,14 @@ named (--router apertus claude), so a bare run never spends. A fallback
 means part of a row is the keyword router under another name; the report
 says so in bold under the table.
 
+REPEATS. One run of an LLM router is one sample: at temperature 0.8 by
+construction, and at temperature 0 too if the provider is nondeterministic.
+--repeats N reruns the LLM routers N times, each repeat under its own cache
+key (llm/cache.py), labels the rows '#0'..'#N-1', and adds a stability table:
+how many queries changed answer between repeats, with the backend
+fingerprint per repeat. A difference between two routers smaller than
+either one's instability is not a finding.
+
 EVERY NUMBER IS A FLOOR. Labels are sparse (eval/README.md's pooling
 protocol): an apt passage nobody labelled scores as a miss. Fine for
 comparing configurations, which is what the matrix is for; not fine to
@@ -412,12 +420,60 @@ def usage_notes(rows: list[dict]) -> list[str]:
         paths = ", ".join(f"{k} {v}" for k, v in sorted(u["paths"].items())) or "none"
         warn = (f" **{u['fallbacks']} of {u['n']} queries fell back to `keyword`; "
                 "those rows are not this router's answers.**" if u["fallbacks"] else "")
-        out.append(f"*`{r['router']}` JSON path: {paths}.{warn}*")
+        out.append(f"*`{r.get('label', r['router'])}` JSON path: {paths}.{warn}*")
     if out:
         out += ["", "*$/q is blank for providers with no published per-token rate "
                 "(publicai). Latency is the LLM round trip on queries that made a call; "
                 "cached completions report the original call's time.*", ""]
     return out
+
+
+def tag_repeat(rows: list[dict], records: list[dict], repeat: int, repeats: int) -> list[dict]:
+    """Mark one repeat's rows and records. Rows get a label like
+    'apertus-t08 #2' only when there is more than one repeat."""
+    for rec in records:
+        rec["repeat"] = repeat
+    for row in rows:
+        row["repeat"] = repeat
+        if repeats > 1 and row["router"] in LLM_ROUTERS:
+            row["label"] = f"{row['router']} #{repeat}"
+    return rows
+
+
+def render_stability(router_records: list[dict], safety_records: list[dict],
+                     repeats: int) -> str:
+    """How many answers changed between repeats of the same router: the
+    measure of how far one run can be trusted. A query counts as unstable
+    if any two repeats disagree. Fingerprints per repeat say whether the
+    serving backend changed in between (PLAN.md, Risk 2 / determinism)."""
+    L = ["## Stability across repeats", "",
+         f"*{repeats} repeats per LLM router. Unstable = the answer differed in at "
+         "least one repeat. Repeat 0 may be served from an earlier run's cache, so "
+         "its fingerprint can read 'not reported'.*", ""]
+    rows = []
+    names = sorted({r["router"] for r in router_records + safety_records} & LLM_ROUTERS)
+    for name in names:
+        def unstable(records, field):
+            seen = defaultdict(set)
+            for r in records:
+                if r["router"] == name:
+                    v = r[field]
+                    seen[r["query"]].add(tuple(v) if isinstance(v, list) else v)
+            return sum(1 for v in seen.values() if len(v) > 1), len(seen)
+        i_n, i_t = unstable(router_records, "got")
+        f_n, f_t = unstable(safety_records, "llm_safety")
+        u_n, u_t = unstable(safety_records, "got")
+        prints = []
+        for k in range(repeats):
+            fps = sorted({f for r in router_records + safety_records
+                          if r["router"] == name and r.get("repeat") == k
+                          for f in r["fingerprints"]})
+            prints.append(f"#{k}: {', '.join(fps) or 'not reported'}")
+        rows.append([f"`{name}`", f"{i_n}/{i_t}", f"{f_n}/{f_t}", f"{u_n}/{u_t}",
+                     "; ".join(prints)])
+    L += [table(["router", "intent unstable (router set)", "LLM-alone flags unstable",
+                 "union flags unstable", "fingerprints by repeat"], rows), ""]
+    return "\n".join(L) + "\n"
 
 
 def render(results, router_rows, safety_rows, stamp, skipped) -> str:
@@ -461,7 +517,7 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
             ins = pi.get("in_scope")
             pair = (f"({pct(pi['out_of_scope'][0] / pi['out_of_scope'][1])}, "
                     f"{pct(ins[0] / ins[1])})" if "out_of_scope" in pi and ins else "—")
-            rows.append([f"`{r['router']}`", *cells,
+            rows.append([f"`{r.get('label', r['router'])}`", *cells,
                          pct(oos_h[0] / oos_h[1]) + f" ({oos_h[1]})" if oos_h else "—",
                          pair, *usage_cells(r["router"], r["usage"])])
         L += [table(["router", *intents, "oos (hard only)",
@@ -480,7 +536,7 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
         for r in safety_rows:
             flags = "; ".join(f"{f} {c}/{t}" for f, (c, t) in sorted(r["per_flag"].items()))
             llm = r["router"] in LLM_ROUTERS
-            rows.append([f"`{r['router']}`", flags or "—",
+            rows.append([f"`{r.get('label', r['router'])}`", flags or "—",
                          f"{r['fp'][0]}/{r['fp'][1]}" if r["fp"][1] else "—",
                          f"{r['llm_caught'][0]}/{r['llm_caught'][1]}" if llm else "—",
                          f"{r['llm_fp'][0]}/{r['llm_fp'][1]}" if llm else "—",
@@ -513,6 +569,9 @@ def main() -> int:
                     help=f"routers to score; LLM routers ({', '.join(sorted(LLM_ROUTERS))}) "
                          "only when named")
     ap.add_argument("--routers-only", action="store_true")
+    ap.add_argument("--repeats", type=int, default=1,
+                    help="run the LLM routers this many times, each repeat under its own "
+                         "cache key, and report how many answers changed between repeats")
     ap.add_argument("--golden", type=Path, default=None,
                     help="labelled set to score against (default eval/golden_set.jsonl)")
     ap.add_argument("--safety-set", type=Path, default=None)
@@ -562,13 +621,25 @@ def main() -> int:
         if name in LLM_ROUTERS:
             client = get_router(name).client
             stamp[f"llm ({name} router)"] = f"{client.name} = {client.model}"
-    router_rows, router_records = (run_routers(args.router, router_set)
-                                   if router_set else ([], []))
-    safety_rows, safety_records = [], []
-    if safety_set and resources:
-        safety_rows, safety_records = run_safety(
-            args.router, safety_set, RetrievalConfig(embedder=args.embedder[0], k=max(KS)),
-            resources, run_id)
+    # Repeat 0 is the normal run. Repeats 1..N-1 rerun only the LLM routers
+    # (the keyword router is deterministic), each under its own cache key,
+    # so stability is measured rather than replayed from the first run.
+    router_rows, router_records, safety_rows, safety_records = [], [], [], []
+    for repeat in range(args.repeats):
+        llm.set_repeat(repeat)
+        names = args.router if repeat == 0 else [n for n in args.router if n in LLM_ROUTERS]
+        if repeat:
+            print(f"  repeat {repeat}: {', '.join(names)} …", flush=True)
+        rows, recs = run_routers(names, router_set) if router_set else ([], [])
+        router_rows += tag_repeat(rows, recs, repeat, args.repeats)
+        router_records += recs
+        if safety_set and resources:
+            rows, recs = run_safety(
+                names, safety_set, RetrievalConfig(embedder=args.embedder[0], k=max(KS)),
+                resources, run_id)
+            safety_rows += tag_repeat(rows, recs, repeat, args.repeats)
+            safety_records += recs
+    llm.set_repeat(0)
 
     # What actually served each LLM router, from the providers' own responses:
     # a substituted model, or a backend change between two runs, shows here
@@ -582,6 +653,8 @@ def main() -> int:
             stamp[f"fingerprints ({name} router)"] = ", ".join(prints) or "not reported"
 
     report = render(results, router_rows, safety_rows, stamp, skipped)
+    if args.repeats > 1:
+        report += render_stability(router_records, safety_records, args.repeats)
     print("\n" + report)
 
     # The report and its per-query evidence travel together: the matrix is the

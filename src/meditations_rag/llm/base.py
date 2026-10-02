@@ -158,6 +158,14 @@ class LLMClient(Protocol):
         share a provider but not a model."""
         ...
 
+    @property
+    def sampling(self) -> dict[str, float | None]:
+        """The decoding settings every call uses, e.g. {"temperature": 0.0,
+        "top_p": None}. Part of the completion-cache key whenever it differs
+        from config.DEFAULT_SAMPLING, so editing a temperature can never be
+        answered from completions made at another."""
+        ...
+
     def complete(self, system: str, user: str) -> str:
         """Plain text completion. Used for HyDE."""
         ...

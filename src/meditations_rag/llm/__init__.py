@@ -17,6 +17,7 @@ query, HyDE only on real problems.
 
     apertus       Apertus-70B   generation, judgement
     apertus-8b    Apertus-8B    routing
+    *-t08         the same two at the model card's temperature 0.8 / top_p 0.9
     claude        Sonnet 5      generation, judgement (comparator)
     claude-haiku  Haiku 4.5     routing (comparator)
 
@@ -30,11 +31,12 @@ from meditations_rag import config
 from meditations_rag.llm.base import LLMClient, LLMError
 
 
-def _hf(name: str, model: str) -> Callable[[], LLMClient]:
+def _hf(name: str, model: str,
+        sampling: dict[str, float | None] | None = None) -> Callable[[], LLMClient]:
     def make() -> LLMClient:
         from meditations_rag.llm.hf import HFClient
 
-        return HFClient(name, model)
+        return HFClient(name, model, sampling)
     return make
 
 
@@ -49,6 +51,12 @@ def _claude(name: str, model: str) -> Callable[[], LLMClient]:
 _REGISTRY: dict[str, Callable[[], LLMClient]] = {
     "apertus": _hf("apertus", config.HF_GEN_MODEL),
     "apertus-8b": _hf("apertus-8b", config.HF_ROUTER_MODEL),
+    # The model card's recommended sampling (config.APERTUS_RECOMMENDED_SAMPLING),
+    # as separate entries so the setting is visible in every row label.
+    "apertus-t08": _hf("apertus-t08", config.HF_GEN_MODEL,
+                       config.APERTUS_RECOMMENDED_SAMPLING),
+    "apertus-8b-t08": _hf("apertus-8b-t08", config.HF_ROUTER_MODEL,
+                          config.APERTUS_RECOMMENDED_SAMPLING),
     "claude": _claude("claude", config.CLAUDE_MODEL),
     "claude-haiku": _claude("claude-haiku", config.CLAUDE_ROUTER_MODEL),
 }
@@ -60,6 +68,14 @@ _cache_dir: Path | None = None
 
 class UnknownLLMError(KeyError):
     """No LLM provider is registered under that name."""
+
+
+def set_repeat(index: int) -> None:
+    """Which repeat of an eval run the following calls belong to (see
+    llm/cache.py). 0, the default, is a normal run."""
+    from meditations_rag.llm import cache
+
+    cache.set_repeat(index)
 
 
 def enable_cache(directory: Path = config.LLM_CACHE_DIR) -> None:
@@ -88,4 +104,5 @@ def get_llm(name: str) -> LLMClient:
     return client
 
 
-__all__ = ["LLM_NAMES", "LLMClient", "LLMError", "UnknownLLMError", "enable_cache", "get_llm"]
+__all__ = ["LLM_NAMES", "LLMClient", "LLMError", "UnknownLLMError", "enable_cache", "get_llm",
+           "set_repeat"]

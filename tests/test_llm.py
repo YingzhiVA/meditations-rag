@@ -12,6 +12,11 @@ structured-output fallback in llm/hf.py is observable in every CallRecord's
 json_path, so the eval report catches it rather than a mocked transport.
 """
 
+import hashlib
+import json
+
+from meditations_rag import config
+from meditations_rag.llm import cache
 from meditations_rag.llm.base import CALLS, observed_call
 from meditations_rag.llm.cache import CachedClient
 
@@ -19,8 +24,9 @@ from meditations_rag.llm.cache import CachedClient
 class _CountingClient:
     """Answers with its own name, so a cross-served completion is visible."""
 
-    def __init__(self, name: str, model: str) -> None:
+    def __init__(self, name: str, model: str, sampling=None) -> None:
         self.name, self.model, self.calls = name, model, 0
+        self.sampling = dict(sampling or config.DEFAULT_SAMPLING)
 
     def complete(self, system: str, user: str) -> str:
         self.calls += 1
@@ -56,3 +62,31 @@ def test_cache_never_crosses_llm_model_or_prompt(tmp_path):
     ca.complete("other sys", "q")
     ca.complete_json("sys", "q", {"type": "object"})
     assert a.calls == 3
+
+
+def test_repeats_and_sampling_get_their_own_entries_and_old_keys_survive(tmp_path):
+    """A repeat served from the first run's cache would report perfect
+    stability while measuring nothing; a sampled client served greedy
+    completions would compare greedy with itself. Both must miss. And the
+    defaults must keep the key the cache used before either existed, or
+    every paid completion already on disk would silently be re-bought."""
+    greedy = CachedClient(_CountingClient("apertus-8b", "m"), tmp_path)
+    sampled = CachedClient(_CountingClient("apertus-8b", "m", {"temperature": 0.8,
+                                                                "top_p": 0.9}), tmp_path)
+    legacy = json.dumps(["apertus-8b", "m", "complete", "sys", "q", None],
+                        sort_keys=True, ensure_ascii=False)
+    assert greedy.key("complete", "sys", "q", None) == hashlib.sha256(legacy.encode()).hexdigest()
+
+    greedy.complete("sys", "q")
+    sampled.complete("sys", "q")
+    assert sampled._inner.calls == 1                 # not served the greedy answer
+    try:
+        cache.set_repeat(1)
+        greedy.complete("sys", "q")
+        assert greedy._inner.calls == 2              # repeat 1 is a fresh call
+        greedy.complete("sys", "q")
+        assert greedy._inner.calls == 2              # and itself reruns free
+    finally:
+        cache.set_repeat(0)
+    greedy.complete("sys", "q")
+    assert greedy._inner.calls == 2                  # repeat 0 still hits the original

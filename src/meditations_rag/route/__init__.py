@@ -38,6 +38,10 @@ _REGISTRY: dict[str, Callable[[], Router]] = {
     "keyword": _keyword,
     "apertus": _llm("apertus", "apertus-8b"),
     "apertus-70b": _llm("apertus-70b", "apertus"),
+    # The same two at the model card's recommended sampling (temperature 0.8,
+    # top_p 0.9); run with --repeats, since one sample measures nothing.
+    "apertus-t08": _llm("apertus-t08", "apertus-8b-t08"),
+    "apertus-70b-t08": _llm("apertus-70b-t08", "apertus-t08"),
     "claude": _llm("claude", "claude-haiku"),
 }
 
@@ -45,7 +49,8 @@ ROUTER_NAMES: tuple[str, ...] = tuple(_REGISTRY)
 # Routers that make a network call per query, and so cost money. The eval
 # harness grids over these only when asked by name (CLAUDE.md: ask before
 # spending).
-LLM_ROUTERS: frozenset[str] = frozenset({"apertus", "apertus-70b", "claude"})
+LLM_ROUTERS: frozenset[str] = frozenset(
+    {"apertus", "apertus-70b", "apertus-t08", "apertus-70b-t08", "claude"})
 
 
 class UnknownRouterError(KeyError):

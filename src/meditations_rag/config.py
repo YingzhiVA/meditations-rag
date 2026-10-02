@@ -101,6 +101,15 @@ CLAUDE_EFFORT = "low"
 
 # Query transformation outputs are short; keep the cap tight. Provider-neutral.
 LLM_MAX_TOKENS = 1024
+# Sampling. Every LLM call defaults to greedy decoding (temperature 0, no
+# top_p): classification and the eval want the most likely answer, not a
+# sample. The Apertus model cards recommend temperature 0.8 / top_p 0.9 "in
+# the sampling parameters", for open-ended chat; the *-t08 registry entries
+# run that setting as its own eval row, with --repeats, since one sample at
+# 0.8 measures nothing on its own.
+DEFAULT_SAMPLING: dict[str, float | None] = {"temperature": 0.0, "top_p": None}
+APERTUS_RECOMMENDED_SAMPLING: dict[str, float | None] = {"temperature": 0.8, "top_p": 0.9}
+
 # Per attempt. The router sits on the latency path of every query, so a hung
 # provider has to turn into a keyword fallback in seconds, not minutes.
 LLM_TIMEOUT_S = 30.0

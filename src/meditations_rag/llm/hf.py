@@ -79,12 +79,15 @@ _JSON_INSTRUCTION = (
 class HFClient:
     """An LLMClient backed by HuggingFace Inference Providers."""
 
-    def __init__(self, name: str, model: str | None = None) -> None:
+    def __init__(self, name: str, model: str | None = None,
+                 sampling: dict[str, float | None] | None = None) -> None:
         """name is the registry key ('apertus' / 'apertus-8b'). model defaults
         to config.HF_GEN_MODEL; pass config.HF_ROUTER_MODEL for the cheap
-        classification client. Raises LLMError when no token is configured:
-        a missing key is a setup error to report, not an outage to degrade
-        through."""
+        classification client. sampling defaults to config.DEFAULT_SAMPLING
+        (greedy); a registry entry that samples gets its own name, so its
+        eval row and cache entries never mix with the greedy ones. Raises
+        LLMError when no token is configured: a missing key is a setup error
+        to report, not an outage to degrade through."""
         from huggingface_hub import InferenceClient, get_token
 
         token = get_token()
@@ -95,6 +98,7 @@ class HFClient:
             )
         self._name = name
         self._model = model or config.HF_GEN_MODEL
+        self._sampling = dict(sampling or config.DEFAULT_SAMPLING)
         self._client = InferenceClient(provider=config.HF_PROVIDER, api_key=token,
                                        timeout=config.LLM_TIMEOUT_S)
         # None = untried, True = honoured, False = rejected by the provider.
@@ -107,6 +111,10 @@ class HFClient:
     @property
     def model(self) -> str:
         return self._model
+
+    @property
+    def sampling(self) -> dict[str, float | None]:
+        return dict(self._sampling)
 
     def complete(self, system: str, user: str) -> str:
         return self._chat(system, user, json_path=None)
@@ -152,7 +160,8 @@ class HFClient:
             try:
                 resp = self._client.chat_completion(
                     messages=messages, model=self._model, max_tokens=config.LLM_MAX_TOKENS,
-                    temperature=0.0, response_format=response_format,
+                    temperature=self._sampling["temperature"],
+                    top_p=self._sampling["top_p"], response_format=response_format,
                 )
             except Exception as exc:  # noqa: BLE001 — any SDK/transport error
                 status = getattr(getattr(exc, "response", None), "status_code", None)

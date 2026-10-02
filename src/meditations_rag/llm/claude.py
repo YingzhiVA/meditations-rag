@@ -81,6 +81,13 @@ class ClaudeClient:
     def model(self) -> str:
         return self._model
 
+    @property
+    def sampling(self) -> dict[str, float | None]:
+        """Haiku: greedy, as config.DEFAULT_SAMPLING. Sonnet 5 rejects
+        sampling parameters, so it runs at the API's own default; reported
+        as the default too, since no setting of ours can differ there."""
+        return dict(config.DEFAULT_SAMPLING)
+
     def complete(self, system: str, user: str) -> str:
         return self._create(system, user, output_config={}, json_path=None)
 

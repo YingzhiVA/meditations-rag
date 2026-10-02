@@ -19,6 +19,16 @@ latency columns report what the run cost when it was made, not zero. Errors
 are never cached: an outage during one run must not become a permanent
 fallback in every later one.
 
+SAMPLING AND REPEATS. Two more things go into the key, each only when it is
+not the default, so every entry written before they existed keeps its key:
+  - the client's sampling settings, when they differ from
+    config.DEFAULT_SAMPLING. Registry entries that sample also have their
+    own names; this guards against editing a temperature in place.
+  - the repeat index (set_repeat), when it is not 0. Without it, repeating
+    a run to measure stability would be answered from the first run's
+    completions and report perfect stability while measuring nothing.
+Repeat N of a run is cached like any other, so a repeated run reruns free.
+
 One JSON file per entry under config.LLM_CACHE_DIR/<llm name>/, which is
 under data/ and therefore gitignored.
 """
@@ -27,7 +37,15 @@ import hashlib
 import json
 from pathlib import Path
 
+from meditations_rag import config
 from meditations_rag.llm.base import CALLS, CallRecord, LLMClient
+
+_repeat = 0
+
+
+def set_repeat(index: int) -> None:
+    global _repeat
+    _repeat = index
 
 
 class CachedClient:
@@ -45,6 +63,10 @@ class CachedClient:
     def model(self) -> str:
         return self._inner.model
 
+    @property
+    def sampling(self) -> dict[str, float | None]:
+        return getattr(self._inner, "sampling", dict(config.DEFAULT_SAMPLING))
+
     def complete(self, system: str, user: str) -> str:
         return self._through("complete", system, user, None,
                              lambda: self._inner.complete(system, user))
@@ -54,8 +76,12 @@ class CachedClient:
                              lambda: self._inner.complete_json(system, user, schema))
 
     def key(self, kind: str, system: str, user: str, schema: dict | None) -> str:
-        blob = json.dumps([self.name, self.model, kind, system, user, schema],
-                          sort_keys=True, ensure_ascii=False)
+        parts: list = [self.name, self.model, kind, system, user, schema]
+        if self.sampling != config.DEFAULT_SAMPLING:
+            parts.append({"sampling": self.sampling})
+        if _repeat:
+            parts.append({"repeat": _repeat})
+        blob = json.dumps(parts, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
     def _through(self, kind, system, user, schema, call):
@@ -67,6 +93,7 @@ class CachedClient:
         start = len(CALLS)
         output = call()   # raises on failure; nothing is written
         entry = {"llm": self.name, "model": self.model, "kind": kind,
+                 "sampling": self.sampling, "repeat": _repeat,
                  "user": user, "output": output,
                  # Every provider call this completion took, retries included.
                  "calls": [{k: v for k, v in vars(r).items() if k != "cached"}

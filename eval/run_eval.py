@@ -619,8 +619,12 @@ def main() -> int:
 
     for name in args.router:
         if name in LLM_ROUTERS:
-            client = get_router(name).client
+            router = get_router(name)
+            client = router.client
             stamp[f"llm ({name} router)"] = f"{client.name} = {client.model}"
+            # The prompt is part of what a row measures: a prompt edit makes
+            # two rows incomparable as models, so the report says which one.
+            stamp[f"prompt ({name} router)"] = getattr(router, "prompt_version", "unversioned")
     # Repeat 0 is the normal run. Repeats 1..N-1 rerun only the LLM routers
     # (the keyword router is deterministic), each under its own cache key,
     # so stability is measured rather than replayed from the first run.

@@ -54,6 +54,9 @@ GOLDEN_FIELDS = {"query", "gold_ids", "tier", "note", "theme", "failure_mode"}
 ROUTER_FIELDS = {"query", "intent", "safety", "tier", "note"}
 SAFETY_FIELDS = {"query", "flags", "must_not_return", "tier", "note"}
 LANGUAGE_FIELDS = {"query", "lang", "tier", "note"}
+REVIEW_FIELDS = {"list", "id", "verdict", "why"}
+# Which shipped list a review entry belongs to, by the flag that applies it.
+REVIEW_LISTS = {"abuse": SafetyFlag.ABUSE, "death": SafetyFlag.MENTAL_HEALTH}
 LANGUAGE_TIERS = {"crisis", "everyday", "short"}
 # ISO 639-1, plus the ISO 639-3 codes for languages without a 639-1 code
 # (gsw: Swiss German). A label, so checked for shape only.
@@ -537,11 +540,56 @@ def validate_language(path: Path) -> Report:
     return rep
 
 
+# --- suppression_review.jsonl -----------------------------------------------
+
+def validate_review(path: Path, known: set[str] | None) -> Report:
+    """The reviewed keeps and strikes behind retrieve/safety.py, as data for
+    the LLM check's agreement table. PLAN.md stays the reviewed artifact;
+    this is its transcription. Like must_not_return, the verdicts are human
+    claims: a keep the shipped list lacks, or a listed id the review struck,
+    is reported as a NOTE, never derived from the code."""
+    rep = Report(path)
+    entries = load(path, rep)
+    seen: dict[tuple[str, str], int] = {}
+    counts: Counter[tuple[str, str]] = Counter()
+    for n, obj in entries:
+        for key in set(obj) - REVIEW_FIELDS:
+            rep.warn(n, f"unknown field {key!r} — known: {', '.join(sorted(REVIEW_FIELDS))}")
+        lst, pid, verdict = obj.get("list"), obj.get("id"), obj.get("verdict")
+        if lst not in REVIEW_LISTS:
+            rep.error(n, f"list {lst!r} not one of {sorted(REVIEW_LISTS)}")
+            continue
+        if verdict not in ("keep", "strike"):
+            rep.error(n, f"verdict {verdict!r} must be 'keep' or 'strike'")
+            continue
+        if not check_id(rep, n, pid, known):
+            continue
+        if not obj.get("why"):
+            rep.warn(n, "no 'why': the reasons are what let the list be contested later")
+        if (lst, pid) in seen:
+            rep.error(n, f"{pid} reviewed twice for {lst!r}, first at line {seen[(lst, pid)]}")
+        seen[(lst, pid)] = n
+        counts[(lst, verdict)] += 1
+    for lst, flag in REVIEW_LISTS.items():
+        keeps = {pid for (l, pid), _ in seen.items() if l == lst
+                 and next(o for m, o in entries if m == seen[(l, pid)])["verdict"] == "keep"}
+        shipped = set(SUPPRESSION[flag])
+        if keeps - shipped:
+            rep.note(None, f"{lst}: kept {sorted(keeps - shipped)} but not in retrieve/safety.py")
+        if shipped - keeps:
+            rep.note(None, f"{lst}: in retrieve/safety.py but not kept here: {sorted(shipped - keeps)}")
+    rep.info("")
+    rep.info(f"  {len(entries)} entries: " + ", ".join(
+        f"{l} {v} {c}" for (l, v), c in sorted(counts.items())))
+    return rep
+
+
 VALIDATORS = {
     "golden_set.jsonl": lambda p, known: validate_golden(p, known),
     "router_set.jsonl": lambda p, known: validate_router(p),
     "safety_set.jsonl": lambda p, known: validate_safety(p, known),
     "language_set.jsonl": lambda p, known: validate_language(p),
+    "suppression_review.jsonl": lambda p, known: validate_review(p, known),
 }
 
 

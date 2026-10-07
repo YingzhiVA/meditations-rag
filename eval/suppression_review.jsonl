@@ -1,0 +1,26 @@
+{"list": "abuse", "id": "2.1", "verdict": "keep", "why": "'I therefore cannot be hurt by any of these' minimizes, and it is the conclusion the passage builds toward"}
+{"list": "abuse", "id": "4.3", "verdict": "keep", "why": "inward retreat in place of external change is the thesis: 'to bear with them is a part of justice... cease from your complaints'"}
+{"list": "abuse", "id": "6.20", "verdict": "keep", "why": "'keep out of his way... overlook the many injuries done to us': forbearance and avoidance, rarely possible under psychological abuse"}
+{"list": "abuse", "id": "7.26", "verdict": "keep", "why": "'Your duty then is to forgive': forgiveness with no alternative offered"}
+{"list": "abuse", "id": "11.18", "verdict": "keep", "why": "precepts 4, 5, 7 and 9 counsel endurance; whole-passage until Phase 4 sub-chunking refines it to precepts"}
+{"list": "abuse", "id": "5.20", "verdict": "strike", "why": "governs the reader's own disposition or retaliation, not the other's conduct (PLAN.md groups 5.20, 6.6, 8.59, 11.16 so)"}
+{"list": "abuse", "id": "6.6", "verdict": "strike", "why": "governs the reader's own disposition or retaliation, not the other's conduct (PLAN.md groups 5.20, 6.6, 8.59, 11.16 so)"}
+{"list": "abuse", "id": "8.59", "verdict": "strike", "why": "'Teach them better then' comes before 'or bear with them': correction is offered"}
+{"list": "abuse", "id": "11.16", "verdict": "strike", "why": "governs the reader's own disposition or retaliation, not the other's conduct (PLAN.md groups 5.20, 6.6, 8.59, 11.16 so)"}
+{"list": "abuse", "id": "5.25", "verdict": "strike", "why": "'Let him look to that' places the reader's concern; it does not counsel accepting the conduct"}
+{"list": "abuse", "id": "1.15", "verdict": "strike", "why": "regex noise: a character portrait of Maximus that matched on 'forgive'"}
+{"list": "abuse", "id": "9.3", "verdict": "strike", "why": "a passage about dying; 'bear with them mildly' is one incidental clause"}
+{"list": "death", "id": "5.29", "verdict": "keep", "why": "'if men do not permit you, then depart from life... If my house be smoky, I go out'"}
+{"list": "death", "id": "8.47", "verdict": "keep", "why": "'Quit life then, in the same kindly spirit as though you had done it'"}
+{"list": "death", "id": "9.2", "verdict": "keep", "why": "ranks death above going on in a corrupt life: 'the more desirable lot to depart... the next choice were to expire'"}
+{"list": "death", "id": "9.3", "verdict": "keep", "why": "'Despise not death; but receive it well content'; ends 'Haste, death!'"}
+{"list": "death", "id": "10.8", "verdict": "keep", "why": "'or else depart from life altogether... having done at least one thing in life well, by so leaving it'"}
+{"list": "death", "id": "10.32", "verdict": "keep", "why": "'determine to live no longer if you cannot be such a man'"}
+{"list": "death", "id": "10.36", "verdict": "keep", "why": "'a multitude would rejoice to be rid of me... depart with the less regret'"}
+{"list": "death", "id": "8.58", "verdict": "strike", "why": "'do not cease to live' reads as the opposite sentiment"}
+{"list": "death", "id": "10.31", "verdict": "strike", "why": "matched only on 'smoke': the vanity of worldly things, not leaving life"}
+{"list": "death", "id": "12.27", "verdict": "strike", "why": "matched only on 'smoke and ashes': the vanity of worldly things, not leaving life"}
+{"list": "death", "id": "12.33", "verdict": "strike", "why": "matched only on 'smoke': the vanity of worldly things, not leaving life"}
+{"list": "death", "id": "7.24", "verdict": "strike", "why": "'why should a man wish to remain alive?' is conditional on losing the sense of moral evil itself, a state no distressed reader is in"}
+{"list": "death", "id": "3.1", "verdict": "strike", "why": "names deciding one's own departure as a faculty age takes away, to urge action now; the counsel is urgency"}
+{"list": "death", "id": "7.46", "verdict": "strike", "why": "devalues length of life; observes mortality rather than counselling an end"}

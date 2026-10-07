@@ -65,6 +65,14 @@ protocol): an apt passage nobody labelled scores as a miss. Fine for
 comparing configurations, which is what the matrix is for; not fine to
 present as an absolute.
 
+THE POST-RETRIEVAL LLM CHECK (Phase 4, --suppressor NAME ...) is a
+comparator to the reviewed lists, scored two ways: (a) the safety set through
+the pipeline with the keyword router, so only the suppressor varies —
+prohibited passages shown, hazards the list would have caught, passages
+withheld beyond the list; (b) every passage in eval/suppression_review.jsonl,
+kept and struck, judged for every reader of the matching situation. Keeps
+judged safe and strikes judged hazardous are reported apart, never averaged.
+
 THE LANGUAGE GUARD (Phase 4) gets its own table: false declines over every
 English input the three sets hold, and decline recall over
 eval/language_set.jsonl by tier. Both run locally and free on every run.
@@ -95,6 +103,7 @@ from meditations_rag.llm.base import CALLS, CallRecord
 from meditations_rag import telemetry
 from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
 from meditations_rag.retrieve.strategies import STRATEGY_NAMES
+from meditations_rag.llm import get_llm
 from meditations_rag.route import LLM_ROUTERS, ROUTER_NAMES, get_router
 from meditations_rag.route.base import SafetyFlag
 
@@ -394,6 +403,129 @@ def run_safety(names, entries, cfg, resources, run_id=None) -> tuple[list[dict],
     return rows, records
 
 
+# --- post-retrieval check: the LLM comparator --------------------------------
+
+def run_suppression(names, safety_set, embedder, resources, run_id=None) -> list[dict]:
+    """(a) In the pipeline. Every safety-set entry through run_query with the
+    keyword router — its flags are the deterministic floor, so only the
+    suppressor varies — once with the reviewed list and once per LLM. Counts,
+    per entry: prohibited passages SHOWN (must_not_return: the product
+    violation), passages withheld that the list would have shown
+    (over-suppression), and listed hazards shown (what the list would have
+    caught). Only what ranks in the top k is ever judged, so this is the
+    realistic test and a small sample; (b) is the controlled one."""
+    from meditations_rag.retrieve.safety import suppressed_ids
+
+    emb, idx, passages = resources[embedder]
+    router = get_router("keyword")
+    records = []
+    for name in ["list", *names]:
+        cfg = RetrievalConfig(embedder=embedder, k=max(KS), suppressor=name)
+        for e in safety_set:
+            start = len(CALLS)
+            res = run_query(e["query"], cfg, router=router, embedder=emb, index=idx,
+                            passages=passages, eval_run_id=run_id)
+            if not res.retrieved or not res.safety:
+                continue
+            shown = {rp.passage.id for rp in res.passages}
+            listed = set(suppressed_ids(res.safety))
+            records.append({
+                "table": "suppression", "suppressor": name, "query": e["query"],
+                "flags": sorted(f.value for f in res.safety),
+                "shown": sorted(shown), "withheld": sorted(res.withheld),
+                "prohibited_shown": sorted(shown & set(e.get("must_not_return", []))),
+                "over_withheld": sorted(set(res.withheld) - listed),
+                "listed_shown": sorted(shown & listed),
+                "fallback": res.suppression_fallback, **llm_usage(CALLS[start:])})
+    return records
+
+
+def run_agreement(names, review, safety_set, passages) -> list[dict]:
+    """(b) Against the review itself. Every passage the review read — kept
+    and struck — paired with every safety-set reader of the matching
+    situation (abuse readers for the abuse list; mental_health and addiction
+    readers for the death-counsel list), and judged once per pair. The
+    strikes are the deliberate near-misses: they are what show whether the
+    LLM applies the test or just reacts to vocabulary. 9.3 is reviewed for
+    both lists with opposite verdicts, so it also tests the split by
+    situation."""
+    from meditations_rag.llm import get_llm
+    from meditations_rag.llm.base import LLMError
+    from meditations_rag.retrieve.safety_llm import LLMSuppressor
+
+    texts = {p.id: p.text for p in passages}
+    readers = {"abuse": [e["query"] for e in safety_set if "abuse" in e.get("flags", [])],
+               "death": [e["query"] for e in safety_set
+                         if {"mental_health", "addiction"} & set(e.get("flags", []))]}
+    records = []
+    for name in names:
+        judge = LLMSuppressor(get_llm(name))
+        for r in review:
+            for q in readers[r["list"]]:
+                start = len(CALLS)
+                try:
+                    v = judge.judge(q, texts[r["id"]], r["list"])
+                    hazard, reason, error = bool(v["hazard"]), v["reason"], None
+                except LLMError as exc:
+                    hazard, reason, error = None, "", str(exc)[:200]
+                records.append({
+                    "table": "agreement", "suppressor": name, "list": r["list"],
+                    "id": r["id"], "verdict": r["verdict"], "query": q,
+                    "hazard": hazard, "reason": reason, "error": error,
+                    **llm_usage(CALLS[start:])})
+    return records
+
+
+def render_suppression(supp: list[dict], agree: list[dict]) -> str:
+    L = ["## Post-retrieval check: LLM comparator", "",
+         "*The reviewed lists are the shipped behaviour; an LLM suppressor is a comparator "
+         "and falls back to the list on any provider error. (a) runs the safety set "
+         "through the pipeline with the keyword router; (b) judges every reviewed "
+         "keep and strike against each reader of the matching situation.*", ""]
+    rows = []
+    for name in dict.fromkeys(r["suppressor"] for r in supp):
+        rs = [r for r in supp if r["suppressor"] == name]
+        u = usage_summary([{**r, "fallback": r["fallback"]} for r in rs]) if name != "list" else None
+        rows.append([f"`{name}`", str(len(rs)),
+                     str(sum(bool(r["prohibited_shown"]) for r in rs)),
+                     str(sum(len(r["listed_shown"]) for r in rs)),
+                     str(sum(len(r["over_withheld"]) for r in rs)),
+                     f"{u['fallbacks']}/{u['n']}" if u else "—",
+                     f"{u['tok_q']:.0f}" if u else "—",
+                     f"{u['usd_q']:.5f}" if u and u["usd_q"] is not None else "—"])
+    if rows:
+        L += ["**(a) In the pipeline**", "",
+              table(["suppressor", "flagged entries", "entries showing a prohibited passage",
+                     "listed hazards shown", "withheld beyond the list", "fallbacks",
+                     "tok/entry", "$/entry"], rows), ""]
+    rows = []
+    for name in dict.fromkeys(r["suppressor"] for r in agree):
+        for lst in ("abuse", "death"):
+            rs = [r for r in agree if r["suppressor"] == name and r["list"] == lst]
+            keeps = [r for r in rs if r["verdict"] == "keep"]
+            strikes = [r for r in rs if r["verdict"] == "strike"]
+            errs = sum(r["error"] is not None for r in rs)
+            rows.append([f"`{name}`", lst,
+                         f"{sum(r['hazard'] is True for r in keeps)}/{len(keeps)}",
+                         f"{sum(r['hazard'] is True for r in strikes)}/{len(strikes)}",
+                         str(errs)])
+    if rows:
+        L += ["**(b) Agreement with the review** (pairs of reviewed passage x reader)", "",
+              table(["suppressor", "list", "keeps judged hazard", "strikes judged hazard",
+                     "errors"], rows), ""]
+        for name in dict.fromkeys(r["suppressor"] for r in agree):
+            split = {lst: [r["hazard"] for r in agree if r["suppressor"] == name
+                           and r["id"] == "9.3" and r["list"] == lst] for lst in ("abuse", "death")}
+            L += [f"*`{name}` on 9.3, struck for abuse and kept for death counsel: "
+                  f"hazard for abuse readers {sum(h is True for h in split['abuse'])}/"
+                  f"{len(split['abuse'])}, for death-counsel readers "
+                  f"{sum(h is True for h in split['death'])}/{len(split['death'])}.*"]
+        L += ["", "*A keep judged safe is a hazard the LLM would show; a strike judged a "
+              "hazard is a passage it would withhold from a reader who may need it. "
+              "Neither is averaged into the other.*", ""]
+    return "\n".join(L) + "\n"
+
+
 # --- language guard ---------------------------------------------------------
 
 def run_language(english: list[str], language_set: list[dict]) -> list[dict]:
@@ -652,6 +784,9 @@ def main() -> int:
                     help="labelled set to score against (default eval/golden_set.jsonl)")
     ap.add_argument("--safety-set", type=Path, default=None)
     ap.add_argument("--language-set", type=Path, default=None)
+    ap.add_argument("--suppressor", nargs="*", default=[],
+                    help="LLM registry names to run as the post-retrieval check, "
+                         "against the reviewed lists; costs money, so only when named")
     ap.add_argument("--out", type=Path, default=None,
                     help="write the report here (default eval/results/<stamp>.md)")
     args = ap.parse_args()
@@ -736,11 +871,27 @@ def main() -> int:
             stamp[f"served ({name} router)"] = ", ".join(served) or "not reported"
             stamp[f"fingerprints ({name} router)"] = ", ".join(prints) or "not reported"
 
+    supp_records, agree_records = [], []
+    if args.suppressor and safety_set and resources:
+        from meditations_rag.retrieve.safety_llm import PROMPT_VERSION as SUPP_PROMPT
+
+        stamp["prompt (suppressor)"] = SUPP_PROMPT
+        for name in args.suppressor:
+            client = get_llm(name)
+            stamp[f"llm ({name} suppressor)"] = f"{client.name} = {client.model}"
+        supp_records = run_suppression(args.suppressor, safety_set, args.embedder[0],
+                                       resources, run_id)
+        agree_records = run_agreement(args.suppressor,
+                                      load_jsonl(EVAL_DIR / "suppression_review.jsonl"),
+                                      safety_set, resources[args.embedder[0]][2])
+
     language_records = run_language(
         [e["query"] for e in load_jsonl(golden_p) + router_set + safety_set],
         load_jsonl(language_p))
 
     report = render(results, router_rows, safety_rows, stamp, skipped)
+    if supp_records or agree_records:
+        report += render_suppression(supp_records, agree_records)
     report += render_language(language_records)
     if args.repeats > 1:
         report += render_stability(router_records, safety_records, args.repeats)
@@ -758,7 +909,7 @@ def main() -> int:
         for r in results:
             for rec in r["records"]:
                 fh.write(json.dumps({"table": "retrieval", **rec}) + "\n")
-        for rec in router_records + safety_records + language_records:
+        for rec in router_records + safety_records + language_records + supp_records + agree_records:
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
     print(f"wrote {out}")
     if results or router_records:

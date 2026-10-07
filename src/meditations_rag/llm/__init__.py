@@ -15,7 +15,7 @@ per provider, because generation and classification have different
 cost/latency profiles and should not share a model: the router runs on every
 query, HyDE only on real problems.
 
-    apertus       Apertus-70B   generation, judgement
+    apertus       Apertus-70B   generation, judgement (featherless-ai; see config)
     apertus-8b    Apertus-8B    routing
     *-t08         the same two at the model card's temperature 0.8 / top_p 0.9
     claude        Sonnet 5      generation, judgement (comparator)
@@ -31,12 +31,12 @@ from meditations_rag import config
 from meditations_rag.llm.base import LLMClient, LLMError
 
 
-def _hf(name: str, model: str,
+def _hf(name: str, model: str, provider: str,
         sampling: dict[str, float | None] | None = None) -> Callable[[], LLMClient]:
     def make() -> LLMClient:
         from meditations_rag.llm.hf import HFClient
 
-        return HFClient(name, model, sampling)
+        return HFClient(name, model, sampling, provider)
     return make
 
 
@@ -49,13 +49,13 @@ def _claude(name: str, model: str) -> Callable[[], LLMClient]:
 
 
 _REGISTRY: dict[str, Callable[[], LLMClient]] = {
-    "apertus": _hf("apertus", config.HF_GEN_MODEL),
-    "apertus-8b": _hf("apertus-8b", config.HF_ROUTER_MODEL),
+    "apertus": _hf("apertus", config.HF_GEN_MODEL, config.HF_GEN_PROVIDER),
+    "apertus-8b": _hf("apertus-8b", config.HF_ROUTER_MODEL, config.HF_ROUTER_PROVIDER),
     # The model card's recommended sampling (config.APERTUS_RECOMMENDED_SAMPLING),
     # as separate entries so the setting is visible in every row label.
-    "apertus-t08": _hf("apertus-t08", config.HF_GEN_MODEL,
+    "apertus-t08": _hf("apertus-t08", config.HF_GEN_MODEL, config.HF_GEN_PROVIDER,
                        config.APERTUS_RECOMMENDED_SAMPLING),
-    "apertus-8b-t08": _hf("apertus-8b-t08", config.HF_ROUTER_MODEL,
+    "apertus-8b-t08": _hf("apertus-8b-t08", config.HF_ROUTER_MODEL, config.HF_ROUTER_PROVIDER,
                           config.APERTUS_RECOMMENDED_SAMPLING),
     "claude": _claude("claude", config.CLAUDE_MODEL),
     "claude-haiku": _claude("claude-haiku", config.CLAUDE_ROUTER_MODEL),

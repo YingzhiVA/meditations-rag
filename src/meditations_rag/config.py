@@ -81,7 +81,14 @@ DEFAULT_LLM = "apertus"      # key into the llm registry; see llm/__init__.py
 # HuggingFace Inference Providers. "publicai" is the one provider verified live
 # for these models; "featherless-ai" currently reports an error status, which is
 # why llm/hf.py needs a fallback path rather than assuming availability.
-HF_PROVIDER = "publicai"
+HF_PROVIDER = "publicai"          # the default; entries may name another (below)
+# publicai stopped serving Apertus-70B-Instruct-2509 after 2026-09-29 ("Model
+# ... is not supported by provider publicai"); HF lists featherless-ai as the
+# one live provider for it. The 8B is still live on publicai. The provider is
+# part of every LLM's stamp and, when not the default, of its cache key: the
+# same model behind another serving stack is a different row.
+HF_GEN_PROVIDER = "featherless-ai"
+HF_ROUTER_PROVIDER = "publicai"
 # Generation-quality work (HyDE writes prose in a 1902 register) gets the 70B.
 HF_GEN_MODEL = "swiss-ai/Apertus-70B-Instruct-2509"
 # Routing is short classification — no reason to pay 70B latency per query.

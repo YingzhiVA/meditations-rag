@@ -19,8 +19,12 @@ latency columns report what the run cost when it was made, not zero. Errors
 are never cached: an outage during one run must not become a permanent
 fallback in every later one.
 
-SAMPLING AND REPEATS. Two more things go into the key, each only when it is
-not the default, so every entry written before they existed keeps its key:
+SAMPLING, PROVIDER AND REPEATS. Three more things go into the key, each only
+when it is not the default, so every entry written before they existed keeps
+its key:
+  - the HF provider, when it is not config.HF_PROVIDER: the same model on
+    another serving stack must never be answered from the old stack's
+    completions (publicai dropped the 70B and featherless-ai took over).
   - the client's sampling settings, when they differ from
     config.DEFAULT_SAMPLING. Registry entries that sample also have their
     own names; this guards against editing a temperature in place.
@@ -60,6 +64,11 @@ class CachedClient:
     def sampling(self) -> dict[str, float | None]:
         return getattr(self._inner, "sampling", dict(config.DEFAULT_SAMPLING))
 
+    @property
+    def provider(self) -> str | None:
+        """The HF provider, for HF clients; None for clients without one."""
+        return getattr(self._inner, "provider", None)
+
     def complete(self, system: str, user: str) -> str:
         return self._through("complete", system, user, None,
                              lambda: self._inner.complete(system, user))
@@ -72,6 +81,8 @@ class CachedClient:
         parts: list = [self.name, self.model, kind, system, user, schema]
         if self.sampling != config.DEFAULT_SAMPLING:
             parts.append({"sampling": self.sampling})
+        if self.provider not in (None, config.HF_PROVIDER):
+            parts.append({"provider": self.provider})
         if current_repeat():
             parts.append({"repeat": current_repeat()})
         blob = json.dumps(parts, sort_keys=True, ensure_ascii=False)
@@ -86,7 +97,8 @@ class CachedClient:
         start = len(CALLS)
         output = call()   # raises on failure; nothing is written
         entry = {"llm": self.name, "model": self.model, "kind": kind,
-                 "sampling": self.sampling, "repeat": current_repeat(),
+                 "sampling": self.sampling, "provider": self.provider,
+                 "repeat": current_repeat(),
                  "user": user, "output": output,
                  # Every provider call this completion took, retries included.
                  "calls": [{k: v for k, v in vars(r).items() if k != "cached"}

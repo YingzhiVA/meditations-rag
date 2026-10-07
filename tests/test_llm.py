@@ -89,3 +89,20 @@ def test_repeats_and_sampling_get_their_own_entries_and_old_keys_survive(tmp_pat
         llm.set_repeat(0)
     greedy.complete("sys", "q")
     assert greedy._inner.calls == 2                  # repeat 0 still hits the original
+
+
+def test_a_provider_change_is_never_answered_from_the_old_provider(tmp_path):
+    """publicai dropped the 70B and featherless-ai serves it now. Same name,
+    same model, same prompt: without the provider in the key, the new row
+    would be the old provider's completions under a new label."""
+    old = CachedClient(_CountingClient("apertus", "m"), tmp_path)        # default provider
+    new_inner = _CountingClient("apertus", "m")
+    new_inner.provider = "featherless-ai"
+    new = CachedClient(new_inner, tmp_path)
+    old.complete("sys", "q")
+    new.complete("sys", "q")
+    assert new_inner.calls == 1                    # a fresh call, not publicai's answer
+    default_inner = _CountingClient("apertus", "m")
+    default_inner.provider = config.HF_PROVIDER     # naming the default changes nothing
+    assert CachedClient(default_inner, tmp_path).key("complete", "sys", "q", None) == \
+        old.key("complete", "sys", "q", None)

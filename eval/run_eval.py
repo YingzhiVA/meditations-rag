@@ -122,6 +122,12 @@ def load_jsonl(path: Path) -> list[dict]:
     return [json.loads(l) for l in path.open(encoding="utf-8") if l.strip()]
 
 
+def _llm_stamp(client) -> str:
+    """'apertus = swiss-ai/Apertus-70B-Instruct-2509 via featherless-ai'."""
+    provider = getattr(client, "provider", None) or "anthropic"
+    return f"{client.name} = {client.model} via {provider}"
+
+
 def _version(dist: str) -> str:
     from importlib.metadata import PackageNotFoundError, version
 
@@ -836,7 +842,7 @@ def main() -> int:
         if name in LLM_ROUTERS:
             router = get_router(name)
             client = router.client
-            stamp[f"llm ({name} router)"] = f"{client.name} = {client.model}"
+            stamp[f"llm ({name} router)"] = _llm_stamp(client)
             # The prompt is part of what a row measures: a prompt edit makes
             # two rows incomparable as models, so the report says which one.
             stamp[f"prompt ({name} router)"] = getattr(router, "prompt_version", "unversioned")
@@ -878,7 +884,7 @@ def main() -> int:
         stamp["prompt (suppressor)"] = SUPP_PROMPT
         for name in args.suppressor:
             client = get_llm(name)
-            stamp[f"llm ({name} suppressor)"] = f"{client.name} = {client.model}"
+            stamp[f"llm ({name} suppressor)"] = _llm_stamp(client)
         supp_records = run_suppression(args.suppressor, safety_set, args.embedder[0],
                                        resources, run_id)
         agree_records = run_agreement(args.suppressor,

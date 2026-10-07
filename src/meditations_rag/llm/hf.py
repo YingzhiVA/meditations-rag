@@ -82,14 +82,16 @@ class HFClient:
     """An LLMClient backed by HuggingFace Inference Providers."""
 
     def __init__(self, name: str, model: str | None = None,
-                 sampling: dict[str, float | None] | None = None) -> None:
+                 sampling: dict[str, float | None] | None = None,
+                 provider: str | None = None) -> None:
         """name is the registry key ('apertus' / 'apertus-8b'). model defaults
         to config.HF_GEN_MODEL; pass config.HF_ROUTER_MODEL for the cheap
         classification client. sampling defaults to config.DEFAULT_SAMPLING
         (greedy); a registry entry that samples gets its own name, so its
         eval row and cache entries never mix with the greedy ones. Raises
         LLMError when no token is configured: a missing key is a setup error
-        to report, not an outage to degrade through."""
+        to report, not an outage to degrade through. provider defaults to
+        config.HF_PROVIDER; see config.HF_GEN_PROVIDER for why entries differ."""
         from huggingface_hub import InferenceClient, get_token
 
         token = get_token()
@@ -101,7 +103,8 @@ class HFClient:
         self._name = name
         self._model = model or config.HF_GEN_MODEL
         self._sampling = dict(sampling or config.DEFAULT_SAMPLING)
-        self._client = InferenceClient(provider=config.HF_PROVIDER, api_key=token,
+        self._provider = provider or config.HF_PROVIDER
+        self._client = InferenceClient(provider=self._provider, api_key=token,
                                        timeout=config.LLM_TIMEOUT_S)
         # None = untried, True = honoured, False = rejected by the provider.
         self._structured: bool | None = None
@@ -117,6 +120,10 @@ class HFClient:
     @property
     def sampling(self) -> dict[str, float | None]:
         return dict(self._sampling)
+
+    @property
+    def provider(self) -> str:
+        return self._provider
 
     def complete(self, system: str, user: str) -> str:
         return self._chat(system, user, json_path=None)
@@ -134,7 +141,7 @@ class HFClient:
             except _FormatRejected as exc:
                 self._structured = False
                 log.warning("%s: %s rejected response_format (%s); using prompt-"
-                            "instructed JSON from now on", self._name, config.HF_PROVIDER, exc)
+                            "instructed JSON from now on", self._name, self._provider, exc)
             except LLMError as exc:
                 if isinstance(exc.__cause__, _ProviderDown):
                     raise
@@ -157,7 +164,7 @@ class HFClient:
     def _chat(self, system: str, user: str, *, json_path: str | None,
               response_format: dict | None = None) -> str:
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        with observed_call(self._name, self._model, f"hf:{config.HF_PROVIDER}",
+        with observed_call(self._name, self._model, f"hf:{self._provider}",
                            system, user) as call:
             try:
                 # seed: the provider caches whole responses keyed on prompt +

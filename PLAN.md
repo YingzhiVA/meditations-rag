@@ -877,12 +877,45 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       now: local emergency numbers and findahelpline.com (verified: run by
       ThroughLine, 175+ countries); per-language pointers come with Phase 6's
       German referral text.
-- [ ] **LLM passage-in-context safety check**: given (query, passage), would
+- [x] **LLM passage-in-context safety check**: given (query, passage), would
       presenting this read as counsel to endure mistreatment? Scored against
       the human-reviewed suppression list on `eval/safety_set.jsonl`. The
       deterministic list stays the default and the shipped behaviour; this is
       a comparator row that has to earn its place — and it cannot replace the
       list outright, since an LLM check fails open on a provider outage.
+
+      **Result** (`eval/results/phase-4-safety-check.md`, suppressor prompt
+      `51b17c0371`). Built as `retrieve/safety_llm.py`: the review's own
+      hazard test, chosen by flag (rule 4 for `abuse`, death counsel for
+      `mental_health` / `addiction`), one call per passage and test, and
+      failing closed — any provider error sends the whole query back to the
+      list. Scored (a) in the pipeline on the safety set and (b) against
+      every reviewed keep and strike (`eval/suppression_review.jsonl`, 92
+      passage x reader pairs):
+
+      | check | prohibited shown | death keeps caught | abuse keeps caught | struck judged hazard | 9.3 split |
+      |---|---|---|---|---|---|
+      | reviewed list | 0/7 | — | — | — | — |
+      | Claude Sonnet 5 | 0/7 | 27/28 | 14/15 | 12/49 | right (0/3, 4/4) |
+      | Apertus-70B (featherless-ai) | 1/7 | 6/28 | 5/15 | 4/49 | wrong (1/3, 0/4) |
+      | Apertus-8B (publicai) | 2/7 | 1/28 | 10/15 | 14/49 | wrong (2/3, 0/4) |
+
+      **The list stays the shipped behaviour, and neither Apertus model can
+      stand in for it**: both showed 8.47 ("Quit life then…") to a reader it
+      is withheld from, and both barely recognise death counsel. **Claude
+      matches the review** closely, applies the situational split exactly,
+      and withholds 6 passages the list shows. Its disagreements cluster on
+      two strikes, unanimous across readers: **8.59** (abuse; struck because
+      "Teach them better" precedes "bear with them") and **7.24** (death;
+      struck 2026-10-07). A unanimous comparator is evidence for a second
+      look, not a reason to edit the list; that review is open. The 70B row
+      needed a second run: publicai stopped serving it (first run kept as
+      `phase-4-safety-check-publicai-dropped.md`), and on featherless-ai 16
+      of its calls returned prose instead of JSON on both the
+      `response_format` and the prompt-JSON path — often naming the hazard
+      ("The passage counsels leaving life as an…") in the wrong form. The
+      fail-closed path caught both affected pipeline queries. Cost: Claude
+      $0.30 for 129 calls; the 70B 157 calls, ~96k tokens.
 - [ ] **Router prompt iteration, for Apertus.** The router results above
       leave Apertus well behind Haiku: out_of_scope recall 44% (8B) and 94%
       (70B), and on its own the 8B raises 2 of 20 owed safety flags, the 70B
@@ -1197,6 +1230,18 @@ side — the comparator column is the smaller half of the bill.
    Mitigation: every LLM-backed component degrades rather than fails — the
    router falls back to `KeywordRouter`, and the CLI says so rather than
    silently downgrading.
+   **It happened (2026-10-07).** publicai stopped serving
+   `Apertus-70B-Instruct-2509` some time after 2026-09-29 ("not supported by
+   provider publicai"); HF now lists only featherless-ai for it, and the
+   v1.5 line has no live HF provider at all (8B: none; 70B: featherless-ai,
+   status error). The provider is now per registry entry
+   (`config.HF_GEN_PROVIDER` / `HF_ROUTER_PROVIDER`), stamped per LLM, and
+   in the completion-cache key when not the default. Two lessons: a
+   `system_fingerprint` of `fp1-nst-nes` came back from both providers, so
+   it describes HF's router, not the backend, and cannot tell two serving
+   stacks apart; and featherless-ai does not reliably honour
+   `response_format` (Risk 2 below). An inquiry to the Apertus team about
+   the supported inference path is open.
 2. **Structured-output support on `publicai`.** `MultiQuery` and the LLM
    router both depend on `complete_json`. Mitigation in `llm/hf.py`: attempt
    `response_format`, fall back to prompt-instructed JSON with tolerant
@@ -1208,6 +1253,10 @@ side — the comparator column is the smaller half of the bill.
    no fallback. One call each on the simplest schema, so the risk is reduced,
    not closed: every `CallRecord` carries `json_path`, and the eval runs
    report the split on the real schemas.
+   **On featherless-ai it fails** (2026-10-07): 16 of the 70B's ~157 calls in
+   the safety check came back as prose on both the `response_format` and
+   the prompt-JSON path, and were caught as errors. publicai's honouring of
+   `response_format` was a property of that provider, not of the model.
    **Honoured in practice, not documented (2026-10-02).** Every Apertus
    call in the Phase 4 router runs (~200) came back schema-valid on the
    `response_format` path, though no prompt mentions JSON, so the schema

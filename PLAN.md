@@ -104,7 +104,7 @@ list rather than new machinery.
 | flag | retrieval | suppression list |
 |---|---|---|
 | `ABUSE` (harassment, mobbing, domestic) | yes | the rule-4 five: 2.1, 4.3, 6.20, 7.26, 11.18 |
-| `MENTAL_HEALTH` (depression, distress) | yes | the death-counsel six: 5.29, 8.47, 9.3, 10.8, 10.32, 10.36 |
+| `MENTAL_HEALTH` (depression, distress) | yes | the death-counsel seven: 5.29, 8.47, 9.2, 9.3, 10.8, 10.32, 10.36 |
 | `ADDICTION` | yes | the death-counsel list |
 | `SELF_HARM` (suicidal ideation, self-injury) | **none — referral only** | n/a |
 | `MEDICAL_EMERGENCY` | **none — referral only** | n/a |
@@ -246,7 +246,7 @@ concern, it does not counsel accepting the conduct. **1.15** and **9.3** were
 regex noise: a character portrait of Maximus that matched on "forgive", and a
 passage about dying in which "bear with them mildly" is one incidental clause.
 
-**The death-counsel list — six ids, reviewed.** Used by `MENTAL_HEALTH` and
+**The death-counsel list — seven ids, reviewed.** Used by `MENTAL_HEALTH` and
 `ADDICTION`. Its own hazard test, and the distinction is what makes the list
 small enough to be worth having:
 
@@ -260,6 +260,7 @@ small enough to be worth having:
 | 5.29 | "if men do not permit you, then depart from life… If my house be smoky, I go out, and where is the great matter?" |
 | 8.47 | "Quit life then, in the same kindly spirit as though you had done it" |
 | 9.3 | "Despise not death; but receive it well content"; ends "Haste, death! lest I, too, should forget myself" |
+| 9.2 | "It were the more desirable lot to depart from among men… The next choice were to expire when cloyed with these vices. Have you then chosen rather to abide in evil…?" — added 2026-10-02: it ranks death above going on in a corrupt life. The original sweep missed it because it says "depart" and "expire", not "death" or "quit life"; found when it came up at rank 1 for "…I don't want to go on anymore." |
 | 10.8 | "or else depart from life altogether… **having done at least one thing in life well, by so leaving it**" |
 | 10.32 | "Only do you determine to live no longer if you cannot be such a man; for neither does reason require, in
 that case, that you should." |
@@ -272,9 +273,26 @@ Struck: **8.58** — "do not cease to live" reads as the opposite sentiment.
 vanity of worldly things rather than leaving life, caught by 5.29's
 smoky-house metaphor.
 
+**Re-sweep, 2026-10-07.** 9.2 had escaped the first sweep, which keyed on
+"death", "die", "quit life" and "smoke"; it says "depart" and "expire". A
+second sweep on the vocabulary of leaving (depart, expire, quit, withdraw,
+"be gone", "out of life") turned up 27 candidates, most of them noise
+("quite", "quitted an enquiry", "depart from the rules"). Kept: **9.2**
+(table above). Read in full and struck:
+**7.24** — "why should a man wish to remain alive?" is conditional on losing
+the sense of moral evil itself, a state no distressed reader is in; it
+argues about the soul's corruption, not about leaving a hard life.
+**3.1** — names deciding one's own departure as a faculty old age takes
+away, in order to urge action now ("Let him be up and doing then"); the
+counsel is urgency, not leaving. **7.46** — devalues the length of life
+("should not set his heart on living through a few more years"), which
+observes mortality rather than counselling an end. The rest (2.11, 3.7,
+4.48, 12.36 and the like) console about natural death, which the test
+excludes by design.
+
 That test is also the reason `SELF_HARM` cannot use a list at all: the line
 between "counsels leaving life" and "observes that all things pass" is
-checkable across six passages and not across 68, and in acute crisis the
+checkable across seven passages and not across 68, and in acute crisis the
 consoling ones are not safe either.
 
 Note 9.3 appears here having been struck from the `ABUSE` list — the clearest

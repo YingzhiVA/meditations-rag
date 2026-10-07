@@ -89,6 +89,13 @@ HF_PROVIDER = "publicai"          # the default; entries may name another (below
 # same model behind another serving stack is a different row.
 HF_GEN_PROVIDER = "featherless-ai"
 HF_ROUTER_PROVIDER = "publicai"
+
+# Apertus v1.5, straight from publicAI's own gateway (llm/publicai.py): the
+# v1.5 models have no live provider on HF. The non-thinking releases, per
+# PLAN.md's one-non-thinking-completion-per-side invariant. 262k context.
+PUBLICAI_BASE_URL = "https://api.publicai.co/v1"
+PUBLICAI_GEN_MODEL = "swiss-ai/apertus-v1.5-70b"
+PUBLICAI_ROUTER_MODEL = "swiss-ai/apertus-v1.5-8b"
 # Generation-quality work (HyDE writes prose in a 1902 register) gets the 70B.
 HF_GEN_MODEL = "swiss-ai/Apertus-70B-Instruct-2509"
 # Routing is short classification — no reason to pay 70B latency per query.
@@ -133,6 +140,9 @@ LLM_CACHE_DIR = DATA_DIR / "cache" / "llm"
 LLM_PRICES_PER_MTOK: dict[str, tuple[float, float]] = {
     "claude-sonnet-5": (2.00, 10.00),
     "claude-haiku-4-5": (1.00, 5.00),
+    # publicAI's own gateway publishes per-token rates (unlike its HF route).
+    "swiss-ai/apertus-v1.5-8b": (0.10, 0.20),
+    "swiss-ai/apertus-v1.5-70b": (0.82, 2.92),
 }
 
 # --- Language guard (Phase 4) ------------------------------------------------

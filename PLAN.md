@@ -1236,12 +1236,25 @@ side — the comparator column is the smaller half of the bill.
    v1.5 line has no live HF provider at all (8B: none; 70B: featherless-ai,
    status error). The provider is now per registry entry
    (`config.HF_GEN_PROVIDER` / `HF_ROUTER_PROVIDER`), stamped per LLM, and
-   in the completion-cache key when not the default. Two lessons: a
-   `system_fingerprint` of `fp1-nst-nes` came back from both providers, so
-   it describes HF's router, not the backend, and cannot tell two serving
-   stacks apart; and featherless-ai does not reliably honour
+   in the completion-cache key when not the default. Two lessons: the
+   `system_fingerprint` `fp1-nst-nes` is a placeholder, not a backend
+   identity — publicai (via HF and directly, for its 8B) and featherless-ai
+   all return it, while publicAI's v1.5 70B returns a real one
+   (`vllm-0.1.dev1+g54b4292c2-tp2-bfd70257`) — so it only distinguishes
+   backends that fill it in; and featherless-ai does not reliably honour
    `response_format` (Risk 2 below). An inquiry to the Apertus team about
    the supported inference path is open.
+   **Apertus v1.5 is served by publicAI's own gateway**
+   (`llm/publicai.py`, `PUBLICAI_API_KEY`), not through HF: the
+   non-thinking `swiss-ai/apertus-v1.5-8b` and `-70b`, at $0.10 / $0.20 and
+   $0.82 / $2.92 per MTok. Smoke-tested 2026-10-07: `response_format`
+   honoured, `seed` accepted, 11-12 output tokens (no thinking), the 70B at
+   0.5-1.2 s. Registered as new names, so `apertus` and `apertus-8b` keep
+   meaning the 2509 models every recorded row used. From v1.5 on the bare
+   name is the 8B and `-70b` the 70B, for LLMs and routers alike:
+   `apertus-v15`, `apertus-v15-70b`. (The 2509 names keep their inverted
+   pairing — `apertus` is the 70B LLM but the 8B router — rather than
+   orphan their cache and relabel recorded rows.)
 2. **Structured-output support on `publicai`.** `MultiQuery` and the LLM
    router both depend on `complete_json`. Mitigation in `llm/hf.py`: attempt
    `response_format`, fall back to prompt-instructed JSON with tolerant

@@ -32,6 +32,7 @@ rather than zero.
 """
 
 import json
+import logging
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -39,6 +40,8 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from meditations_rag import telemetry
+
+_log = logging.getLogger(__name__)
 
 
 class LLMError(RuntimeError):
@@ -126,6 +129,95 @@ def check_schema(data: object, schema: dict, where: str = "$") -> None:
         raise LLMError(f"{where}: expected boolean")
     if "enum" in schema and data not in schema["enum"]:
         raise LLMError(f"{where}: {data!r} not in {schema['enum']}")
+
+
+class FormatRejected(Exception):
+    """The provider refused response_format itself (HTTP 400/422)."""
+
+
+class ProviderDown(Exception):
+    """Marks an LLMError as transport/provider failure: retrying the prompt
+    path would hit the same wall, so it propagates at once."""
+
+
+# The prompt-path instruction. Deliberately plain: it has to work on a model
+# that was never told about structured output at all.
+JSON_INSTRUCTION = (
+    "\n\nRespond with a single JSON object and nothing else: no prose, no "
+    "code fence. It must validate against this JSON Schema:\n{schema}"
+)
+
+
+class ChatJSONClient:
+    """complete / complete_json for providers that speak the OpenAI-style chat
+    API without GUARANTEED structured output (HF Inference Providers,
+    publicAI's own gateway). Subclasses implement _chat and set _name,
+    _provider. Risk 2 (PLAN.md) lives here, once, for every such provider:
+
+    attempt response_format; a 400/422 on it marks the provider as not
+    supporting it for the rest of the process (logged once), and later calls
+    go straight to prompt-instructed JSON. Unparseable or schema-invalid
+    output on the response_format path does NOT disable it; that call
+    retries through the prompt path, with one more retry. A provider outage
+    (ProviderDown) propagates at once. Every CallRecord carries json_path.
+    """
+
+    _name: str
+    _provider: str
+    _structured: bool | None = None   # None untried, True honoured, False rejected
+
+    def complete(self, system: str, user: str) -> str:
+        return self._chat(system, user, json_path=None)
+
+    def complete_json(self, system: str, user: str, schema: dict) -> dict:
+        if self._structured is not False:
+            fmt = {"type": "json_schema",
+                   "json_schema": {"name": "output", "schema": schema, "strict": True}}
+            try:
+                data = parse_json(self._chat(system, user, json_path="response_format",
+                                             response_format=fmt))
+                check_schema(data, schema)
+                self._structured = True
+                return data
+            except FormatRejected as exc:
+                self._structured = False
+                _log.warning("%s: %s rejected response_format (%s); using prompt-"
+                             "instructed JSON from now on", self._name, self._provider, exc)
+            except LLMError as exc:
+                if isinstance(exc.__cause__, ProviderDown):
+                    raise
+                _log.info("%s: response_format output unusable (%s); retrying via prompt",
+                          self._name, exc)
+
+        prompted = system + JSON_INSTRUCTION.format(schema=json.dumps(schema))
+        last: LLMError | None = None
+        for _ in range(2):  # one try plus one retry
+            try:
+                data = parse_json(self._chat(prompted, user, json_path="prompt"))
+                check_schema(data, schema)
+                return data
+            except LLMError as exc:
+                if isinstance(exc.__cause__, ProviderDown):
+                    raise
+                last = exc
+        raise LLMError(f"{self._name}: no schema-valid JSON after retry: {last}")
+
+    def _chat(self, system: str, user: str, *, json_path: str | None,
+              response_format: dict | None = None) -> str:
+        raise NotImplementedError
+
+    def _checked(self, text: str, finish_reason: str | None) -> str:
+        """The finish checks every provider's _chat applies after recording
+        the call. content_filter is named: our inputs are often crisis
+        disclosures, exactly what a provider filter may block, and the
+        caller degrades (the router falls back to the keyword floor)."""
+        if finish_reason == "content_filter":
+            raise LLMError(f"{self._name}: provider content filter stopped the completion")
+        if finish_reason == "length":
+            raise LLMError(f"{self._name}: output truncated at max_tokens")
+        if not text.strip():
+            raise LLMError(f"{self._name}: empty completion")
+        return text
 
 
 class _Call:

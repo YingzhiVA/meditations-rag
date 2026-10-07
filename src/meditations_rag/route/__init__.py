@@ -42,6 +42,10 @@ _REGISTRY: dict[str, Callable[[], Router]] = {
     # top_p 0.9); run with --repeats, since one sample measures nothing.
     "apertus-t08": _llm("apertus-t08", "apertus-8b-t08"),
     "apertus-70b-t08": _llm("apertus-70b-t08", "apertus-t08"),
+    # Apertus v1.5 (publicAI gateway): the 8B as the router, the 70B as the
+    # size row. Same names as the LLMs they run on (llm/__init__.py, Naming).
+    "apertus-v15": _llm("apertus-v15", "apertus-v15"),
+    "apertus-v15-70b": _llm("apertus-v15-70b", "apertus-v15-70b"),
     "claude": _llm("claude", "claude-haiku"),
 }
 
@@ -50,7 +54,8 @@ ROUTER_NAMES: tuple[str, ...] = tuple(_REGISTRY)
 # harness grids over these only when asked by name (CLAUDE.md: ask before
 # spending).
 LLM_ROUTERS: frozenset[str] = frozenset(
-    {"apertus", "apertus-70b", "apertus-t08", "apertus-70b-t08", "claude"})
+    {"apertus", "apertus-70b", "apertus-t08", "apertus-70b-t08",
+     "apertus-v15", "apertus-v15-70b", "claude"})
 
 
 class UnknownRouterError(KeyError):

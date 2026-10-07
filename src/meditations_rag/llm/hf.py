@@ -44,7 +44,8 @@ TWO RISKS THIS MODULE OWNS
    structured output IS guaranteed, which is one concrete axis on which the
    comparator may legitimately win.
 
-   Implemented as: a 400/422 on response_format marks the provider as not
+   Implemented in llm/base.ChatJSONClient, shared with llm/publicai.py:
+   a 400/422 on response_format marks the provider as not
    supporting it for the rest of the process (logged once), and every later
    call goes straight to prompt-instructed JSON. Unparseable or schema-invalid
    output on the response_format path does NOT disable it; that call just
@@ -60,26 +61,16 @@ TWO RISKS THIS MODULE OWNS
    competitive — not a reason to have picked a different default.
 """
 
-import json
-import logging
-
 from meditations_rag import config
 from meditations_rag.llm.base import (
-    LLMError, check_schema, current_repeat, observed_call, parse_json,
-)
-
-log = logging.getLogger(__name__)
-
-# The prompt-path instruction. Deliberately plain: it has to work on a model
-# that was never told about structured output at all.
-_JSON_INSTRUCTION = (
-    "\n\nRespond with a single JSON object and nothing else: no prose, no "
-    "code fence. It must validate against this JSON Schema:\n{schema}"
+    ChatJSONClient, FormatRejected, LLMError, ProviderDown, current_repeat, observed_call,
 )
 
 
-class HFClient:
-    """An LLMClient backed by HuggingFace Inference Providers."""
+class HFClient(ChatJSONClient):
+    """An LLMClient backed by HuggingFace Inference Providers. complete and
+    complete_json (with the structured-output fallback) come from
+    llm/base.ChatJSONClient; this class is the transport."""
 
     def __init__(self, name: str, model: str | None = None,
                  sampling: dict[str, float | None] | None = None,
@@ -106,8 +97,6 @@ class HFClient:
         self._provider = provider or config.HF_PROVIDER
         self._client = InferenceClient(provider=self._provider, api_key=token,
                                        timeout=config.LLM_TIMEOUT_S)
-        # None = untried, True = honoured, False = rejected by the provider.
-        self._structured: bool | None = None
 
     @property
     def name(self) -> str:
@@ -124,42 +113,6 @@ class HFClient:
     @property
     def provider(self) -> str:
         return self._provider
-
-    def complete(self, system: str, user: str) -> str:
-        return self._chat(system, user, json_path=None)
-
-    def complete_json(self, system: str, user: str, schema: dict) -> dict:
-        if self._structured is not False:
-            fmt = {"type": "json_schema",
-                   "json_schema": {"name": "output", "schema": schema, "strict": True}}
-            try:
-                data = parse_json(self._chat(system, user, json_path="response_format",
-                                             response_format=fmt))
-                check_schema(data, schema)
-                self._structured = True
-                return data
-            except _FormatRejected as exc:
-                self._structured = False
-                log.warning("%s: %s rejected response_format (%s); using prompt-"
-                            "instructed JSON from now on", self._name, self._provider, exc)
-            except LLMError as exc:
-                if isinstance(exc.__cause__, _ProviderDown):
-                    raise
-                log.info("%s: response_format output unusable (%s); retrying via prompt",
-                         self._name, exc)
-
-        prompted = system + _JSON_INSTRUCTION.format(schema=json.dumps(schema))
-        last: LLMError | None = None
-        for _ in range(2):  # one try plus one retry
-            try:
-                data = parse_json(self._chat(prompted, user, json_path="prompt"))
-                check_schema(data, schema)
-                return data
-            except LLMError as exc:
-                if isinstance(exc.__cause__, _ProviderDown):
-                    raise
-                last = exc
-        raise LLMError(f"{self._name}: no schema-valid JSON after retry: {last}")
 
     def _chat(self, system: str, user: str, *, json_path: str | None,
               response_format: dict | None = None) -> str:
@@ -183,30 +136,12 @@ class HFClient:
             except Exception as exc:  # noqa: BLE001 — any SDK/transport error
                 status = getattr(getattr(exc, "response", None), "status_code", None)
                 if response_format is not None and status in (400, 422):
-                    raise _FormatRejected(f"HTTP {status}") from exc
-                raise LLMError(f"{self._name}: provider error: {exc}") from _ProviderDown(exc)
+                    raise FormatRejected(f"HTTP {status}") from exc
+                raise LLMError(f"{self._name}: provider error: {exc}") from ProviderDown(exc)
             choice = resp.choices[0]
             text = choice.message.content or ""
             usage = resp.usage
             call.done(text, usage.prompt_tokens if usage else 0,
                       usage.completion_tokens if usage else 0, json_path,
                       served_model=resp.model, fingerprint=resp.system_fingerprint)
-        if choice.finish_reason == "content_filter":
-            # Our inputs are often crisis disclosures, exactly what a provider
-            # filter may block. The caller degrades (the router falls back to
-            # the keyword floor); the name makes the cause countable.
-            raise LLMError(f"{self._name}: provider content filter stopped the completion")
-        if choice.finish_reason == "length":
-            raise LLMError(f"{self._name}: output truncated at max_tokens")
-        if not text.strip():
-            raise LLMError(f"{self._name}: empty completion")
-        return text
-
-
-class _FormatRejected(Exception):
-    """The provider refused response_format itself (HTTP 400/422)."""
-
-
-class _ProviderDown(Exception):
-    """Marks an LLMError as transport/provider failure: retrying the prompt
-    path would hit the same wall, so it propagates at once."""
+        return self._checked(text, choice.finish_reason)

@@ -18,6 +18,14 @@ query, HyDE only on real problems.
     apertus       Apertus-70B   generation, judgement (featherless-ai; see config)
     apertus-8b    Apertus-8B    routing
     *-t08         the same two at the model card's temperature 0.8 / top_p 0.9
+    apertus-v15      Apertus v1.5 8B   routing (publicAI gateway)
+    apertus-v15-70b  Apertus v1.5 70B  generation, judgement (publicAI gateway)
+
+Naming. From v1.5 on, the bare name is the 8B and "-70b" the 70B, here and
+in route/__init__.py, so an LLM and the router built on it share a name. The
+2509 names predate the convention and keep it inverted ("apertus" is the 70B
+here, the 8B router there): they label every recorded row, and the
+completion cache is stored per LLM name, so renaming them would orphan it.
     claude        Sonnet 5      generation, judgement (comparator)
     claude-haiku  Haiku 4.5     routing (comparator)
 
@@ -40,6 +48,14 @@ def _hf(name: str, model: str, provider: str,
     return make
 
 
+def _publicai(name: str, model: str) -> Callable[[], LLMClient]:
+    def make() -> LLMClient:
+        from meditations_rag.llm.publicai import PublicAIClient
+
+        return PublicAIClient(name, model)
+    return make
+
+
 def _claude(name: str, model: str) -> Callable[[], LLMClient]:
     def make() -> LLMClient:
         from meditations_rag.llm.claude import ClaudeClient
@@ -57,6 +73,12 @@ _REGISTRY: dict[str, Callable[[], LLMClient]] = {
                        config.APERTUS_RECOMMENDED_SAMPLING),
     "apertus-8b-t08": _hf("apertus-8b-t08", config.HF_ROUTER_MODEL, config.HF_ROUTER_PROVIDER,
                           config.APERTUS_RECOMMENDED_SAMPLING),
+    # Apertus v1.5 from publicAI's own gateway: a new model generation, so new
+    # names; "apertus" and "apertus-8b" keep meaning the 2509 models every
+    # recorded row was made with. Convention from v1.5 on: the bare name is
+    # the 8B, "-70b" the 70B, in this registry and the router registry alike.
+    "apertus-v15": _publicai("apertus-v15", config.PUBLICAI_ROUTER_MODEL),
+    "apertus-v15-70b": _publicai("apertus-v15-70b", config.PUBLICAI_GEN_MODEL),
     "claude": _claude("claude", config.CLAUDE_MODEL),
     "claude-haiku": _claude("claude-haiku", config.CLAUDE_ROUTER_MODEL),
 }

@@ -33,7 +33,9 @@ adds the language guard, fusion, rerank, and the LLM-backed routers/strategies):
 5. rerank (or identity), cut to k. (Phase 4; identity here.)
 6. retrieve/safety.py: with a safety flag set, withhold the flag's reviewed
    passages from the cut list. No backfill. Gated on the flag, so it is a
-   no-op for the common case.
+   no-op for the common case. cfg.suppressor names an LLM instead to run
+   retrieve/safety_llm.py, the comparator; it falls back to the list on any
+   provider error.
 7. Attach Passage objects (corpus.store.load_passages) + final scores.
    Flag results below config.MIN_SCORE_THRESHOLD so the CLI can render an
    honest "no strong match — Marcus may be silent on this" instead of the
@@ -79,6 +81,10 @@ class RetrievalConfig:
     llm: str | None = None
     router: str = config.DEFAULT_ROUTER
     reranker: str = "none"
+    # "list": the reviewed lists in retrieve/safety.py, the shipped behaviour.
+    # An LLM registry name runs retrieve/safety_llm.LLMSuppressor instead, as
+    # a comparator row in the eval; the CLI never sets it.
+    suppressor: str = "list"
     k: int = config.DEFAULT_TOP_K
 
     def as_dict(self) -> dict:
@@ -92,6 +98,8 @@ class RetrievalConfig:
             core += f"@{self.llm}"
         if self.reranker != "none":
             core += f"+{self.reranker}"
+        if self.suppressor != "list":
+            core += f"+check@{self.suppressor}"
         return core
 
 
@@ -124,6 +132,9 @@ class QueryResult:
     router_fallback: str | None = None
     language: str = "en"
     declined: bool = False
+    # Set when an LLM suppressor (cfg.suppressor) lost its provider and the
+    # reviewed list decided instead, for the whole query.
+    suppression_fallback: str | None = None
 
     @property
     def retrieved(self) -> bool:
@@ -231,11 +242,22 @@ def _run_query(problem, cfg, router, embedder, index, passages) -> QueryResult:
                                      for h in hits])
 
     # Gated on the flag like apply_suppression itself: no flag, no span.
+    suppression_fallback = None
     if decision.safety:
         with telemetry.span("safety.suppress", "GUARDRAIL",
-                            input=sorted(f.value for f in decision.safety)) as sp:
-            kept, withheld = apply_suppression(hits, decision.safety)
-            telemetry.set_output(sp, {"withheld": [h.passage_id for h in withheld]})
+                            input=sorted(f.value for f in decision.safety),
+                            **{"meditations.suppressor": cfg.suppressor}) as sp:
+            if cfg.suppressor == "list":
+                kept, withheld = apply_suppression(hits, decision.safety)
+            else:
+                from meditations_rag.llm import get_llm
+                from meditations_rag.retrieve.safety_llm import LLMSuppressor
+
+                kept, withheld, suppression_fallback = LLMSuppressor(
+                    get_llm(cfg.suppressor)).apply(
+                        problem, hits, decision.safety, {p.id: p.text for p in passages})
+            telemetry.set_output(sp, {"withheld": [h.passage_id for h in withheld],
+                                      "fallback": suppression_fallback})
     else:
         kept, withheld = hits, []
 
@@ -254,4 +276,5 @@ def _run_query(problem, cfg, router, embedder, index, passages) -> QueryResult:
         queries=queries,
         router_fallback=decision.fallback,
         language=verdict.language,
+        suppression_fallback=suppression_fallback,
     )

@@ -45,6 +45,7 @@ SPAN TREE
       ├─ index.search           (RETRIEVER — documents with scores and text)
       ├─ rerank                 (RERANKER; Phase 4)
       └─ safety.suppress        (GUARDRAIL — only when a flag fired)
+           └─ llm.generate      (LLM — one per passage and test, LLM suppressor only)
 
 ATTRIBUTES THAT MAKE IT USEFUL
 ------------------------------

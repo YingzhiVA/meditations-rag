@@ -1255,6 +1255,20 @@ side — the comparator column is the smaller half of the bill.
    `apertus-v15`, `apertus-v15-70b`. (The 2509 names keep their inverted
    pairing — `apertus` is the 70B LLM but the 8B router — rather than
    orphan their cache and relabel recorded rows.)
+   **But what serves those ids is not what they say**
+   (`eval/results/phase-4-publicai-serving-probe.txt`; the first v1.5 run
+   was stopped and its completions quarantined, not reported). The gateway
+   answered 16 of 102 `apertus-v1.5-70b` requests with
+   `aisingapore/Qwen-SEA-LION-v4-32B-IT`, saying so in the response; and
+   `apertus-v1.5-8b` very likely runs the 2509 8B weights — the account's
+   usage page lists `apertus-8b-instruct`, and its greedy router answers
+   matched the 2509 8B's on 65 of 66 prompts, while the response echoes
+   the requested id. Whether the "v1.5" 70B is v1.5 is undetermined. The
+   publicAI client now refuses any answer whose served model differs from
+   the request (a visible fallback, never a mislabelled row), which
+   catches the substitution but not an echoing alias. **No v1.5 row is
+   reported until publicAI or the Apertus team confirms what serves these
+   ids** (inquiry open).
 2. **Structured-output support on `publicai`.** `MultiQuery` and the LLM
    router both depend on `complete_json`. Mitigation in `llm/hf.py`: attempt
    `response_format`, fall back to prompt-instructed JSON with tolerant

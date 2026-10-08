@@ -106,3 +106,31 @@ def test_a_provider_change_is_never_answered_from_the_old_provider(tmp_path):
     default_inner.provider = config.HF_PROVIDER     # naming the default changes nothing
     assert CachedClient(default_inner, tmp_path).key("complete", "sys", "q", None) == \
         old.key("complete", "sys", "q", None)
+
+
+def test_publicai_refuses_an_answer_from_a_substituted_model(monkeypatch):
+    """publicAI's gateway answered 16 of 102 'apertus-v1.5-70b' requests with
+    Qwen-SEA-LION. Accepted silently, those answers would be scored and
+    cached as Apertus — a comparison of the wrong model, under the right
+    name, with nothing crashing."""
+    import httpx
+    import pytest
+
+    from meditations_rag.llm.base import LLMError
+    from meditations_rag.llm.publicai import PublicAIClient
+
+    def served_by(model):
+        def handler(request):
+            return httpx.Response(200, json={
+                "model": model, "usage": {"prompt_tokens": 5, "completion_tokens": 3},
+                "choices": [{"message": {"content": "fine"}, "finish_reason": "stop"}]})
+        return httpx.MockTransport(handler)
+
+    monkeypatch.setenv("PUBLICAI_API_KEY", "test-key")
+    asked = "swiss-ai/apertus-v1.5-70b"
+    ok = PublicAIClient("apertus-v15-70b", asked, transport=served_by(asked))
+    assert ok.complete("sys", "q") == "fine"
+    swapped = PublicAIClient("apertus-v15-70b", asked,
+                             transport=served_by("aisingapore/Qwen-SEA-LION-v4-32B-IT"))
+    with pytest.raises(LLMError, match="SEA-LION"):
+        swapped.complete("sys", "q")

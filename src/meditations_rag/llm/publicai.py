@@ -18,6 +18,16 @@ are where a thinking model would show.
 
 Auth: PUBLICAI_API_KEY (.env). publicAI asks every client to send a
 User-Agent naming the application.
+
+THE SERVED MODEL MUST BE THE REQUESTED ONE. The gateway silently answers some
+requests with another model: 16 of 102 "apertus-v1.5-70b" completions came
+back from aisingapore/Qwen-SEA-LION-v4-32B-IT
+(eval/results/phase-4-publicai-serving-probe.txt). A response whose `model`
+differs from the request raises LLMError, so the router falls back visibly,
+the suppressor falls back to the list, the eval counts it, and no
+substituted answer is ever recorded or cached under the requested name. It
+cannot catch an alias that echoes the requested id (the probe's evidence is
+that "apertus-v1.5-8b" answers like the 2509 8B); that needs the provider.
 """
 
 import httpx
@@ -34,9 +44,10 @@ class PublicAIClient(ChatJSONClient):
     """An LLMClient backed by publicAI's gateway."""
 
     def __init__(self, name: str, model: str,
-                 sampling: dict[str, float | None] | None = None) -> None:
+                 sampling: dict[str, float | None] | None = None,
+                 transport: httpx.BaseTransport | None = None) -> None:
         """Raises LLMError when no key is configured: a setup error to
-        report, not an outage to degrade through."""
+        report, not an outage to degrade through. transport is for tests."""
         import os
 
         key = os.environ.get("PUBLICAI_API_KEY")
@@ -49,7 +60,8 @@ class PublicAIClient(ChatJSONClient):
         self._provider = "publicai.co"
         self._http = httpx.Client(
             base_url=config.PUBLICAI_BASE_URL, timeout=config.LLM_TIMEOUT_S,
-            headers={"Authorization": f"Bearer {key}", "User-Agent": USER_AGENT})
+            headers={"Authorization": f"Bearer {key}", "User-Agent": USER_AGENT},
+            transport=transport)
 
     @property
     def name(self) -> str:
@@ -102,7 +114,14 @@ class PublicAIClient(ChatJSONClient):
             except (ValueError, KeyError, IndexError) as exc:
                 raise LLMError(f"{self._name}: malformed response: {r.text[:200]}") from exc
             usage = data.get("usage") or {}
+            served = data.get("model")
             call.done(text, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0),
-                      json_path, served_model=data.get("model"),
+                      json_path, served_model=served,
                       fingerprint=data.get("system_fingerprint"))
+        if served != self._model:
+            # Recorded above (the CallRecord shows what really answered), then
+            # refused: see the module docstring. ProviderDown, so the
+            # prompt-JSON path does not retry into the same substitution.
+            raise LLMError(f"{self._name}: provider served {served!r} instead of "
+                           f"{self._model!r}") from ProviderDown(served)
         return self._checked(text, choice.get("finish_reason"))

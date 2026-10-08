@@ -90,12 +90,26 @@ HF_PROVIDER = "publicai"          # the default; entries may name another (below
 HF_GEN_PROVIDER = "featherless-ai"
 HF_ROUTER_PROVIDER = "publicai"
 
-# Apertus v1.5, straight from publicAI's own gateway (llm/publicai.py): the
-# v1.5 models have no live provider on HF. The non-thinking releases, per
-# PLAN.md's one-non-thinking-completion-per-side invariant. 262k context.
-PUBLICAI_BASE_URL = "https://api.publicai.co/v1"
+# OpenAI-compatible gateways called directly (llm/gateway.py), for models HF
+# Inference Providers does not serve: Apertus v1.5 has no live HF provider.
+# Each names its key's environment variable (.env) and where to get one.
+GATEWAYS: dict[str, dict[str, str]] = {
+    "publicai.co": {"base_url": "https://api.publicai.co/v1",
+                    "key_env": "PUBLICAI_API_KEY",
+                    "where": "platform.publicai.co, Settings, API keys"},
+    # CSCS, the Swiss National Supercomputing Centre: "does not record user
+    # prompts or model responses", which matters for this tool's inputs.
+    "cscs": {"base_url": "https://api.inference.cscs.ch/v1",
+             "key_env": "CSCS_INFERENCE_API_KEY",
+             "where": "ui.inference.cscs.ch"},
+}
+# Apertus v1.5 on publicAI: the non-thinking releases. HELD — the gateway
+# substitutes models (PLAN.md, Risk 1), so no row is reported from them.
 PUBLICAI_GEN_MODEL = "swiss-ai/apertus-v1.5-70b"
 PUBLICAI_ROUTER_MODEL = "swiss-ai/apertus-v1.5-8b"
+# The same models on CSCS, ids as on HF; the -thinking variants are not used.
+CSCS_GEN_MODEL = "swiss-ai/Apertus-v1.5-70B"
+CSCS_ROUTER_MODEL = "swiss-ai/Apertus-v1.5-8B"
 # Generation-quality work (HyDE writes prose in a 1902 register) gets the 70B.
 HF_GEN_MODEL = "swiss-ai/Apertus-70B-Instruct-2509"
 # Routing is short classification — no reason to pay 70B latency per query.

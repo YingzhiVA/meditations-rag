@@ -48,11 +48,11 @@ def _hf(name: str, model: str, provider: str,
     return make
 
 
-def _publicai(name: str, model: str) -> Callable[[], LLMClient]:
+def _gateway(name: str, model: str, gateway: str) -> Callable[[], LLMClient]:
     def make() -> LLMClient:
-        from meditations_rag.llm.publicai import PublicAIClient
+        from meditations_rag.llm.gateway import GatewayClient
 
-        return PublicAIClient(name, model)
+        return GatewayClient(name, model, gateway)
     return make
 
 
@@ -77,8 +77,8 @@ _REGISTRY: dict[str, Callable[[], LLMClient]] = {
     # names; "apertus" and "apertus-8b" keep meaning the 2509 models every
     # recorded row was made with. Convention from v1.5 on: the bare name is
     # the 8B, "-70b" the 70B, in this registry and the router registry alike.
-    "apertus-v15": _publicai("apertus-v15", config.PUBLICAI_ROUTER_MODEL),
-    "apertus-v15-70b": _publicai("apertus-v15-70b", config.PUBLICAI_GEN_MODEL),
+    "apertus-v15": _gateway("apertus-v15", config.PUBLICAI_ROUTER_MODEL, "publicai.co"),
+    "apertus-v15-70b": _gateway("apertus-v15-70b", config.PUBLICAI_GEN_MODEL, "publicai.co"),
     "claude": _claude("claude", config.CLAUDE_MODEL),
     "claude-haiku": _claude("claude-haiku", config.CLAUDE_ROUTER_MODEL),
 }

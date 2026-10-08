@@ -117,7 +117,7 @@ def test_publicai_refuses_an_answer_from_a_substituted_model(monkeypatch):
     import pytest
 
     from meditations_rag.llm.base import LLMError
-    from meditations_rag.llm.publicai import PublicAIClient
+    from meditations_rag.llm.gateway import GatewayClient
 
     def served_by(model):
         def handler(request):
@@ -128,9 +128,9 @@ def test_publicai_refuses_an_answer_from_a_substituted_model(monkeypatch):
 
     monkeypatch.setenv("PUBLICAI_API_KEY", "test-key")
     asked = "swiss-ai/apertus-v1.5-70b"
-    ok = PublicAIClient("apertus-v15-70b", asked, transport=served_by(asked))
+    ok = GatewayClient("apertus-v15-70b", asked, "publicai.co", transport=served_by(asked))
     assert ok.complete("sys", "q") == "fine"
-    swapped = PublicAIClient("apertus-v15-70b", asked,
-                             transport=served_by("aisingapore/Qwen-SEA-LION-v4-32B-IT"))
+    swapped = GatewayClient("apertus-v15-70b", asked, "publicai.co",
+                            transport=served_by("aisingapore/Qwen-SEA-LION-v4-32B-IT"))
     with pytest.raises(LLMError, match="SEA-LION"):
         swapped.complete("sys", "q")

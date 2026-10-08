@@ -1245,7 +1245,7 @@ side — the comparator column is the smaller half of the bill.
    `response_format` (Risk 2 below). An inquiry to the Apertus team about
    the supported inference path is open.
    **Apertus v1.5 is served by publicAI's own gateway**
-   (`llm/publicai.py`, `PUBLICAI_API_KEY`), not through HF: the
+   (`llm/gateway.py`, then `llm/publicai.py`; `PUBLICAI_API_KEY`), not through HF: the
    non-thinking `swiss-ai/apertus-v1.5-8b` and `-70b`, at $0.10 / $0.20 and
    $0.82 / $2.92 per MTok. Smoke-tested 2026-10-07: `response_format`
    honoured, `seed` accepted, 11-12 output tokens (no thinking), the 70B at

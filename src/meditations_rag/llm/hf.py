@@ -44,7 +44,7 @@ TWO RISKS THIS MODULE OWNS
    structured output IS guaranteed, which is one concrete axis on which the
    comparator may legitimately win.
 
-   Implemented in llm/base.ChatJSONClient, shared with llm/publicai.py:
+   Implemented in llm/base.ChatJSONClient, shared with llm/gateway.py:
    a 400/422 on response_format marks the provider as not
    supporting it for the rest of the process (logged once), and every later
    call goes straight to prompt-instructed JSON. Unparseable or schema-invalid

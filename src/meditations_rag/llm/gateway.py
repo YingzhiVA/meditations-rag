@@ -1,33 +1,31 @@
-"""Apertus v1.5 straight from publicAI's own gateway (api.publicai.co).
+"""Models from OpenAI-compatible gateways, called directly.
 
-Why a second Apertus client. HF Inference Providers has no live provider for
-the v1.5 models (8B: none; 70B: featherless-ai, status error), and publicai
-dropped the 70B 2509 model from its HF integration after 2026-09-29 (PLAN.md,
-Risk 1). publicAI serves v1.5 on its own OpenAI-compatible endpoint, so this
-client talks to it directly: POST {base}/chat/completions with a bearer key.
+For models HF Inference Providers does not serve: Apertus v1.5 has no live
+HF provider (PLAN.md, Risk 1). Each gateway is data in config.GATEWAYS — a
+base URL, the environment variable holding its key, and where to get one —
+so publicAI's gateway and CSCS's are one client with two configurations:
+POST {base_url}/chat/completions with a bearer key and a User-Agent naming
+this application (publicAI asks for one; it costs nothing elsewhere).
 
-The structured-output fallback (response_format, then prompt-instructed JSON
-with one retry) is llm/base.ChatJSONClient's, shared with llm/hf.py: publicAI's
-documented ChatCompletionRequest lists neither response_format nor seed, so
-whether either is honoured is measured, per call, in json_path.
+The structured-output fallback (response_format, then prompt-instructed
+JSON with one retry) is llm/base.ChatJSONClient's, shared with llm/hf.py:
+neither gateway documents response_format, so whether it is honoured is
+measured, per call, in json_path.
 
-Models: the NON-thinking v1.5 releases, config.PUBLICAI_GEN_MODEL (70B) and
-config.PUBLICAI_ROUTER_MODEL (8B). One non-thinking completion per side is an
-eval invariant (PLAN.md, Phase 4); the output token counts in every report
-are where a thinking model would show.
+Models: the NON-thinking Apertus releases. One non-thinking completion per
+side is an eval invariant (PLAN.md, Phase 4); the output token counts in
+every report are where a thinking model would show.
 
-Auth: PUBLICAI_API_KEY (.env). publicAI asks every client to send a
-User-Agent naming the application.
-
-THE SERVED MODEL MUST BE THE REQUESTED ONE. The gateway silently answers some
-requests with another model: 16 of 102 "apertus-v1.5-70b" completions came
-back from aisingapore/Qwen-SEA-LION-v4-32B-IT
+THE SERVED MODEL MUST BE THE REQUESTED ONE. publicAI's gateway silently
+answered 16 of 102 "apertus-v1.5-70b" requests with
+aisingapore/Qwen-SEA-LION-v4-32B-IT
 (eval/results/phase-4-publicai-serving-probe.txt). A response whose `model`
 differs from the request raises LLMError, so the router falls back visibly,
 the suppressor falls back to the list, the eval counts it, and no
 substituted answer is ever recorded or cached under the requested name. It
 cannot catch an alias that echoes the requested id (the probe's evidence is
-that "apertus-v1.5-8b" answers like the 2509 8B); that needs the provider.
+that publicAI's "apertus-v1.5-8b" answers like the 2509 8B); for that, a
+model's identity is checked by behaviour before its rows are trusted.
 """
 
 import httpx
@@ -40,26 +38,28 @@ from meditations_rag.llm.base import (
 USER_AGENT = "meditations-rag/0.1 (retrieval eval over Marcus Aurelius' Meditations)"
 
 
-class PublicAIClient(ChatJSONClient):
-    """An LLMClient backed by publicAI's gateway."""
+class GatewayClient(ChatJSONClient):
+    """An LLMClient backed by one of config.GATEWAYS."""
 
-    def __init__(self, name: str, model: str,
+    def __init__(self, name: str, model: str, gateway: str,
                  sampling: dict[str, float | None] | None = None,
                  transport: httpx.BaseTransport | None = None) -> None:
-        """Raises LLMError when no key is configured: a setup error to
-        report, not an outage to degrade through. transport is for tests."""
+        """gateway is a key of config.GATEWAYS, and becomes the provider in
+        stamps and cache keys. Raises LLMError when no key is configured: a
+        setup error to report, not an outage to degrade through. transport
+        is for tests."""
         import os
 
-        key = os.environ.get("PUBLICAI_API_KEY")
+        spec = config.GATEWAYS[gateway]
+        key = os.environ.get(spec["key_env"])
         if not key:
-            raise LLMError("no publicAI key: set PUBLICAI_API_KEY in .env "
-                           "(platform.publicai.co, Settings, API keys)")
+            raise LLMError(f"no {gateway} key: set {spec['key_env']} in .env ({spec['where']})")
         self._name = name
         self._model = model
         self._sampling = dict(sampling or config.DEFAULT_SAMPLING)
-        self._provider = "publicai.co"
+        self._provider = gateway
         self._http = httpx.Client(
-            base_url=config.PUBLICAI_BASE_URL, timeout=config.LLM_TIMEOUT_S,
+            base_url=spec["base_url"], timeout=config.LLM_TIMEOUT_S,
             headers={"Authorization": f"Bearer {key}", "User-Agent": USER_AGENT},
             transport=transport)
 

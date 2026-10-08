@@ -103,8 +103,9 @@ GATEWAYS: dict[str, dict[str, str]] = {
              "key_env": "CSCS_INFERENCE_API_KEY",
              "where": "ui.inference.cscs.ch"},
 }
-# Apertus v1.5 on publicAI: the non-thinking releases. HELD — the gateway
-# substitutes models (PLAN.md, Risk 1), so no row is reported from them.
+# Apertus v1.5 on publicAI: the non-thinking releases. NOT USED — its
+# "v1.5-8b" serves the 2509 8B and its gateway substitutes models (PLAN.md,
+# Risk 1). Kept for the record; the registry serves v1.5 from CSCS.
 PUBLICAI_GEN_MODEL = "swiss-ai/apertus-v1.5-70b"
 PUBLICAI_ROUTER_MODEL = "swiss-ai/apertus-v1.5-8b"
 # The same models on CSCS, ids as on HF; the -thinking variants are not used.

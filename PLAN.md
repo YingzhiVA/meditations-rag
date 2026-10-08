@@ -1269,6 +1269,18 @@ side — the comparator column is the smaller half of the bill.
    catches the substitution but not an echoing alias. **No v1.5 row is
    reported until publicAI or the Apertus team confirms what serves these
    ids** (inquiry open).
+   **CSCS serves v1.5, verified** (`eval/results/phase-4-cscs-identity-check.txt`,
+   2026-10-08). CSCS's gateway (`config.GATEWAYS["cscs"]`,
+   `CSCS_INFERENCE_API_KEY`; it records neither prompts nor responses)
+   serves `swiss-ai/Apertus-v1.5-8B` and `-70B` with matching served ids and
+   their own vLLM fingerprints. Their identity was checked before any row:
+   the CSCS 8B agrees with the 2509 8B on only 38 of 66 greedy answers
+   (publicAI's "v1.5" 8B: 65 of 66), and both took a 100,276-token prompt,
+   past the 2509 models' documented 64,000 / 32,768-token limits. Agreement
+   alone could not decide the 70B (60 of 66 with the 2509 70B, which left
+   little to change); the context test did. `apertus-v15` and
+   `apertus-v15-70b` now point at CSCS; publicAI's v1.5 ids are not
+   registered. CSCS bills in node hours, so the $ column stays blank.
 2. **Structured-output support on `publicai`.** `MultiQuery` and the LLM
    router both depend on `complete_json`. Mitigation in `llm/hf.py`: attempt
    `response_format`, fall back to prompt-instructed JSON with tolerant

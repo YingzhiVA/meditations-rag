@@ -1,0 +1,40 @@
+CSCS identity check: is "Apertus v1.5" on CSCS really v1.5? 2026-10-08.
+
+Why: publicAI's gateway served its "apertus-v1.5-8b" with the 2509 8B's
+weights and answered some "apertus-v1.5-70b" requests with another model
+(phase-4-publicai-serving-probe.txt). So a model's identity is checked
+before any of its rows is trusted.
+
+Setup: api.inference.cscs.ch, greedy, the router prompt (route/llm
+PROMPT_VERSION d83b622eb0), the 66 non-chitchat router-set and safety-set
+queries. The key is not authorized for CSCS's 2509 models (HTTP 403), so
+the comparisons use greedy answers already cached from earlier runs.
+
+1. Served model and deployment
+   swiss-ai/Apertus-v1.5-8B   served as requested, 66/66; fingerprint
+                              vllm-0.23.1rc1.dev1029+ga601a9d99-2d880180
+   swiss-ai/Apertus-v1.5-70B  served as requested, 66/66; fingerprint
+                              vllm-0.23.1rc1.dev1029+ga601a9d99-tp4-1381023c
+   (publicAI's 70B: vllm-0.1.dev1+g54b4292c2-tp2-bfd70257, another
+   deployment.) response_format honoured; median output 17-18 tokens, so
+   no thinking.
+
+2. Behaviour (identical JSON answers / same intent, on shared prompts)
+   CSCS v1.5-8B  vs 2509 8B (HF -> publicai)            38/66   55/66
+   CSCS v1.5-8B  vs publicAI "v1.5-8b"                   38/66   54/66
+   publicAI "v1.5-8b" vs 2509 8B (the earlier finding)   65/66   65/66
+   CSCS v1.5-70B vs 2509 70B (publicai, 2026-09-29)      60/66   64/66
+   CSCS v1.5-70B vs publicAI "v1.5-70b"                  40/48   45/48
+   CSCS v1.5-8B  vs CSCS v1.5-70B                        45/66   59/66
+   The 8B is decisive: CSCS's v1.5-8B is a different model from the 2509
+   8B, and publicAI's "v1.5-8b" was the 2509 8B. Agreement cannot decide
+   the 70B: the 2509 70B already routed 94% of out_of_scope correctly, so a
+   successor has few answers left to change.
+
+3. Context length (one prompt of 100,276 tokens: the corpus twice)
+   Apertus-v1.5-70B  accepted, answered "OK"
+   Apertus-v1.5-8B   accepted, answered "OK"
+   The 2509 models are documented at 64,000 (70B) and 32,768 (8B) tokens
+   of context, so neither request can have been served by 2509 weights.
+
+Conclusion: CSCS's Apertus-v1.5-8B and -70B are taken to be v1.5.

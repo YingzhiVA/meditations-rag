@@ -73,10 +73,11 @@ LONG_PASSAGE_WORDS = 300
 
 # --- LLM (Phase 4: query transformation + routing; no synthesis in v1) -------
 # The LLM is a swappable seam (llm/base.py) and an eval axis, not a fixed
-# dependency. Default is Apertus via the HuggingFace Inference API — an open
-# model is genuinely competitive at these short transformation/classification
-# calls, and it is the model the Apertus Hackathon targets.
-DEFAULT_LLM = "apertus"      # key into the llm registry; see llm/__init__.py
+# dependency. Default is Apertus — an open model, and the one the Apertus
+# Hackathon targets — now v1.5 70B on CSCS: the generation still served
+# (publicai dropped the 2509 70B), identity verified, and on the router
+# and safety sets at least the 2509 70B's level (PLAN.md, Phase 4 results).
+DEFAULT_LLM = "apertus-v15-70b"  # key into the llm registry; see llm/__init__.py
 
 # HuggingFace Inference Providers. "publicai" is the one provider verified live
 # for these models; "featherless-ai" currently reports an error status, which is

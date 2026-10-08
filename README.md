@@ -152,17 +152,20 @@ gitignored and loaded by `config.py`; rotating a key is then one edited line:
 cp .env.example .env    # then fill in the values
 ```
 
-- `HF_TOKEN` for the default path. A fine-grained token with only "Make calls
-  to Inference Providers" is enough. Alternatively `hf auth login`, which
-  stores a token outside the repo that `huggingface_hub` finds by itself.
+- `CSCS_INFERENCE_API_KEY` for the default LLM, Apertus v1.5 70B on CSCS
+  (the Swiss National Supercomputing Centre), which records neither
+  prompts nor responses.
+- `HF_TOKEN` for the Apertus 2509 rows via HF Inference Providers. A
+  fine-grained token with only "Make calls to Inference Providers" is
+  enough. Alternatively `hf auth login`, which stores a token outside the
+  repo that `huggingface_hub` finds by itself.
 - `ANTHROPIC_API_KEY` is optional, and only needed to run the Claude
   comparator column of the eval matrix.
 
 A variable already exported in your shell takes precedence over `.env`.
 
-The default Apertus models (`Apertus-8B/70B-Instruct-2509`) are **ungated** —
-no terms to accept, no access request. Switching `config.py` to an
-`Apertus-v1.5-*` model would add that step.
+The Apertus 2509 models on HF are **ungated** — no terms to accept. On CSCS
+the key itself grants access to the v1.5 models; no HF gating applies.
 
 ## CLI
 

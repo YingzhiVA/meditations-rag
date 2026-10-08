@@ -1250,7 +1250,7 @@ That is the scaling argument against keyword lists, stated as work.
 |---|---|
 | Infra | None through Phase 3 — everything local (files + numpy). From Phase 4, `sqlite-vec`: still a single file, still no server. |
 | Embeddings | Local: free (`bge-base` Phase 2; `bge-small` + Apertus-0.4B Phase 4). Voyage, if used: pennies one-time for 487 passages. |
-| LLM — default path | Apertus via HF Inference (`publicai`). Router calls are tiny; HyDE/multi-query are ~1 short completion per query. Requires `HF_TOKEN`. |
+| LLM — default path | Apertus v1.5 70B on CSCS (`config.DEFAULT_LLM = "apertus-v15-70b"`; free to this project through Hack Apertus, but shared capacity). Router calls are tiny; HyDE/multi-query are ~1 short completion per query. Requires `CSCS_INFERENCE_API_KEY`. The 2509 rows run via HF Inference (`HF_TOKEN`; the 70B on featherless-ai). |
 | LLM — comparator | `claude-sonnet-5` ($2/$10 per MTok), scoped to comparator eval runs, not every query. A full golden-set pass is cents. |
 | Telemetry | Phoenix runs locally. Free. |
 | Hosting (Phase 5) | HuggingFace Space, free CPU tier. LLM spend bounded by the daily cap; past it the Space runs keyword + `raw` for free. |

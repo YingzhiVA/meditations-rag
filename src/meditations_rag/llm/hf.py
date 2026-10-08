@@ -10,7 +10,8 @@ routers stay testable with a fake.
 Read HF_TOKEN from the environment — never hardcode. (huggingface_hub's own
 lookup: HF_TOKEN, then a token stored by `hf auth login`.) A fine-grained
 token with only "Make calls to Inference Providers" is enough for the
-ungated -2509 models. This is the only key the default path needs;
+ungated -2509 models, which this client serves; the default LLM is now
+Apertus v1.5 on CSCS (llm/gateway.py, CSCS_INFERENCE_API_KEY).
 ANTHROPIC_API_KEY is required only to run the comparator column of the eval
 matrix.
 

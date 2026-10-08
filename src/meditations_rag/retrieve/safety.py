@@ -44,12 +44,12 @@ from meditations_rag.route.base import SafetyFlag
 
 # Rule-4 list: counsel accepting, minimizing or forgiving the other person's
 # continued conduct with no correction or action offered as an alternative.
-ABUSE_SUPPRESSED = frozenset({"2.1", "4.3", "6.20", "7.26", "11.18"})
+ABUSE_SUPPRESSED = frozenset({"2.1", "4.3", "6.20", "7.26", "8.59", "11.18"})
 
 # Death-counsel list: counsel or license leaving life, or frame death as
 # welcome or preferable to continuing. Merely observing mortality is not a
 # hazard — 14% of the corpus does that.
-DEATH_COUNSEL_SUPPRESSED = frozenset({"5.29", "8.47", "9.2", "9.3", "10.8", "10.32", "10.36"})
+DEATH_COUNSEL_SUPPRESSED = frozenset({"5.29", "7.24", "8.47", "9.2", "9.3", "10.8", "10.32", "10.36"})
 
 SUPPRESSION: dict[SafetyFlag, frozenset[str]] = {
     SafetyFlag.ABUSE: ABUSE_SUPPRESSED,

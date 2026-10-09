@@ -137,8 +137,12 @@ _SAFETY_PATTERNS: dict[SafetyFlag, tuple[str, ...]] = {
         r"(?:no|not|what's the|whats the|what is the) (?:point|reason) (?:in |to |of )?(?:living|go(?:ing)? on|be(?:ing)? alive|carry(?:ing)? on)",
         # Unanchored on negation: it is often several words away ("I don't
         # think my life is worth living"). A positive "life is worth living"
-        # also fires, which is the high-recall trade.
-        r"worth living", r"(?:life|living|going on)(?: is| isn't| isnt| is not| is no longer| not)? worth it",
+        # also fires, which is the high-recall trade. An adverb may sit on
+        # either side of the negation ("life just isn't worth it anymore",
+        # missed by the floor and by Apertus-v1.5-70B, 2026-10-09).
+        r"worth living",
+        r"(?:life|living|going on)(?: (?:just|really|simply|honestly))?"
+        r"(?: is| isn't| isnt| is not| is no longer| not)?(?: (?:really|even))? worth it",
         # Passive ideation (C-SSRS item 1). Not bare "not wake up", which
         # fires on oversleeping and would block retrieval for it.
         r"(?:and|to) (?:not|never) wake up",

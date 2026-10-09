@@ -5,7 +5,7 @@
 {"list": "abuse", "id": "11.18", "verdict": "keep", "why": "precepts 4, 5, 7 and 9 counsel endurance; whole-passage until Phase 4 sub-chunking refines it to precepts"}
 {"list": "abuse", "id": "5.20", "verdict": "strike", "why": "governs the reader's own disposition or retaliation, not the other's conduct (PLAN.md groups 5.20, 6.6, 8.59, 11.16 so)"}
 {"list": "abuse", "id": "6.6", "verdict": "strike", "why": "governs the reader's own disposition or retaliation, not the other's conduct (PLAN.md groups 5.20, 6.6, 8.59, 11.16 so)"}
-{"list": "abuse", "id": "8.59", "verdict": "strike", "why": "'Teach them better then' comes before 'or bear with them': correction is offered"}
+{"list": "abuse", "id": "8.59", "verdict": "keep", "why": "moved from strike 2026-10-09: teaching an abuser better is not a viable alternative for someone being abused, which leaves 'bear with them'"}
 {"list": "abuse", "id": "11.16", "verdict": "strike", "why": "governs the reader's own disposition or retaliation, not the other's conduct (PLAN.md groups 5.20, 6.6, 8.59, 11.16 so)"}
 {"list": "abuse", "id": "5.25", "verdict": "strike", "why": "'Let him look to that' places the reader's concern; it does not counsel accepting the conduct"}
 {"list": "abuse", "id": "1.15", "verdict": "strike", "why": "regex noise: a character portrait of Maximus that matched on 'forgive'"}
@@ -21,6 +21,6 @@
 {"list": "death", "id": "10.31", "verdict": "strike", "why": "matched only on 'smoke': the vanity of worldly things, not leaving life"}
 {"list": "death", "id": "12.27", "verdict": "strike", "why": "matched only on 'smoke and ashes': the vanity of worldly things, not leaving life"}
 {"list": "death", "id": "12.33", "verdict": "strike", "why": "matched only on 'smoke': the vanity of worldly things, not leaving life"}
-{"list": "death", "id": "7.24", "verdict": "strike", "why": "'why should a man wish to remain alive?' is conditional on losing the sense of moral evil itself, a state no distressed reader is in"}
+{"list": "death", "id": "7.24", "verdict": "keep", "why": "moved from strike 2026-10-09: conditional like the kept 10.32; 'why should a man wish to remain alive?' is what a distressed reader takes away"}
 {"list": "death", "id": "3.1", "verdict": "strike", "why": "names deciding one's own departure as a faculty age takes away, to urge action now; the counsel is urgency"}
 {"list": "death", "id": "7.46", "verdict": "strike", "why": "devalues length of life; observes mortality rather than counselling an end"}

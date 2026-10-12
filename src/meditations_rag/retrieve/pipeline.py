@@ -22,7 +22,10 @@ adds the language guard, fusion, rerank, and the LLM-backed routers/strategies):
    PRE-retrieval rejection and is cheap — it runs before any embedding work,
    before the model is even loaded. It is NOT the same as step 7's
    threshold check; see route/base.py for why both exist.
-1. strategy.expand(problem)            -> 1..N query strings
+1. strategy.expand(problem)            -> 1..N query strings. An LLM
+   strategy that loses its provider degrades to the raw query, with
+   `strategy_fallback` set: like a router outage, it costs quality, never
+   the query, and the eval can see which rows were not the strategy's.
 2. embedder.embed_query(q) per string  -> query vectors
 3. vector_index.search(vec, k) per vector -> ranked lists
 4. If N > 1 (Phase 4): Reciprocal Rank Fusion. RRF score of passage p =
@@ -64,6 +67,7 @@ from meditations_rag.corpus.store import Passage, load_passages
 from meditations_rag.embed.base import Embedder
 from meditations_rag.index.vector_index import LoadedIndex, SearchHit, load_index, search
 from meditations_rag.retrieve.safety import apply_suppression
+from meditations_rag.retrieve.strategies import QueryStrategy
 from meditations_rag.route.base import Intent, RouteDecision, Router, SafetyFlag
 
 
@@ -135,6 +139,9 @@ class QueryResult:
     # Set when an LLM suppressor (cfg.suppressor) lost its provider and the
     # reviewed list decided instead, for the whole query.
     suppression_fallback: str | None = None
+    # Set when an LLM strategy (cfg.strategy) lost its provider and the raw
+    # query was embedded instead.
+    strategy_fallback: str | None = None
 
     @property
     def retrieved(self) -> bool:
@@ -147,6 +154,7 @@ def run_query(
     cfg: RetrievalConfig,
     *,
     router: Router | None = None,
+    strategy: QueryStrategy | None = None,
     embedder: Embedder | None = None,
     index: LoadedIndex | None = None,
     passages: list[Passage] | None = None,
@@ -163,7 +171,7 @@ def run_query(
     with telemetry.span("query", "CHAIN", input=problem) as root:
         telemetry.set_metadata(root, {**cfg.as_dict(), "config": cfg.label,
                                       "eval_run_id": eval_run_id}, tags=[cfg.label])
-        result = _run_query(problem, cfg, router, embedder, index, passages)
+        result = _run_query(problem, cfg, router, strategy, embedder, index, passages)
         telemetry.set_output(root, {
             "intent": result.intent.value if result.intent else None,
             "language": result.language,
@@ -173,11 +181,12 @@ def run_query(
             "withheld": result.withheld,
             "no_strong_match": result.no_strong_match,
             "router_fallback": result.router_fallback,
+            "strategy_fallback": result.strategy_fallback,
         })
         return result
 
 
-def _run_query(problem, cfg, router, embedder, index, passages) -> QueryResult:
+def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> QueryResult:
     from meditations_rag.route import get_router
     from meditations_rag.route.keyword import safety_flags
     from meditations_rag.route.language import check_language
@@ -204,13 +213,22 @@ def _run_query(problem, cfg, router, embedder, index, passages) -> QueryResult:
                            router_fallback=decision.fallback, language=verdict.language)
 
     from meditations_rag.embed import get_embedder
-    from meditations_rag.retrieve.strategies import get_strategy
+    from meditations_rag.llm.base import LLMError
+    from meditations_rag.retrieve.strategies import RawQuery, get_strategy
 
-    strategy = get_strategy(cfg.strategy)
+    if strategy is None:
+        from meditations_rag.llm import get_llm
+
+        strategy = get_strategy(cfg.strategy, get_llm(cfg.llm) if cfg.llm else None)
+    strategy_fallback = None
     with telemetry.span("strategy.expand", "CHAIN", input=problem,
                         **{"meditations.strategy": strategy.name}) as sp:
-        queries = strategy.expand(problem)
-        telemetry.set_output(sp, queries)
+        try:
+            queries = strategy.expand(problem)
+        except LLMError as exc:
+            strategy_fallback = f"{type(exc).__name__}: {exc}"[:300]
+            queries = RawQuery().expand(problem)
+        telemetry.set_output(sp, {"queries": queries, "fallback": strategy_fallback})
     if len(queries) != 1:
         raise NotImplementedError(
             "multi-query fusion lands in Phase 4; Phase 2 strategies expand 1 -> 1"
@@ -277,4 +295,5 @@ def _run_query(problem, cfg, router, embedder, index, passages) -> QueryResult:
         router_fallback=decision.fallback,
         language=verdict.language,
         suppression_fallback=suppression_fallback,
+        strategy_fallback=strategy_fallback,
     )

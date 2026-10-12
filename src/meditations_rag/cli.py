@@ -60,8 +60,13 @@ UX notes:
 - Phase 4 strategies and LLM routers hit the network — a brief status line
   on stderr ("routing with apertus...") explains the latency. If an LLM
   router falls back after a provider error, the rendering ends with one
-  quiet line saying so; the reason is under --debug. A missing API key is a
-  setup error and exits with one line, not a fallback.
+  quiet line saying so; the reason is under --debug. The same for an LLM
+  strategy, which falls back to the problem as typed. A missing API key is
+  a setup error and exits with one line, not a fallback.
+- --llm picks the provider for an LLM strategy (rewrite), defaulting to
+  config.DEFAULT_LLM. It configures the strategy only, never the router,
+  which names its own model; with --strategy raw it is an error rather
+  than a flag that silently does nothing.
 - Tracing (Phase 3): call telemetry.setup_tracing() once at startup. It is
   a no-op unless MEDITATIONS_TRACING=1, so this costs nothing by default.
 """
@@ -147,7 +152,9 @@ def _add_query_parser(sub: argparse._SubParsersAction, config) -> argparse.Argum
                    help=f"embedder name (see embed/); default {config.DEFAULT_EMBEDDER}")
     p.add_argument("--router", default=config.DEFAULT_ROUTER,
                    help=f"intent router (see route/); default {config.DEFAULT_ROUTER}")
-    p.add_argument("--llm", default=None, help="LLM provider (see llm/; Phase 4)")
+    p.add_argument("--llm", default=None,
+                   help="LLM provider for an LLM strategy such as rewrite (see llm/); "
+                        f"default {config.DEFAULT_LLM}")
     p.add_argument("--scores", action="store_true",
                    help="also print the cosine score of each passage")
     p.add_argument("--debug", action="store_true",
@@ -334,6 +341,8 @@ def _debug_block(result) -> str:
     lines = [f"[debug] language: {result.language}", f"[debug] intent: {intent}"]
     if result.router_fallback:
         lines.append(f"[debug] router fallback: {result.router_fallback}")
+    if result.strategy_fallback:
+        lines.append(f"[debug] strategy fallback: {result.strategy_fallback}")
     flags = ", ".join(f.value for f in sorted(result.safety, key=lambda f: f.value)) or "none"
     lines.append(f"[debug] safety flags: {flags}")
     if result.queries:
@@ -355,22 +364,28 @@ def _preview(p) -> str:
 
 
 def cmd_query(args: argparse.Namespace) -> None:
+    from meditations_rag import config
     from meditations_rag.corpus.store import CorpusMissingError
     from meditations_rag.index.vector_index import IndexCorruptError, IndexMissingError
     from meditations_rag.llm.base import LLMError
     from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
-    from meditations_rag.retrieve.strategies import UnknownStrategyError
+    from meditations_rag.llm import UnknownLLMError
+    from meditations_rag.retrieve.strategies import LLM_STRATEGIES, UnknownStrategyError
     from meditations_rag.route import LLM_ROUTERS, UnknownRouterError
 
-    if args.llm is not None:
-        raise CLIError("--llm lands in Phase 4; no LLM-backed strategies or routers yet")
     if args.k <= 0:
         raise CLIError("--k must be positive")
+    llm_name = args.llm
+    if args.strategy in LLM_STRATEGIES:
+        llm_name = llm_name or config.DEFAULT_LLM
+    elif llm_name is not None:
+        raise CLIError(f"--llm applies to an LLM strategy ({', '.join(sorted(LLM_STRATEGIES))}); "
+                       f"--strategy {args.strategy} makes no LLM call")
 
     cfg = RetrievalConfig(
         embedder=args.embedder,
         strategy=args.strategy,
-        llm=args.llm,
+        llm=llm_name,
         router=args.router,
         k=args.k,
     )
@@ -378,13 +393,15 @@ def cmd_query(args: argparse.Namespace) -> None:
         # The round trip is the slow part of the query; say so rather than
         # leave the user watching a silent cursor.
         print(f"routing with {cfg.router}...", file=sys.stderr, flush=True)
+    if cfg.llm:
+        print(f"{cfg.strategy} with {cfg.llm}...", file=sys.stderr, flush=True)
     try:
         result = run_query(args.query, cfg)
     except (CorpusMissingError, IndexMissingError, IndexCorruptError) as exc:
         raise CLIError(str(exc)) from None
     except LLMError as exc:  # no credentials for an LLM router: a setup error
         raise CLIError(str(exc)) from None
-    except (UnknownStrategyError, UnknownRouterError) as exc:
+    except (UnknownStrategyError, UnknownRouterError, UnknownLLMError) as exc:
         raise CLIError(exc.args[0]) from None
     except NotImplementedError as exc:  # a Phase 4 strategy or reranker
         raise CLIError(str(exc)) from None
@@ -479,6 +496,9 @@ def _finish(out: list[str], result, debug: bool) -> str:
         # path. The reason (an HTTP error, a timeout) is for --debug.
         out.append("(The language-model router was unavailable, so keyword "
                    "matching classified this message.)")
+    if result.strategy_fallback:
+        out.append("(The language model was unavailable, so your message was "
+                   "searched as you typed it.)")
     if debug:
         out.append(_debug_block(result))
     return "\n\n".join(out)

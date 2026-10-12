@@ -1119,8 +1119,52 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       numbers argue for keeping raw's ranking and *adding* the
       continuation's (see the note under MultiQuery), not for a shorter
       prompt tuned on these results.
-- [ ] **HyDE** (`HyDEQuery`): 1→pseudo-document. Write a short passage in the
+- [x] **HyDE** (`HyDEQuery`): 1→pseudo-document. Write a short passage in the
       corpus's register and embed that instead of the query.
+
+      **Result** (`eval/results/phase-4-hyde.md`, prompt `43e6eb9c68`,
+      zero-shot; register and length taken from the corpus, not the set:
+      Chrystal says "you", 785 times against 14 "thou", and the median
+      passage is 56 words. No edit was needed after the smoke test. The
+      prompt restates rule 4 and the death-counsel rule, so a
+      pseudo-passage never pulls what the suppression lists withhold):
+
+      | config | R@1 | R@3 | R@5 | MRR | canary R@5 | content R@5 | vs raw (hit@5) | p50 | $/q |
+      |---|---|---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 | — | 20 ms | — |
+      | `hyde@apertus-v15-70b` | 25% | 30% | 35% | 0.287 | 5/6 | 0/2 | fixed 2, broke 13 | 1.4 s | — |
+      | `hyde@apertus-v15` (8B) | 10% | 35% | 50% | 0.243 | 4/6 | 0/2 | fixed 1, broke 10 | 0.5 s | — |
+      | `hyde@claude` (Sonnet 5) | 20% | 35% | 45% | 0.297 | 6/6 | 1/2 | fixed 1, broke 8 | 2.8 s | $0.0019 |
+
+      **HyDE loses to raw too, as the rewrite results predicted, but it
+      fails differently: it is all or nothing.** Where it hits, it often
+      hits at rank 1. The 40th birthday, "how other people view me" and
+      doom-scrolling all go from raw's rank 4 to rank 1 on at least two of
+      the three LLMs, and every HyDE row finds "not a good mum", which raw
+      misses. Where it misses, the pseudo-passage has landed on the
+      doctrine's most general statements. 9.31 ("Let nothing due to a
+      cause outside yourself disturb your calm…") is in the 70B's top 5
+      for 15 of 28 queries and 5.3 for 13; the 70B's lists cover 52
+      distinct passages, against raw's 91. The pseudo-passages keep
+      Marcus's register and lose the situation, which is the rewrite
+      attractor at document length.
+
+      **The headline comparison** (Apertus-70B against Sonnet 5, below):
+      Sonnet leads by two hard queries at R@5 (45% against 35%), with
+      MRR almost level (0.297 against 0.287) and every canary held. That
+      gap is too small on 20 queries to call style imitation the place
+      where the open model falls behind. And the 8B outscores both at R@5
+      (50%), as it did on introspect. The finding is not Apertus against
+      Claude; it is that no LLM makes a replacing transformation beat raw
+      on this corpus.
+
+      **What fusion could gain, at most.** Taking every hard query that
+      raw *or* one strategy row finds in the top 5, the best rows reach
+      17 of 20 (raw: 15), and all nine rows together 18. Two queries are
+      found by no configuration (the final interview; burnout from
+      deadlines). This is an oracle ceiling, not a prediction: RRF can
+      also push a raw hit out of the top 5. It is the bar the fused
+      variants under MultiQuery have to approach.
 - [ ] **Multi-query expansion** (`MultiQuery`): 1→N Stoic themes, fused with
       Reciprocal Rank Fusion.
       **Once RRF lands, refactor the query-rewriting strategies onto it.**
@@ -1187,6 +1231,10 @@ HyDE. HyDE is style imitation rather than classification, so it's where an open
 model is most challenged. If Apertus holds on routing and rewriting but trails
 on HyDE, that's a *finding* about where open models are competitive — worth
 writing up, not a reason to have picked a different default.
+**As measured (v1.5, see the HyDE result):** Sonnet leads by two of 20 hard
+queries, within noise, and the v1.5 8B beats both. All three lose to raw, so
+the comparison that matters turned out to be transformation against raw, not
+Apertus against Claude.
 
 **The Claude comparator column** is `claude-haiku-4-5` for routing ($1/$5 per
 MTok) and `claude-sonnet-5` for rewriting and HyDE ($2/$10 per MTok). A full

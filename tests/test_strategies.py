@@ -5,7 +5,9 @@ pinned is the plumbing a quality number silently depends on:
 
 1. What the strategy wrote is what gets embedded. If the pipeline embedded
    the problem instead, the rewrite row would reproduce the raw row and
-   read as "rewriting does nothing".
+   read as "rewriting does nothing". For IntrospectQuery that means the
+   message as typed AND the continuation: the user's own words staying in
+   the query is the whole difference from RewriteQuery.
 2. An outage degrades, visibly. A raising client yields the RAW problem
    embedded and `strategy_fallback` set, rather than an exception (a lost
    query) or an unmarked raw answer (a rewrite row that silently measures
@@ -19,7 +21,7 @@ import pytest
 
 from meditations_rag.llm.base import LLMError
 from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
-from meditations_rag.retrieve.strategies import RewriteQuery
+from meditations_rag.retrieve.strategies import IntrospectQuery, RewriteQuery
 from meditations_rag.route.keyword import KeywordRouter
 
 PROBLEM = "My manager praised everyone on the team except me and I keep replaying it"
@@ -82,6 +84,17 @@ def test_the_rewrite_is_what_gets_embedded():
     with pytest.raises(_Embedded):
         _run(PROBLEM, _FakeClient('  "on being overlooked\nby others"  '), emb)
     assert emb.seen == ["on being overlooked by others"]
+
+
+def test_introspect_embeds_the_message_then_its_continuation():
+    emb = _RecordingEmbedder()
+    cfg = RetrievalConfig(embedder="bge-base", strategy="introspect", llm="fake",
+                          router="keyword", k=5)
+    with pytest.raises(_Embedded):
+        run_query(PROBLEM + "  ", cfg, router=KeywordRouter(),
+                  strategy=IntrospectQuery(_FakeClient("I wonder if I matter\nto them.")),
+                  embedder=emb, index=_NoIndex(), passages=[])
+    assert emb.seen == [PROBLEM + " I wonder if I matter to them."]
 
 
 def test_strategy_outage_embeds_the_raw_problem_and_says_so():

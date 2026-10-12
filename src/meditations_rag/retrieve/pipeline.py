@@ -28,7 +28,9 @@ adds the language guard, fusion, rerank, and the LLM-backed routers/strategies):
    the query, and the eval can see which rows were not the strategy's.
 2. embedder.embed_query(q) per string  -> query vectors
 3. vector_index.search(vec, k) per vector -> ranked lists
-4. If N > 1 (Phase 4): Reciprocal Rank Fusion. RRF score of passage p =
+4. If N > 1 (Phase 4, retrieve/fusion.py): Reciprocal Rank Fusion, each
+   list searched to config.RRF_DEPTH first. Ordered by RRF, scored by the
+   best cosine any list gave the passage. RRF score of passage p =
    sum over lists of 1 / (C + rank_p), C = 60 (standard). Rank-based, so no
    score-scale reconciliation needed — which is also why RRF is the natural
    place to merge BM25 (Phase 4 hybrid): just add the lexical ranked list
@@ -229,10 +231,6 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
             strategy_fallback = f"{type(exc).__name__}: {exc}"[:300]
             queries = RawQuery().expand(problem)
         telemetry.set_output(sp, {"queries": queries, "fallback": strategy_fallback})
-    if len(queries) != 1:
-        raise NotImplementedError(
-            "multi-query fusion lands in Phase 4; Phase 2 strategies expand 1 -> 1"
-        )
     if cfg.reranker != "none":
         raise NotImplementedError("rerankers land in Phase 4; Phase 2 knows only 'none'")
 
@@ -247,17 +245,30 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
         raise ValueError(f"index is for {index.embedder!r}, embedder is {embedder.name!r}")
     by_id = {p.id: p for p in passages}
 
-    with telemetry.span("embed.query", "EMBEDDING", input=queries[0], **{
-        "embedding.model_name": getattr(embedder, "model_id", embedder.name),
-        "embedding.embeddings.0.embedding.text": queries[0],
-    }):
-        vector = embedder.embed_query(queries[0])
+    # One string: search to k, exactly as Phase 2 did. Several: search each
+    # to config.RRF_DEPTH and fuse (retrieve/fusion.py), then cut to k.
+    depth = cfg.k if len(queries) == 1 else max(cfg.k, config.RRF_DEPTH)
+    lists: list[list[SearchHit]] = []
+    for q in queries:
+        with telemetry.span("embed.query", "EMBEDDING", input=q, **{
+            "embedding.model_name": getattr(embedder, "model_id", embedder.name),
+            "embedding.embeddings.0.embedding.text": q,
+        }):
+            vector = embedder.embed_query(q)
+        with telemetry.span("index.search", "RETRIEVER", input=q,
+                            **{"meditations.k": depth}) as sp:
+            found = search(vector, index, depth)
+            telemetry.set_documents(sp, [(h.passage_id, h.score, by_id[h.passage_id].text)
+                                         for h in found[:cfg.k]])
+        lists.append(found)
+    if len(lists) == 1:
+        hits: list[SearchHit] = lists[0]
+    else:
+        from meditations_rag.retrieve.fusion import rrf
 
-    with telemetry.span("index.search", "RETRIEVER", input=queries[0],
-                        **{"meditations.k": cfg.k}) as sp:
-        hits: list[SearchHit] = search(vector, index, cfg.k)
-        telemetry.set_documents(sp, [(h.passage_id, h.score, by_id[h.passage_id].text)
-                                     for h in hits])
+        with telemetry.span("fuse", "CHAIN", **{"meditations.lists": len(lists)}) as sp:
+            hits = rrf(lists, cfg.k)
+            telemetry.set_output(sp, [h.passage_id for h in hits])
 
     # Gated on the flag like apply_suppression itself: no flag, no span.
     suppression_fallback = None

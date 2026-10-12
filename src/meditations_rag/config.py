@@ -202,6 +202,12 @@ BGE_BASE_MODEL = "BAAI/bge-base-en-v1.5"
 DEFAULT_STRATEGY = "raw"     # baseline; eval winner becomes the default later
 DEFAULT_TOP_K = 5            # results shown by default
 OVERRETRIEVE_K = 20          # candidates fetched before rerank (Phase 4)
+# Reciprocal Rank Fusion (retrieve/fusion.py), for strategies that embed more
+# than one string. Both untuned on purpose: C is the standard constant, and
+# each list is searched this deep before fusing so a passage ranked low in
+# several lists can still rise.
+RRF_C = 60
+RRF_DEPTH = 50
 # Below this cosine score the CLI should say "no strong match" instead of
 # presenting the least-bad passage. Tune against the golden set in Phase 4.
 # This is POST-retrieval rejection; the router handles PRE-retrieval rejection.

@@ -1071,10 +1071,67 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       (the same attractor, at document length), and MultiQuery fans out
       into exactly these abstract themes. Fusing them *with the raw query*
       rather than replacing it is the variant these numbers argue for.
+- [x] **Introspective continuation** (`IntrospectQuery`): 1→1. Keep the
+      message as typed and append two or three sentences in the user's own
+      voice on what lies under it, as if they paused and asked themselves
+      why they said it and how they feel. Added after reading the rewrite
+      losses, which it targets directly: the situation stays in the query
+      and the register stays the user's. Because it was proposed after
+      seeing those results, the fresh-query check before Phase 5 (Risk 5)
+      is its independent test. Zero-shot, with one rule beyond form:
+      nothing darker than the message (no despair, death or self-harm it
+      does not point to), since the continuation is invented and would
+      otherwise pull death passages for readers no flag protects.
+
+      **Result** (`eval/results/phase-4-introspect.md`, prompt
+      `9a0b969180`, embedded as one query):
+
+      | config | R@1 | R@3 | R@5 | MRR | canary R@5 | content R@5 | vs raw (hit@5) | p50 | $/q |
+      |---|---|---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 | — | 21 ms | — |
+      | `introspect@apertus-v15-70b` | 25% | 40% | 50% | 0.333 | 5/6 | 1/2 | fixed 0, broke 7 | 0.9 s | — |
+      | `introspect@apertus-v15` (8B) | 25% | 45% | 70% | 0.402 | 5/6 | 2/2 | fixed 2, broke 4 | 0.4 s | — |
+      | `introspect@claude` (Sonnet 5) | 30% | 50% | 60% | 0.406 | 6/6 | 0/2 | fixed 1, broke 6 | 2.2 s | $0.0016 |
+
+      **Much better than rewriting, still below raw.** It recovers most of
+      what `rewrite` lost (R@5 30-40% there), so keeping the user's words
+      and register is the right direction. And it reaches what raw cannot:
+      the 8B fixed "toxic relationship" and "not a good mum", and Sonnet
+      the one hard query no configuration had found ("I said something
+      cruel and I can't take it back"). On the 40th birthday the 8B wrote
+      "a sudden, quiet panic about how time has slipped away… regret for
+      things left undone" and moved a labelled passage from rank 4 to 2.
+      Why it still loses:
+      - **The continuation drowns the message.** At ~50-60 words it is two
+        to three times most queries, so it dominates the one embedding.
+      - **A stock introspective voice becomes the new attractor.** "I keep
+        replaying", "wondering", "quiet", "feels" recur across unrelated
+        queries and pull toward the generic passages on opinion and pain:
+        8.40 ("Take away your opinion about the things that seem to give
+        you pain…") is in the 70B's top 5 for 13 of 28 queries, and 9.21
+        and 8.40 in Sonnet's for 10 each. Sonnet's top-5 lists cover 54
+        distinct passages, against raw's 91.
+      - **Content questions lose their topic.** Sonnet obeyed the rule to
+        continue with *why* the topic is on the user's mind, and the
+        continuation outweighed the topic: both content entries missed.
+        The 70B ignored the rule and named Marcus anyway.
+      The 8B's 70% is one query short of raw: within noise, not a win. The
+      numbers argue for keeping raw's ranking and *adding* the
+      continuation's (see the note under MultiQuery), not for a shorter
+      prompt tuned on these results.
 - [ ] **HyDE** (`HyDEQuery`): 1→pseudo-document. Write a short passage in the
       corpus's register and embed that instead of the query.
 - [ ] **Multi-query expansion** (`MultiQuery`): 1→N Stoic themes, fused with
       Reciprocal Rank Fusion.
+      **Once RRF lands, refactor the query-rewriting strategies onto it.**
+      `RewriteQuery` and `IntrospectQuery` replace or swamp the user's
+      message today, and both lose to raw for that reason (see their
+      results above). With fusion available, each should return the raw
+      query *alongside* its own output (1→2), with the message and the
+      continuation embedded separately and their ranked lists fused, so
+      raw's hits are kept and the strategy can only add. Each refactored
+      strategy is a new row under a new name, not an edit of the recorded
+      ones.
 - [ ] **Parent-child sub-chunking** for the 14 sections over 300 words
       (longest: 1.16 at 754). Embed sub-chunks, dedupe hits back to the parent
       § so citations stay whole. Its own matrix row — an assumption otherwise.

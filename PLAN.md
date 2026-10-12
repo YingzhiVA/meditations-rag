@@ -616,6 +616,10 @@ without a measurement.
       Valid ids are `1.1`–`12.36` within the per-book counts. Labels are
       sparse, not exhaustive — see `eval/README.md` for the pooling protocol
       that makes this tractable, and why it has to follow Phase 2.
+      **As done:** the labels came from one read of the whole book with the
+      queries in mind, not from the pool, so new configurations are scored
+      against them with no re-judging round (`eval/README.md`, "How the
+      labels were made").
       **Start from `eval/pool.py`, do not rewrite it.** It is the probe
       script that produced the Phase 2 notes: model loaded once, a list of
       queries, top-k ids with scores and first words per query, plus the

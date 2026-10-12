@@ -3,6 +3,7 @@
     .venv/bin/python eval/run_eval.py                       # everything
     .venv/bin/python eval/run_eval.py --embedder bge-base --strategy raw
     .venv/bin/python eval/run_eval.py --routers-only
+    .venv/bin/python eval/run_eval.py --strategy raw rewrite --llm apertus-v15-70b claude
 
 THIS FILE IS AUTHORITATIVE for quality numbers. Phoenix (see
 meditations_rag/telemetry.py) is observability only — do not use its
@@ -20,6 +21,10 @@ comparisons that matter.
              they are the easy lexical-anchor queries every configuration
              gets, so folding them in lifts every row equally and blunts the
              comparison. A canary that drops means something broke.
+             Content questions ("What does Marcus say about…", tier
+             "content") get their own column too: they are a different kind
+             of input from a problem statement, and PLAN.md asks for them to
+             be reported apart.
 
   Router     reported as a PAIR: out_of_scope recall AND in_scope retention.
              Recall alone is gameable by rejecting everything, and the real
@@ -52,6 +57,15 @@ named (--router apertus claude), so a bare run never spends. A fallback
 means part of a row is the keyword router under another name; the report
 says so in bold under the table.
 
+LLM STRATEGIES (Phase 4: rewrite) run once per --llm named, and only then,
+for the same reason: a bare run never spends. Their retrieval rows carry the
+strategy's cost in the tok and $/q columns, their latency includes the
+original LLM round trip even when served from the cache, and a provider
+error that made a query fall back to the raw problem is counted in bold
+under the table: those queries measured `raw` under the strategy's name.
+The per-query file records what was actually embedded, which is the
+evidence for any rewrite row.
+
 REPEATS. One run of an LLM router is one sample: at temperature 0.8 by
 construction, and at temperature 0 too if the provider is nondeterministic.
 --repeats N reruns the LLM routers N times, each repeat under its own cache
@@ -60,10 +74,13 @@ how many queries changed answer between repeats, with the backend
 fingerprint per repeat. A difference between two routers smaller than
 either one's instability is not a finding.
 
-EVERY NUMBER IS A FLOOR. Labels are sparse (eval/README.md's pooling
-protocol): an apt passage nobody labelled scores as a miss. Fine for
-comparing configurations, which is what the matrix is for; not fine to
-present as an absolute.
+EVERY NUMBER IS A LOWER BOUND. The labels come from one full read of the
+book (eval/README.md), so an unlabelled passage was read and not picked,
+and every configuration is scored against the same labels. But each entry
+holds the curator's confident picks, not every passage that could help, so
+an apt passage left out still scores as a miss. Fine for comparing
+configurations, which is what the matrix is for; not fine to present as an
+absolute.
 
 THE POST-RETRIEVAL LLM CHECK (Phase 4, --suppressor NAME ...) is a
 comparator to the reviewed lists, scored two ways: (a) the safety set through
@@ -102,7 +119,7 @@ from meditations_rag.index.vector_index import load_index
 from meditations_rag.llm.base import CALLS, CallRecord
 from meditations_rag import telemetry
 from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
-from meditations_rag.retrieve.strategies import STRATEGY_NAMES
+from meditations_rag.retrieve.strategies import LLM_STRATEGIES, STRATEGY_NAMES, get_strategy
 from meditations_rag.llm import get_llm
 from meditations_rag.route import LLM_ROUTERS, ROUTER_NAMES, get_router
 from meditations_rag.route.base import SafetyFlag
@@ -141,12 +158,12 @@ def md5(path: Path) -> str:
     return hashlib.md5(path.read_bytes()).hexdigest() if path.exists() else "absent"
 
 
-def split_golden(entries: list[dict]) -> tuple[list, list, list, int]:
-    """(hard, canary, out_of_scope, n_unlabelled). An entry with no usable
-    gold ids is EXCLUDED, not scored as a miss — it has not been judged yet,
-    and counting it as a failure would make an unfinished set look like a bad
-    pipeline."""
-    hard, canary, oos, skipped = [], [], [], 0
+def split_golden(entries: list[dict]) -> tuple[list, list, list, list, int]:
+    """(hard, canary, content, out_of_scope, n_unlabelled). An entry with no
+    usable gold ids is EXCLUDED, not scored as a miss — it has not been
+    judged yet, and counting it as a failure would make an unfinished set
+    look like a bad pipeline."""
+    hard, canary, content, oos, skipped = [], [], [], [], 0
     for e in entries:
         tier = e.get("tier", "hard")
         if tier == "out_of_scope":
@@ -157,8 +174,8 @@ def split_golden(entries: list[dict]) -> tuple[list, list, list, int]:
             skipped += 1
             continue
         e = {**e, "gold_ids": ids}
-        (canary if tier == "canary" else hard).append(e)
-    return hard, canary, oos, skipped
+        {"canary": canary, "content": content}.get(tier, hard).append(e)
+    return hard, canary, content, oos, skipped
 
 
 # --- retrieval --------------------------------------------------------------
@@ -177,16 +194,17 @@ def describe_device(emb) -> str:
     return device
 
 
-def build_grid(embedders, strategies) -> list[RetrievalConfig]:
+def build_grid(embedders, strategies, llms) -> list[RetrievalConfig]:
     """Derived from the registries, so Phase 4's cells appear with no edit.
 
     The llm axis only varies for LLM-USING strategies: 'raw' takes none, so
     running it once per provider would report identical configurations as
-    distinct rows."""
+    distinct rows. With no llm named, the LLM strategies are left out."""
     return [
-        RetrievalConfig(embedder=e, strategy=s, k=max(KS))
+        RetrievalConfig(embedder=e, strategy=s, llm=m, k=max(KS))
         for e in embedders
         for s in strategies
+        for m in (llms if s in LLM_STRATEGIES else [None])
     ]
 
 
@@ -199,17 +217,25 @@ def gold_rank(result, gold_ids: list[str]) -> int | None:
     return None
 
 
-def run_config(cfg, hard, canary, oos, resources, run_id=None) -> dict:
+def run_config(cfg, hard, canary, content, oos, resources, run_id=None) -> dict:
     """One grid cell over every scored entry. Returns metrics plus the
     per-query records the error-analysis file is built from."""
     emb, idx, passages = resources[cfg.embedder]
+    # Built once per cell, not per query: the client is the same for all of them.
+    strategy = get_strategy(cfg.strategy, get_llm(cfg.llm) if cfg.llm else None)
     records, latencies = [], []
-    for tier, entries in (("hard", hard), ("canary", canary), ("out_of_scope", oos)):
+    for tier, entries in (("hard", hard), ("canary", canary), ("content", content),
+                          ("out_of_scope", oos)):
         for e in entries:
+            start = len(CALLS)
             t0 = time.perf_counter()
-            res = run_query(e["query"], cfg, embedder=emb, index=idx, passages=passages,
-                            eval_run_id=run_id)
-            latencies.append((time.perf_counter() - t0) * 1000)
+            res = run_query(e["query"], cfg, strategy=strategy, embedder=emb, index=idx,
+                            passages=passages, eval_run_id=run_id)
+            calls = CALLS[start:]
+            # A cache hit takes microseconds; add back the original round trip
+            # so a rerun reports the latency the configuration really has.
+            latencies.append((time.perf_counter() - t0) * 1000
+                             + sum(c.latency_ms for c in calls if c.cached))
             gold = e.get("gold_ids", [])
             records.append({
                 "config": cfg.label, "tier": tier, "query": e["query"],
@@ -221,11 +247,15 @@ def run_config(cfg, hard, canary, oos, resources, run_id=None) -> dict:
                 "declined": res.declined, "language": res.language,
                 "safety": sorted(f.value for f in res.safety),
                 "no_strong_match": res.no_strong_match,
+                "embedded": res.queries,
+                "strategy_fallback": res.strategy_fallback,
+                **llm_usage(calls),
             })
     return {"config": cfg, "records": records,
             "metrics": {
                 "hard": tier_metrics([r for r in records if r["tier"] == "hard"]),
                 "canary": tier_metrics([r for r in records if r["tier"] == "canary"]),
+                "content": tier_metrics([r for r in records if r["tier"] == "content"]),
                 "oos": oos_metrics([r for r in records if r["tier"] == "out_of_scope"]),
             },
             "latency": latencies}
@@ -610,6 +640,19 @@ def pct(x) -> str:
 USAGE_HEADERS = ["fallbacks", "LLM p50 ms", "LLM p95 ms", "tok/q", "$/q"]
 
 
+def strategy_cost_cells(result: dict) -> list[str]:
+    """tok and $/q for a retrieval row: blank where no LLM call is made
+    (raw), never 0.00; $ blank where the model has no published rate.
+    Averaged over every scored query, as the router table's are."""
+    recs = result["records"]
+    if not any(r["llm_calls"] for r in recs):
+        return ["—", "—"]
+    usd = [r["usd"] for r in recs if r["llm_calls"]]
+    tok = sum(r["in_tok"] + r["out_tok"] for r in recs) / len(recs)
+    return [f"{tok:.0f}",
+            f"{sum(usd) / len(recs):.5f}" if None not in usd else "—"]
+
+
 def usage_cells(router: str, u: dict) -> list[str]:
     """The cost half of a router row. The keyword router makes no call and
     cannot fall back, so its cells are blank rather than zero."""
@@ -701,23 +744,32 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
         rows = []
         for r in results:
             m, c, o = r["metrics"]["hard"], r["metrics"]["canary"], r["metrics"]["oos"]
+            ct = r["metrics"]["content"]
             lat = r["latency"]
             rows.append([
                 f"`{r['config'].label}`", str(m["n"]),
                 *[pct(m[f"recall@{k}"]) for k in KS], f"{m['mrr']:.3f}",
                 pct(c["recall@5"]) + f" ({c['n']})" if c else "—",
+                pct(ct["recall@5"]) + f" ({ct['n']})" if ct else "—",
                 pct(o["accuracy"]) + f" ({o['n']})" if o else "—",
                 f"{statistics.median(lat):.0f}",
                 f"{sorted(lat)[max(0, int(0.95 * len(lat)) - 1)]:.0f}",
-                "—", "—",
+                *strategy_cost_cells(r),
             ])
         L += [table(["config", "n", "R@1", "R@3", "R@5", "MRR", "canary R@5",
-                     "oos acc", "p50 ms", "p95 ms", "tok", "$/q"], rows), ""]
+                     "content R@5", "oos acc", "p50 ms", "p95 ms", "tok", "$/q"], rows), ""]
+        for r in results:
+            n_fb = sum(1 for rec in r["records"] if rec["strategy_fallback"])
+            if n_fb:
+                L += [f"***`{r['config'].label}`: {n_fb} of {len(r['records'])} queries fell "
+                      "back to the raw problem; those rows are not this strategy's answers.***", ""]
         if skipped:
             L += [f"*{skipped} entries excluded as unlabelled — not scored as misses.*", ""]
-        L += ["*Recall is a FLOOR: labels are sparse, so an apt passage nobody "
-              "labelled counts as a miss. Comparable across rows, not absolute.*",
-              "", "*Canaries are reported separately and never folded into recall@k.*", ""]
+        L += ["*Recall is a LOWER BOUND: labels are one curator's confident picks from "
+              "a full read of the book, so an apt passage left out counts as a miss. "
+              "Comparable across rows, not absolute.*",
+              "", "*Canaries and content questions are reported separately and never "
+              "folded into recall@k.*", ""]
 
     L += ["## Router", ""]
     if router_rows:
@@ -776,6 +828,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--embedder", nargs="*", default=list(EMBEDDER_NAMES))
     ap.add_argument("--strategy", nargs="*", default=list(STRATEGY_NAMES))
+    # LLM strategies spend per query too, so they run only with an --llm.
+    ap.add_argument("--llm", nargs="*", default=[],
+                    help=f"LLMs to run the LLM strategies ({', '.join(sorted(LLM_STRATEGIES))}) "
+                         "on, one row each; without one, those strategies are skipped")
     # LLM routers cost money per query, so they run only when named
     # (CLAUDE.md: ask before spending). A bare run stays free.
     ap.add_argument("--router", nargs="*",
@@ -808,7 +864,7 @@ def main() -> int:
     router_p = EVAL_DIR / "router_set.jsonl"
     safety_p = args.safety_set or EVAL_DIR / "safety_set.jsonl"
     language_p = args.language_set or EVAL_DIR / "language_set.jsonl"
-    hard, canary, oos, skipped = split_golden(load_jsonl(golden_p))
+    hard, canary, content, oos, skipped = split_golden(load_jsonl(golden_p))
     router_set, safety_set = load_jsonl(router_p), load_jsonl(safety_p)
 
     try:
@@ -834,9 +890,17 @@ def main() -> int:
             stamp.update({k: v for k, v in resources[name][1].meta.items()
                           if k in ("model_id", "sentence_transformers", "torch", "numpy")})
             stamp["device"] = describe_device(emb)
-        for cfg in build_grid(args.embedder, args.strategy):
+        if any(s in LLM_STRATEGIES for s in args.strategy):
+            from meditations_rag.retrieve.strategies import PROMPT_VERSIONS
+
+            for name in args.llm:
+                stamp[f"llm (strategy {name})"] = _llm_stamp(get_llm(name))
+            for s in args.strategy:
+                if s in LLM_STRATEGIES and args.llm:
+                    stamp[f"prompt ({s})"] = PROMPT_VERSIONS[s]
+        for cfg in build_grid(args.embedder, args.strategy, args.llm):
             print(f"  {cfg.label} …", flush=True)
-            results.append(run_config(cfg, hard, canary, oos, resources, run_id))
+            results.append(run_config(cfg, hard, canary, content, oos, resources, run_id))
 
     for name in args.router:
         if name in LLM_ROUTERS:

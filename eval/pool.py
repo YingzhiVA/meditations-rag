@@ -7,17 +7,22 @@ be read against its background). Those queries now live in
 eval/golden_set.jsonl, so the hard-coded list is gone; everything else here
 is the same idea with the pieces eval/README.md's pooling protocol asks for.
 
-WHY POOL AT ALL. Judging all 487 passages against 26 queries is ~12,700
-decisions and is not the job. Judging what a retriever actually surfaced is a
-few hundred, mostly quick rejects. The cost is that an apt passage no
-configuration ever surfaces stays unlabelled and scores as a miss — which is
-why every recall number is a FLOOR, and why the pool is drawn from the whole
-grid rather than one configuration. Widening the pool is the only lever
-against that bias.
+WHAT IT IS FOR NOW. The current labels come from a full read of the book
+(eval/README.md), not from this pool, so the pool is not the boundary of
+what was judged, and state.json records what was pooled, not what was
+labelled. It stays as a drafting aid for new entries, and as the method
+that scales: a corpus too large to read can only be labelled by judging
+what retrievers surface, with the pool drawn from the whole grid so no one
+configuration decides what gets seen.
 
     .venv/bin/python eval/pool.py                    # pool the whole grid
-    .venv/bin/python eval/pool.py --new-only         # Phase 4: only unjudged
+    .venv/bin/python eval/pool.py --new-only         # only candidates not pooled before
     .venv/bin/python eval/pool.py --k 20 --words 60
+    .venv/bin/python eval/pool.py --all-entries --new-only --llm apertus-v15-70b claude
+
+LLM strategies (rewrite) are pooled once per --llm, and only then. Their
+completions go through the same on-disk cache as run_eval.py, so pooling a
+configuration and then scoring it pays for each rewrite once.
 
 Writes two files:
 
@@ -60,7 +65,7 @@ from meditations_rag.corpus.store import load_passages
 from meditations_rag.embed import EMBEDDER_NAMES, get_embedder
 from meditations_rag.index.vector_index import load_index
 from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
-from meditations_rag.retrieve.strategies import STRATEGY_NAMES
+from meditations_rag.retrieve.strategies import LLM_STRATEGIES, STRATEGY_NAMES
 
 EVAL_DIR = Path(__file__).resolve().parent
 GOLDEN = EVAL_DIR / "golden_set.jsonl"
@@ -87,8 +92,8 @@ def needs_labels(entry: dict) -> bool:
     return not ids or all(i in UNLABELLED for i in ids)
 
 
-def build_grid(embedders: list[str], strategies: list[str], k: int
-               ) -> list[RetrievalConfig]:
+def build_grid(embedders: list[str], strategies: list[str], k: int,
+               llms: list[str] = ()) -> list[RetrievalConfig]:
     """Every implemented cell. Grows on its own as the registries grow —
     Phase 4 adds embedders and strategies and this needs no edit.
 
@@ -97,9 +102,10 @@ def build_grid(embedders: list[str], strategies: list[str], k: int
     product shows, since those are exactly the ones that would otherwise stay
     unlabelled and score as misses forever."""
     return [
-        RetrievalConfig(embedder=e, strategy=s, k=k)
+        RetrievalConfig(embedder=e, strategy=s, llm=m, k=k)
         for e in embedders
         for s in strategies
+        for m in (llms if s in LLM_STRATEGIES else [None])
     ]
 
 
@@ -115,6 +121,8 @@ def pool_one(entry, cfgs, resources, k) -> dict:
         except NotImplementedError as exc:      # a Phase 4 cell not yet built
             failures.append(f"{cfg.label}: {exc}")
             continue
+        if res.strategy_fallback:   # these are raw's candidates, not the strategy's
+            failures.append(f"{cfg.label}: fell back to the raw query ({res.strategy_fallback})")
         intents.add(res.intent.value)
         flags |= {f.value for f in res.safety}
         if cfg.embedder not in stats:
@@ -210,6 +218,8 @@ def main() -> int:
     ap.add_argument("--words", type=int, default=200, help="words of passage text")
     ap.add_argument("--embedder", nargs="*", default=list(EMBEDDER_NAMES))
     ap.add_argument("--strategy", nargs="*", default=list(STRATEGY_NAMES))
+    ap.add_argument("--llm", nargs="*", default=[],
+                    help="LLMs to pool the LLM strategies on; without one they are skipped")
     ap.add_argument("--new-only", action="store_true",
                     help="show only candidates not seen in a previous run")
     ap.add_argument("--all-entries", action="store_true",
@@ -221,7 +231,11 @@ def main() -> int:
     if not todo:
         print("nothing to pool — every entry is labelled (use --all-entries to force)")
         return 0
-    cfgs = build_grid(args.embedder, args.strategy, args.k)
+    cfgs = build_grid(args.embedder, args.strategy, args.k, args.llm)
+    if args.llm:
+        from meditations_rag import llm
+
+        llm.enable_cache()
     golden_md5 = hashlib.md5(args.golden.read_bytes()).hexdigest()
 
     passages = load_passages()

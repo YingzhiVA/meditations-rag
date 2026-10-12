@@ -288,7 +288,9 @@ def validate_golden(path: Path, known: set[str] | None) -> Report:
         # the oos_accuracy denominator, the other has to be excluded from
         # every metric. Curation makes the second state normal for days at a
         # time, so the harness cannot infer it from emptiness alone.
-        tier = check_tier(rep, n, obj, {"hard", "canary", "out_of_scope"}, "hard")
+        # "content" (Phase 4): a question about what the book says, scored
+        # like a canary on its own line, never folded into hard recall.
+        tier = check_tier(rep, n, obj, {"hard", "canary", "content", "out_of_scope"}, "hard")
         tiers[tier] += 1
         if "theme" in obj:
             # Themes apply to both tiers: the canary line should span concerns
@@ -352,7 +354,7 @@ def validate_golden(path: Path, known: set[str] | None) -> Report:
 
     rep.info("")
     rep.info(f"  {len(entries)} entries: {tiers['hard']} hard, {tiers['canary']} canary, "
-             f"{oos} out-of-scope fixtures")
+             f"{tiers['content']} content, {oos} out-of-scope fixtures")
     rep.info(f"  {labelled} labelled, {unlabelled} awaiting labels")
     if per_query:
         # Reported, not policed. Under hit-ANY, recall rises with the number of

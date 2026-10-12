@@ -1026,9 +1026,51 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       cache). The substitution stays a named residual for the fresh-query
       check before Phase 5 (Risk 5): new passive-ideation phrasings the
       floor does not anticipate are where it would show.
-- [ ] **Query rewriting** (`RewriteQuery`): 1→1. Strip affect and narrative,
+- [x] **Query rewriting** (`RewriteQuery`): 1→1. Strip affect and narrative,
       restate in the corpus's conceptual vocabulary. Cheaper and more
       predictable than HyDE, and it degrades more gracefully.
+
+      **Result** (`eval/results/phase-4-rewrite.md`, prompt `e4774986cb`,
+      zero-shot, one plain completion per query, keyword router):
+
+      | config | R@1 | R@3 | R@5 | MRR | canary R@5 | content R@5 | p50 | tok/q | $/q |
+      |---|---|---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 | 17 ms | — | — |
+      | `rewrite@apertus-v15-70b` | 10% | 20% | 35% | 0.182 | 4/6 | 1/2 | 351 ms | 296 | — |
+      | `rewrite@apertus-v15` (8B) | 10% | 20% | 30% | 0.167 | 6/6 | 0/2 | 181 ms | 293 | — |
+      | `rewrite@claude` (Sonnet 5) | 15% | 40% | 40% | 0.250 | 5/6 | 1/2 | 1.3 s | 401 | $0.001 |
+
+      **Rewriting loses, on every LLM, and the per-query file says why.**
+      Against raw's hits in the top 5 over all 28 scored entries, the 70B
+      fixes 0 and breaks 11, the 8B fixes 2 and breaks 13, Sonnet fixes 1
+      and breaks 10. No fallbacks. Two mechanisms:
+      - **The rewrite throws away what matched.** The labels were picked
+        for the *situation* (a 40th birthday, a jealous friend, a child),
+        and raw's concrete words reach the passages that answer it. A
+        heading such as "On jealousy of another's success and what is not
+        in our power" keeps the topic and loses the situation. This holds
+        for Sonnet too, whose rewrites are the most faithful.
+      - **The corpus's own vocabulary is an attractor.** Asked to speak the
+        book's language, the rewrites match the passages that *are* that
+        language, the doctrinal summaries, rather than the ones that apply
+        it: 11.16 ("To live the best life is within the power of the soul,
+        if it be indifferent to indifferent things…") is in the 70B's top 5
+        for 10 queries and 5.3 for 5; under raw no passage appears more
+        than 5 times. The prompt's subject list makes this worse: 16 of the
+        70B's 28 rewrites end on "what is (not) in our power", and the 8B's
+        top-5 lists cover only 65 distinct passages to raw's 91.
+      **Content questions may not need it.** Raw already finds both
+      labelled content questions, at ranks 1 and 2: on this small sample,
+      bge ignores the "what does Marcus say about…" frame better than this
+      plan assumed ("Why they matter to the Phase 4 strategies"). Two
+      entries are a smoke test, not a measurement.
+      The prompt was not tuned against the set, so a better prompt may do
+      better; but Sonnet's faithful rewrites lose too, so the loss is the
+      strategy's on this corpus and this embedder, not one prompt's. It
+      bears on the next two items: HyDE writes in the corpus's register
+      (the same attractor, at document length), and MultiQuery fans out
+      into exactly these abstract themes. Fusing them *with the raw query*
+      rather than replacing it is the variant these numbers argue for.
 - [ ] **HyDE** (`HyDEQuery`): 1→pseudo-document. Write a short passage in the
       corpus's register and embed that instead of the query.
 - [ ] **Multi-query expansion** (`MultiQuery`): 1→N Stoic themes, fused with

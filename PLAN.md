@@ -1165,7 +1165,7 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       deadlines). This is an oracle ceiling, not a prediction: RRF can
       also push a raw hit out of the top 5. It is the bar the fused
       variants under MultiQuery have to approach.
-- [ ] **Multi-query expansion** (`MultiQuery`): 1→N Stoic themes, fused with
+- [x] **Multi-query expansion** (`MultiQuery`): 1→N Stoic themes, fused with
       Reciprocal Rank Fusion.
       **Once RRF lands, refactor the query-rewriting strategies onto it.**
       `RewriteQuery` and `IntrospectQuery` replace or swamp the user's
@@ -1176,6 +1176,80 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       raw's hits are kept and the strategy can only add. Each refactored
       strategy is a new row under a new name, not an edit of the recorded
       ones.
+      **Done with this item** (`WithRaw`, the `raw+X` rows below). "Can
+      only add" turned out to be wrong: a fused list can push a raw hit out
+      of the top 5, and every `raw+` row does so at least twice.
+
+      **RRF** (`retrieve/fusion.py`): standard, unweighted, C = 60, each
+      list searched 50 deep before fusing; neither constant tuned. Passages
+      are ordered by RRF score and carry the best cosine any list gave them,
+      so `--scores` and the no-match threshold keep their meaning. A
+      one-string strategy still takes the Phase 2 path unchanged (raw
+      reproduces exactly).
+
+      **MultiQuery result** (`eval/results/phase-4-multi.md`, prompt
+      `6c2bd80138`, three "On …" themes via `complete_json`; unlike the
+      rewrite prompt it lists no subjects, since that list is what collapsed
+      the rewrites):
+
+      | config | R@1 | R@5 | MRR | canary R@5 | content R@5 | vs raw (hit@5) | $/q |
+      |---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 75% | 0.477 | 6/6 | 2/2 | — | — |
+      | `multi@apertus-v15-70b` | 5% | 20% | 0.113 | 2/6 | 0/2 | — | — |
+      | `multi@apertus-v15` (8B) | 10% | 30% | 0.164 | 3/6 | 0/2 | — | — |
+      | `multi@claude` (Sonnet 5) | 5% | 25% | 0.114 | 3/6 | 0/2 | fixed 1, broke 16 | $0.0017 |
+      | `raw+multi@apertus-v15-70b` | 5% | 30% | 0.118 | 3/6 | 0/2 | — | — |
+      | `raw+multi@apertus-v15` (8B) | 15% | 35% | 0.227 | 3/6 | 0/2 | — | — |
+      | `raw+multi@claude` | 15% | 60% | 0.299 | 6/6 | 0/2 | fixed 1, broke 6 | $0.0017 |
+
+      **The weakest strategy, on every LLM, with or without raw.** Three
+      abstract themes are the rewrite failure three times over. They lose
+      the situation, and often the one word a canary turns on: the 70B
+      turned "How to deal with anger" into "On the fleeting nature of
+      provocation" and two more headings without the word, and even fused
+      with the message it found neither labelled anger passage. The top-5
+      lists collapse onto the same doctrinal summaries: 11.16 is the most
+      shown passage for all three LLMs (tied for Sonnet), in the 70B's lists
+      for 13 queries. In unweighted RRF the message is one list of four, so three
+      abstract lists outvote it; only Sonnet's `raw+multi` keeps every
+      canary. Structured output held throughout: 28 of 28 calls schema-valid
+      on each LLM (`response_format` on CSCS, structured on Claude), no
+      fallbacks, which is the first evidence for Risk 2 on a generation
+      schema rather than the router's.
+
+      **The fused rows** (`eval/results/phase-4-fused.md`; every completion
+      served from the earlier rows' cache, so the rewritten text is
+      identical and only the fusion differs):
+
+      | config | R@1 | R@3 | R@5 | MRR | canary R@5 | content R@5 | vs raw (hit@5) |
+      |---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 | — |
+      | `raw+rewrite@apertus-v15-70b` | 10% | 55% | 60% | 0.302 | 6/6 | 1/2 | fixed 0, broke 4 |
+      | `raw+rewrite@apertus-v15` (8B) | 5% | 30% | 35% | 0.171 | 6/6 | 1/2 | fixed 0, broke 9 |
+      | `raw+rewrite@claude` | 25% | 50% | 60% | 0.400 | 6/6 | 2/2 | fixed 0, broke 3 |
+      | `raw+introspect@apertus-v15-70b` | 35% | 45% | 65% | 0.434 | 6/6 | 1/2 | fixed 2, broke 5 |
+      | `raw+introspect@apertus-v15` (8B) | 35% | 50% | 60% | 0.442 | 6/6 | 1/2 | fixed 1, broke 5 |
+      | `raw+introspect@claude` | 30% | 60% | 65% | 0.443 | 4/6 | 0/2 | fixed 1, broke 7 |
+      | `raw+hyde@apertus-v15-70b` | 15% | 75% | 80% | 0.435 | 6/6 | 1/2 | fixed 3, broke 3 |
+      | `raw+hyde@apertus-v15` (8B) | 30% | 55% | 65% | 0.439 | 6/6 | 1/2 | fixed 1, broke 4 |
+      | `raw+hyde@claude` | **50%** | 60% | 75% | **0.583** | 6/6 | 2/2 | fixed 2, broke 2 |
+
+      **Fusing recovers most of each strategy's loss, and only HyDE comes
+      out level with raw or ahead.** Every `raw+` row but one beats its
+      replacing version at R@5, and canaries mostly return; the exception
+      is the 8B's introspect, which fusing takes from 70% down to 60%.
+      Rewrite still only subtracts (it fixes nothing on any LLM).
+      `raw+hyde@claude` matches raw at R@5 (fixing "I said something cruel"
+      and "not a good mum", losing two) and moves five hard queries up to
+      rank 1 (40th birthday, last day at work, patience with a child, how
+      others judge me, doom-scrolling): R@1 50% against 35%, MRR 0.583
+      against 0.477. `raw+hyde@apertus-v15-70b` reaches 16 of 20 hard
+      queries at R@5, one more than raw and one short of the oracle
+      ceiling, but only 15% at R@1. **These are candidates, not findings
+      yet.** The R@5 difference is one query, and the R@1 gain is three;
+      rank 1 is the stable rank (eval/README.md), but 20 queries cannot
+      separate three queries from noise. The fresh-query check before
+      Phase 5 (Risk 5) is where `raw+hyde` either holds or does not.
 - [ ] **Parent-child sub-chunking** for the 14 sections over 300 words
       (longest: 1.16 at 754). Embed sub-chunks, dedupe hits back to the parent
       § so citations stay whole. Its own matrix row — an assumption otherwise.

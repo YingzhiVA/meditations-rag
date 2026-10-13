@@ -201,16 +201,18 @@ def describe_device(emb) -> str:
 
 
 def build_grid(embedders, strategies, llms, chunkings=("passage",),
-               filters=("none",)) -> list[RetrievalConfig]:
+               filters=("none",), retrievers=("dense",)) -> list[RetrievalConfig]:
     """Derived from the registries, so Phase 4's cells appear with no edit.
 
     The llm axis only varies for LLM-USING strategies: 'raw' takes none, so
     running it once per provider would report identical configurations as
     distinct rows. With no llm named, the LLM strategies are left out."""
     return [
-        RetrievalConfig(embedder=e, strategy=s, llm=m, chunking=c, filter=f, k=max(KS))
+        RetrievalConfig(embedder=e, strategy=s, llm=m, chunking=c, filter=f,
+                        retriever=r, k=max(KS))
         for e in embedders
         for c in chunkings
+        for r in retrievers
         for f in filters
         for s in strategies
         for m in (llms if s in LLM_STRATEGIES else [None])
@@ -924,6 +926,8 @@ def main() -> int:
     ap.add_argument("--chunking", nargs="*", default=["passage"], choices=["passage", "subchunk"],
                     help="which indexes to score; 'subchunk' needs `meditations index "
                          "--chunking subchunk` first")
+    ap.add_argument("--retriever", nargs="*", default=["dense"], choices=["dense", "hybrid"],
+                    help="dense only, or hybrid (BM25 fused with dense); one row each")
     ap.add_argument("--exposure-llm", action="store_true",
                     help="include LLM-strategy rows in the exposure table; each query "
                          "outside the golden set is a new LLM call")
@@ -1005,7 +1009,7 @@ def main() -> int:
                 stamp[f"subchunk index ({name})"] = (
                     f"{sub['count']} rows, max {config.SUBCHUNK_MAX_WORDS} words per chunk")
         for cfg in build_grid(args.embedder, args.strategy, args.llm, args.chunking,
-                              args.filter):
+                              args.filter, args.retriever):
             print(f"  {cfg.label} …", flush=True)
             results.append(run_config(cfg, hard, canary, content, oos, resources, run_id))
 

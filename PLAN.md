@@ -1380,7 +1380,7 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       default should exclude Book I anyway (no measured cost, one fewer
       wrong-reason passage in 73 queries) is a Phase 5 call, made with the
       rest of the winning configuration; the eval baseline stays unfiltered.
-- [ ] **Hybrid retrieval**: BM25 alongside dense, RRF fusion — helps queries
+- [x] **Hybrid retrieval**: BM25 alongside dense, RRF fusion — helps queries
       with lexical anchors ("death", "anger", "fame"). **This is where the
       vector store stops being a numpy array**: `sqlite-vec` (single file, no
       server, pre-v1 so pin it) holds the vectors, and SQLite's built-in FTS5
@@ -1395,6 +1395,47 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       `sqlite-vec` store moves to Phase 7: it changes the plumbing, not the
       numbers.
 
+      **Built** (`index/lexical.py`, `--retriever hybrid`, row label
+      `bge-base+bm25`). BM25 over whole passages, in memory per process,
+      Porter stemming, no stopword list, standard parameters; nothing
+      tuned. It always runs on the user's own words, whatever the strategy
+      wrote, obeys the metadata filter, and its hits carry their cosine
+      into the fusion, never a BM25 score. The message is reduced to quoted
+      words before it reaches FTS5, so no input is ever query syntax (a
+      test throws quotes, NEAR, AND and `*` at it).
+
+      **Result** (`eval/results/phase-4-hybrid.md`, all LLM rows from
+      cache):
+
+      | config | R@1 | R@5 | MRR | canary R@5 | content R@5 | vs dense (hit@5) |
+      |---|---|---|---|---|---|---|
+      | `raw` | 35% | 75% | 0.477 | 6/6 | 2/2 | — |
+      | `raw` + BM25 | 25% | 40% | 0.300 | 6/6 | 2/2 | fixed 1, broke 8 |
+      | `raw+hyde@claude` + BM25 | 20% | 55% | 0.303 | 6/6 | 2/2 | fixed 1, broke 5 |
+      | `raw+hyde@apertus-v15-70b` + BM25 | 25% | 55% | 0.360 | 6/6 | 2/2 | fixed 1, broke 5 |
+      | `raw+hyde@apertus-v15` (8B) + BM25 | 25% | 55% | 0.352 | 6/6 | 2/2 | fixed 4, broke 5 |
+
+      **Hybrid loses badly, and dense stays the default.** Two causes,
+      both visible per query:
+      - **Unweighted RRF rewards consensus over conviction.** Dense's
+        first hit scores 1/61; a passage both lists put around rank 10
+        scores 2/70, nearly twice as much. So generic passages that each
+        ranker places mid-list (5.36, 7.2, 10.36) displace dense's best
+        hits unless BM25 also ranks them: "I'm jealous of my friend's
+        success" loses 7.27 from rank 1.
+      - **This set is built from BM25's failure modes.** The hard queries
+        were written as conceptual gaps and lexical hijacks (eval/README),
+        and a lexical hijack is what BM25 does: "friend" pulls Book I's
+        1.13 and 1.14, rare words like "deal" outweigh "anger". Alone,
+        BM25 finds 3 of 20 hard queries. The lexical-anchor cases it is
+        meant for, the canaries, were already 6/6 under dense.
+      It keeps every canary and both content questions, and with the 8B's
+      `raw+hyde` it fixes four queries, but every row breaks five or more.
+      A weighted fusion (dense counted more than BM25) is the obvious
+      variant; it is one knob fitted to 20 queries, so it is left for a
+      larger set rather than tuned here. Exposure (raw): Book I shown 1 to
+      4 times over the 73 retrieving queries, rule-4 passages to unflagged
+      readers 5 to 9, distinct passages 152 to 171.
 - [ ] **Rerank** (`retrieve/rerank.py`): over-retrieve ~20, rerank to top 5.
       Cross-encoder (local, free) first; LLM listwise rerank as a comparison.
       **Scoped down for the delivery:** cross-encoder only; the LLM

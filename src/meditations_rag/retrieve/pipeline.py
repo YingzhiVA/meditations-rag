@@ -65,6 +65,7 @@ Returns QueryResult — the render/eval contract. Eval scores retrieval on
 .passages, the router on .intent and .safety, and suppression on .withheld.
 """
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 
 from meditations_rag import config, telemetry
@@ -93,6 +94,9 @@ class RetrievalConfig:
     # "passage" (one vector per §) or "subchunk" (the long passages split
     # into children, deduped back to the parent at query time).
     chunking: str = "passage"
+    # A metadata filter (FILTERS): "none", or "no-book-1" to exclude Book I,
+    # the list of debts to particular people, which is not counsel.
+    filter: str = "none"
     # "list": the reviewed lists in retrieve/safety.py, the shipped behaviour.
     # An LLM registry name runs retrieve/safety_llm.LLMSuppressor instead, as
     # a comparator row in the eval; the CLI never sets it.
@@ -114,7 +118,22 @@ class RetrievalConfig:
             core += f"+{self.reranker}"
         if self.suppressor != "list":
             core += f"+check@{self.suppressor}"
+        if self.filter != "none":
+            core += f"+{self.filter}"
         return core
+
+
+# Metadata filters (Phase 4): which passages a configuration may return.
+# Each maps a Passage to True when it is excluded. Applied to the search
+# itself, before fusion, suppression and the cut to k, and every list is
+# searched deeper by the number of excluded index rows, so a filtered query
+# still returns k passages. Book I is a list of debts to particular people
+# ("From Rusticus I learned…"), not counsel, and matches on names and
+# kinship for the wrong reason (eval/README.md, "Book I noise").
+FILTERS: dict[str, Callable[[Passage], bool] | None] = {
+    "none": None,
+    "no-book-1": lambda p: p.book == 1,
+}
 
 
 @dataclass(frozen=True)
@@ -284,6 +303,14 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
 
     subchunked = cfg.chunking != "passage"
     extra = len(index) - len({parent_id(i) for i in index.ids}) if subchunked else 0
+    try:
+        excludes = FILTERS[cfg.filter]
+    except KeyError:
+        raise ValueError(f"unknown filter {cfg.filter!r}; known: {', '.join(FILTERS)}") from None
+    excluded = {p.id for p in passages if excludes(p)} if excludes else set()
+    if excluded:
+        # Every excluded row could rank above the first allowed one.
+        extra += sum(1 for i in index.ids if parent_id(i) in excluded)
     depth = (cfg.k if len(queries) == 1 else max(cfg.k, config.RRF_DEPTH)) + extra
     matched: dict[str, tuple[float, str]] = {}   # parent -> (best cosine, child)
     lists: list[list[SearchHit]] = []
@@ -296,6 +323,8 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
         with telemetry.span("index.search", "RETRIEVER", input=q,
                             **{"meditations.k": depth}) as sp:
             found = search(vector, index, depth)
+            if excluded:
+                found = [h for h in found if parent_id(h.passage_id) not in excluded]
             if subchunked:
                 found = _dedupe_to_parent(found, matched)
             telemetry.set_documents(sp, [(h.passage_id, h.score, by_id[h.passage_id].text)

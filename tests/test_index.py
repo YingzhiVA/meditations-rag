@@ -29,6 +29,10 @@ Phase 4's sub-chunking adds three, for the same reasons:
    back when children crowd the top, with the matching child recorded; and a
    hit on 11.18's tenth-precept chunk is still withheld from an ABUSE
    reader, since suppression stays whole-passage (PLAN.md).
+7. The Book I filter (fixture, no model): with "no-book-1", no Book I
+   passage comes back even when Book I rows, children included, rank first,
+   and the query still returns k passages. A filter that also shrank the
+   result list would read as a recall loss caused by the filter.
 """
 
 import json
@@ -322,3 +326,28 @@ def test_subchunk_dedupe_returns_k_parents_and_keeps_11_18_withheld():
                     passages=passages)
     assert res.withheld == ["11.18"]
     assert [rp.passage.id for rp in res.passages] == ["5.1", "6.1"]   # no backfill
+
+
+def test_no_book_1_filter_excludes_book_one_and_still_returns_k():
+    from meditations_rag.corpus.store import Passage
+    from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
+    from meditations_rag.route.keyword import KeywordRouter
+
+    ids = ["1.16#1", "1.16#2", "1.2", "5.1", "6.1", "7.1"]
+    sims = [0.99, 0.98, 0.97, 0.9, 0.8, 0.7]
+    vectors = np.array([[s, np.sqrt(1 - s * s), 0.0] for s in sims], dtype=np.float32)
+    index = vi.LoadedIndex(embedder="bge-base", vectors=vectors, ids=ids, meta={})
+    passages = [Passage(id=i, book=int(i.split(".")[0]), number=int(i.split(".")[1]), text="x")
+                for i in ("1.16", "1.2", "5.1", "6.1", "7.1")]
+
+    class _Embedder:
+        name, dim = "bge-base", 3
+
+        def embed_query(self, q):
+            return np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+    cfg = RetrievalConfig(embedder="bge-base", strategy="raw", router="keyword",
+                          chunking="subchunk", filter="no-book-1", k=3)
+    res = run_query("how do I become more patient", cfg, router=KeywordRouter(),
+                    embedder=_Embedder(), index=index, passages=passages)
+    assert [rp.passage.id for rp in res.passages] == ["5.1", "6.1", "7.1"]

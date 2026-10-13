@@ -19,7 +19,7 @@ Three subcommands + a default query mode (argparse; stdlib is enough):
 
   meditations "problem statement..." [--k N] [--all] [--strategy NAME]
                                      [--embedder NAME] [--router NAME]
-                                     [--llm NAME] [--chunking NAME]
+                                     [--llm NAME] [--chunking NAME] [--filter NAME]
       retrieve.pipeline.run_query with a RetrievalConfig assembled from
       flags + config defaults.
 
@@ -158,6 +158,9 @@ def _add_query_parser(sub: argparse._SubParsersAction, config) -> argparse.Argum
                    help=f"embedder name (see embed/); default {config.DEFAULT_EMBEDDER}")
     p.add_argument("--chunking", default="passage", choices=("passage", "subchunk"),
                    help="which index to search (see `meditations index --chunking`)")
+    p.add_argument("--filter", default="none", choices=("none", "no-book-1"),
+                   help="metadata filter: no-book-1 leaves out Book I, Marcus's list "
+                        "of debts to particular people")
     p.add_argument("--router", default=config.DEFAULT_ROUTER,
                    help=f"intent router (see route/); default {config.DEFAULT_ROUTER}")
     p.add_argument("--llm", default=None,
@@ -397,6 +400,7 @@ def cmd_query(args: argparse.Namespace) -> None:
         llm=llm_name,
         router=args.router,
         chunking=args.chunking,
+        filter=args.filter,
         k=args.k,
     )
     if cfg.router in LLM_ROUTERS:

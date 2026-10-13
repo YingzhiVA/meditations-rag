@@ -121,7 +121,7 @@ src/meditations_rag/
   llm/claude.py          Claude Sonnet — the eval comparator
   cli.py                 `meditations` entry point
 eval/                    golden set + router set + eval harness
-bench/ann_scaling.py     when does ANN start to pay? (exact search stays)
+bench/ann_scaling.py     when does ANN start to pay? (stub; moved to Phase 7)
 tests/                   parser, index/embedder and router invariants
 data/                    (gitignored) raw text, passages, indexes
 ```

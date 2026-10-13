@@ -1380,16 +1380,6 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       default should exclude Book I anyway (no measured cost, one fewer
       wrong-reason passage in 73 queries) is a Phase 5 call, made with the
       rest of the winning configuration; the eval baseline stays unfiltered.
-- [ ] **More embedders** — two rows, one controlled variable each:
-      - `BAAI/bge-small-en-v1.5` (33M, 384-dim, same family, same query
-        prefix, one constructor argument). Isolates encoder *size*: does a 3x
-        smaller model lose anything at 487 passages?
-      - `andreasmartin/apertus-v1.1-swiss-embed-0.4b-bidir` (439M, 1024-dim,
-        1024-token, matryoshka to 256, Apache 2.0). Changes *family and
-        training domain*, and keeps the Apertus thread running through the
-        retrieval half. See the note below on how to read its result.
-      - `embed/voyage.py` stays optional — a hosted comparator if the local
-        rows turn out to be too close together to be interesting.
 - [ ] **Hybrid retrieval**: BM25 alongside dense, RRF fusion — helps queries
       with lexical anchors ("death", "anger", "fame"). **This is where the
       vector store stops being a numpy array**: `sqlite-vec` (single file, no
@@ -1399,9 +1389,19 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       the Book I metadata filter above a `WHERE` clause and the sub-chunk ->
       parent dedup a join. Numpy stays the default path; the DB is an eval row
       that has to earn the dependency, not a replacement.
+      **Scoped down for the 2026-10-16 delivery:** BM25 from SQLite's FTS5
+      in the standard library (no new dependency), dense search stays numpy,
+      and the lexical list joins the existing RRF fusion. The single
+      `sqlite-vec` store moves to Phase 7: it changes the plumbing, not the
+      numbers.
+
 - [ ] **Rerank** (`retrieve/rerank.py`): over-retrieve ~20, rerank to top 5.
       Cross-encoder (local, free) first; LLM listwise rerank as a comparison.
+      **Scoped down for the delivery:** cross-encoder only; the LLM
+      listwise comparison moves to Phase 7.
 - [ ] **"No good match" handling**: score threshold or LLM relevance check.
+      **Scoped down for the delivery:** the threshold only, set from
+      evidence once rerank has landed.
       Post-retrieval rejection — distinct from the router; see `route/base.py`.
       Set the threshold from evidence and keep it conservative: a low cosine
       score means the passage shares little vocabulary with the query, not
@@ -1437,39 +1437,14 @@ budgeted. Three API facts that shape the implementation:
   a few hundred tokens, below the minimum cacheable prefix, so it would
   silently never cache.
 
-**How to read the Apertus embedder row.** There is no official Swiss AI
-Initiative embedding model; the `andreasmartin/*-swiss-embed-*` family is one
-author's independent bidirectional + LoRA adaptation of Apertus, explicitly
-not an official release, with no MTEB/MMTEB submission and self-described
-"internal development diagnostics" on its card. Its training data is Swiss
-administrative and encyclopedic text (Wikipedia, `VotingBooklets-v1`,
-`ZurichNLP/SwissGov-RSD`), and this corpus is 1902 English literary prose — so
-**expect it to lose to bge-base, and treat that as the finding**: what the
-fully-open Swiss stack costs in recall on English literary retrieval, at what
-latency. Two things to state alongside the number, or the row misleads: it is
-~4x bge-base's parameter count (so a loss is worse than it looks, and a win is
-not like-for-like), and its 1024-token window versus bge's 512 means the
-parent-child sub-chunking row behaves differently per embedder.
-
-The 4.9B variant (`apertus-v1.5-swiss-embed-4.9b-bidir`) is deliberately *not*
-used: ~10 GB at fp16 does not fit an 8 GB 3070, so it would run on CPU and
-corrupt exactly the p50/p95 and $/query columns Phase 3 exists to produce.
-
 **Done when:** the matrix shows a clear best configuration and the README can
 tell the story: baseline X% recall@5 → best pipeline Y%, at Z ms and $W/query.
 
 ## Phase 5 — Benchmark, polish, web UI & writeup (~3–4 days)
 
-- [ ] `bench/ann_scaling.py`: **at what corpus size does ANN start to pay?**
-      At 487 vectors HNSW cannot win — exact cosine is one matmul, and
-      approximate search would be both slower and less accurate. So measure the
-      crossover instead: synthesize 10K/100K/1M vectors, plot exact-vs-HNSW
-      latency, HNSW recall *against exact search as ground truth*, build time,
-      memory, and the `ef_search` tradeoff curve. Exact search stays in
-      production; this explains why, with numbers, and says what would change
-      the answer.
 - [ ] README results section: the matrix, the router table, 2–3 worked examples
-      (query → baseline vs tuned pipeline), cost notes, the ANN crossover.
+      (query → baseline vs tuned pipeline), cost notes. (The ANN crossover
+      moved to Phase 7.)
 - [ ] `meditations` UX polish: pleasant passage rendering, `--all` paging,
       config defaults set to the eval winner.
 - [ ] Repo hygiene: license note (Gutenberg text is public domain; state the
@@ -1532,8 +1507,7 @@ user; the LLM only routes and rewrites queries. So an injected query can at
 worst misroute itself, and for English the floor still runs beneath the
 router. Say this in the README rather than leaving it for someone to probe.
 
-**Done when:** the README results section tells the X% → Y% story with the
-ANN crossover; the Space is public and serves the eval-winner config; a query
+**Done when:** the README results section tells the X% → Y% story; the Space is public and serves the eval-winner config; a query
 through the web UI returns the same `QueryResult` as the CLI for the same
 config; and the spend cap and the outage path have both been triggered on
 purpose and seen to degrade as specified.
@@ -1578,7 +1552,7 @@ from Phase 4.
       Telefonseelsorge, AT 142).
 - [ ] **Embedder row**: translate → `bge-base` against German embedded
       directly by a multilingual encoder (`bge-m3`, or the Apertus
-      swiss-embed from Phase 4). Phase 2's reason against a multilingual
+      swiss-embed from Phase 7's embedder rows). Phase 2's reason against a multilingual
       encoder ("a capability nothing here uses") gets tested against a
       number.
 - [ ] Add `"de"` to `config.SUPPORTED_LANGUAGES`, in the commit that meets the
@@ -1610,14 +1584,65 @@ That is the scaling argument against keyword lists, stated as work.
   manager?" into a standalone query is the task rewriting was invented for; in
   v1 it only gets to do half its job.
 
+**Moved here from Phases 4 and 5 (2026-10-13).** The project ships as a
+hackathon artifact on 2026-10-16, polished and with the web UI, so work that
+does not change what ships was cut from v1: none of it touches the shipped
+pipeline's quality, which the remaining Phase 4 items (hybrid retrieval,
+rerank, no-match handling, each scoped down) still can. Kept as written, so
+none of it needs re-planning:
+
+- [ ] **More embedders** — two rows, one controlled variable each:
+      - `BAAI/bge-small-en-v1.5` (33M, 384-dim, same family, same query
+        prefix, one constructor argument). Isolates encoder *size*: does a 3x
+        smaller model lose anything at 487 passages?
+      - `andreasmartin/apertus-v1.1-swiss-embed-0.4b-bidir` (439M, 1024-dim,
+        1024-token, matryoshka to 256, Apache 2.0). Changes *family and
+        training domain*, and keeps the Apertus thread running through the
+        retrieval half. See the note below on how to read its result.
+      - `embed/voyage.py` stays optional — a hosted comparator if the local
+        rows turn out to be too close together to be interesting.
+
+  **How to read the Apertus embedder row.** There is no official Swiss AI
+  Initiative embedding model; the `andreasmartin/*-swiss-embed-*` family is one
+  author's independent bidirectional + LoRA adaptation of Apertus, explicitly
+  not an official release, with no MTEB/MMTEB submission and self-described
+  "internal development diagnostics" on its card. Its training data is Swiss
+  administrative and encyclopedic text (Wikipedia, `VotingBooklets-v1`,
+  `ZurichNLP/SwissGov-RSD`), and this corpus is 1902 English literary prose — so
+  **expect it to lose to bge-base, and treat that as the finding**: what the
+  fully-open Swiss stack costs in recall on English literary retrieval, at what
+  latency. Two things to state alongside the number, or the row misleads: it is
+  ~4x bge-base's parameter count (so a loss is worse than it looks, and a win is
+  not like-for-like), and its 1024-token window versus bge's 512 means the
+  parent-child sub-chunking row behaves differently per embedder.
+
+  The 4.9B variant (`apertus-v1.5-swiss-embed-4.9b-bidir`) is deliberately *not*
+  used: ~10 GB at fp16 does not fit an 8 GB 3070, so it would run on CPU and
+  corrupt exactly the p50/p95 and $/query columns Phase 3 exists to produce.
+
+- [ ] **One SQLite store** (`sqlite-vec` for vectors beside FTS5), from the
+      Phase 4 hybrid item: one file for both halves, the Book I filter as a
+      `WHERE` clause, sub-chunk dedup as a join. Pre-v1, so pin it.
+- [ ] **LLM listwise rerank** as a comparator to the cross-encoder: the
+      problem and the ~20 candidates in one prompt, ids back in order via
+      structured output, Apertus against Sonnet.
+- [ ] `bench/ann_scaling.py`: **at what corpus size does ANN start to pay?**
+      At 487 vectors HNSW cannot win — exact cosine is one matmul, and
+      approximate search would be both slower and less accurate. So measure the
+      crossover instead: synthesize 10K/100K/1M vectors, plot exact-vs-HNSW
+      latency, HNSW recall *against exact search as ground truth*, build time,
+      memory, and the `ef_search` tradeoff curve. Exact search stays in
+      production; this explains why, with numbers, and says what would change
+      the answer.
+
 ---
 
 ## Cost & infra summary
 
 | Item | Estimate |
 |---|---|
-| Infra | None through Phase 3 — everything local (files + numpy). From Phase 4, `sqlite-vec`: still a single file, still no server. |
-| Embeddings | Local: free (`bge-base` Phase 2; `bge-small` + Apertus-0.4B Phase 4). Voyage, if used: pennies one-time for 487 passages. |
+| Infra | None — everything local (files + numpy; BM25 from the standard library's SQLite FTS5). `sqlite-vec` moved to Phase 7. |
+| Embeddings | Local: free (`bge-base` Phase 2; `bge-small` + Apertus-0.4B moved to Phase 7). Voyage, if used: pennies one-time for 487 passages. |
 | LLM — default path | Apertus v1.5 70B on CSCS (`config.DEFAULT_LLM = "apertus-v15-70b"`; free to this project through Hack Apertus, but shared capacity). Router calls are tiny; HyDE/multi-query are ~1 short completion per query. Requires `CSCS_INFERENCE_API_KEY`. The 2509 rows run via HF Inference (`HF_TOKEN`; the 70B on featherless-ai). |
 | LLM — comparator | `claude-sonnet-5` ($2/$10 per MTok), scoped to comparator eval runs, not every query. A full golden-set pass is cents. |
 | Telemetry | Phoenix runs locally. Free. |
@@ -1650,8 +1675,8 @@ side — the comparator column is the smaller half of the bill.
    the supported inference path is open.
    **Apertus v1.5 is served by publicAI's own gateway**
    (`llm/gateway.py`, then `llm/publicai.py`; `PUBLICAI_API_KEY`), not through HF: the
-   non-thinking `swiss-ai/apertus-v1.5-8b` and `-70b`, at $0.10 / $0.20 and
-   $0.82 / $2.92 per MTok. Smoke-tested 2026-10-07: `response_format`
+   non-thinking `swiss-ai/apertus-v1.5-8b` and `-70b`, at \$0.10 / \$0.20 and
+   \$0.82 / \$2.92 per MTok. Smoke-tested 2026-10-07: `response_format`
    honoured, `seed` accepted, 11-12 output tokens (no thinking), the 70B at
    0.5-1.2 s. Registered as new names, so `apertus` and `apertus-8b` keep
    meaning the 2509 models every recorded row used. From v1.5 on the bare

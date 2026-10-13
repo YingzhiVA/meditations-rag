@@ -52,7 +52,8 @@ SPAN TREE
       │                          user's own words)
       ├─ fuse                   (CHAIN — RRF; only when there is more than
       │                          one ranked list)
-      ├─ rerank                 (RERANKER — not built yet; Phase 4)
+      ├─ rerank                 (RERANKER — only with cfg.reranker: the
+      │                          candidates in, the reranked top k out)
       └─ safety.suppress        (GUARDRAIL — only when a flag fired)
            └─ llm.generate      (LLM — one per passage and test, LLM suppressor only)
 

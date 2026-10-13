@@ -35,7 +35,10 @@ adds the language guard, fusion, rerank, and the LLM-backed routers/strategies):
    score-scale reconciliation needed — which is also why RRF is the natural
    place to merge BM25 (Phase 4 hybrid): just add the lexical ranked list
    as one more list in the fusion.
-5. rerank (or identity), cut to k. (Phase 4; identity here.)
+5. rerank (Phase 4, retrieve/rerank.py): with cfg.reranker set, steps 3-4
+   collect config.OVERRETRIEVE_K candidates instead of k, and a
+   cross-encoder scores each against the problem AS TYPED and cuts to k.
+   Identity by default.
 6. retrieve/safety.py: with a safety flag set, withhold the flag's reviewed
    passages from the cut list. No backfill. Gated on the flag, so it is a
    no-op for the common case. cfg.suppressor names an LLM instead to run
@@ -149,6 +152,9 @@ class RetrievedPassage:
     # On a sub-chunked index, the child that matched ('11.18#11'); None when
     # the passage was embedded whole.
     chunk: str | None = None
+    # The cross-encoder's score when a reranker ordered the list (a logit,
+    # not a cosine; see retrieve/rerank.py); None without one.
+    rerank_score: float | None = None
 
 
 @dataclass(frozen=True)
@@ -192,6 +198,7 @@ def run_query(
     *,
     router: Router | None = None,
     strategy: QueryStrategy | None = None,
+    reranker=None,
     embedder: Embedder | None = None,
     index: LoadedIndex | None = None,
     passages: list[Passage] | None = None,
@@ -208,7 +215,8 @@ def run_query(
     with telemetry.span("query", "CHAIN", input=problem) as root:
         telemetry.set_metadata(root, {**cfg.as_dict(), "config": cfg.label,
                                       "eval_run_id": eval_run_id}, tags=[cfg.label])
-        result = _run_query(problem, cfg, router, strategy, embedder, index, passages)
+        result = _run_query(problem, cfg, router, strategy, reranker, embedder, index,
+                            passages)
         telemetry.set_output(root, {
             "intent": result.intent.value if result.intent else None,
             "language": result.language,
@@ -262,7 +270,8 @@ def _lexical_list(problem: str, index: LoadedIndex, passages: list[Passage],
     return [SearchHit(pid, best[pid]) for pid in ids]
 
 
-def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> QueryResult:
+def _run_query(problem, cfg, router, strategy, reranker, embedder, index,
+               passages) -> QueryResult:
     from meditations_rag.route import get_router
     from meditations_rag.route.keyword import safety_flags
     from meditations_rag.route.language import check_language
@@ -305,8 +314,13 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
             strategy_fallback = f"{type(exc).__name__}: {exc}"[:300]
             queries = RawQuery().expand(problem)
         telemetry.set_output(sp, {"queries": queries, "fallback": strategy_fallback})
-    if cfg.reranker != "none":
-        raise NotImplementedError("rerankers land in Phase 4; Phase 2 knows only 'none'")
+    if reranker is None and cfg.reranker != "none":
+        from meditations_rag.retrieve.rerank import get_reranker
+
+        reranker = get_reranker(cfg.reranker)
+    # With a reranker, retrieval hands it OVERRETRIEVE_K candidates and the
+    # reranker cuts to k; without one, retrieval cuts to k itself.
+    n_out = max(cfg.k, config.OVERRETRIEVE_K) if reranker is not None else cfg.k
 
     # Only the CLI reaches this span: the harness passes all three in, so its
     # traces carry per-query cost and never a model load.
@@ -340,7 +354,7 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
         raise ValueError(f"unknown retriever {cfg.retriever!r}; known: dense, hybrid")
     hybrid = cfg.retriever == "hybrid"
     fused = len(queries) > 1 or hybrid
-    depth = (max(cfg.k, config.RRF_DEPTH) if fused else cfg.k) + extra
+    depth = (max(n_out, config.RRF_DEPTH) if fused else n_out) + extra
     matched: dict[str, tuple[float, str]] = {}   # parent -> (best cosine, child)
     lists: list[list[SearchHit]] = []
     first_vector = None
@@ -370,13 +384,25 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
             telemetry.set_output(sp, [h.passage_id for h in lexical[:cfg.k]])
         lists.append(lexical)
     if len(lists) == 1:
-        hits: list[SearchHit] = lists[0][:cfg.k]
+        hits: list[SearchHit] = lists[0][:n_out]
     else:
         from meditations_rag.retrieve.fusion import rrf
 
         with telemetry.span("fuse", "CHAIN", **{"meditations.lists": len(lists)}) as sp:
-            hits = rrf(lists, cfg.k)
+            hits = rrf(lists, n_out)
             telemetry.set_output(sp, [h.passage_id for h in hits])
+
+    # Step 5: rerank against the problem as typed, never the strategy's text.
+    rerank_scores: dict[str, float] = {}
+    if reranker is not None:
+        with telemetry.span("rerank", "RERANKER", input=problem,
+                            **{"meditations.reranker": reranker.name,
+                               "meditations.candidates": len(hits)}) as sp:
+            ranked = reranker.rerank(problem, hits, {pid: by_id[pid].text for pid in
+                                                     (h.passage_id for h in hits)}, cfg.k)
+            hits = [h for h, _ in ranked]
+            rerank_scores = {h.passage_id: sc for h, sc in ranked}
+            telemetry.set_output(sp, [(h.passage_id, round(sc, 3)) for h, sc in ranked])
 
     # Gated on the flag like apply_suppression itself: no flag, no span.
     suppression_fallback = None
@@ -401,7 +427,8 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
     shown = [
         RetrievedPassage(passage=by_id[h.passage_id], score=h.score, rank=r,
                          chunk=matched[h.passage_id][1] if h.passage_id in matched
-                         and "#" in matched[h.passage_id][1] else None)
+                         and "#" in matched[h.passage_id][1] else None,
+                         rerank_score=rerank_scores.get(h.passage_id))
         for r, h in enumerate(kept, start=1)
     ]
     no_strong_match = bool(hits) and hits[0].score < config.MIN_SCORE_THRESHOLD

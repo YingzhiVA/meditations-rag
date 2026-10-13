@@ -20,7 +20,7 @@ Three subcommands + a default query mode (argparse; stdlib is enough):
   meditations "problem statement..." [--k N] [--all] [--strategy NAME]
                                      [--embedder NAME] [--router NAME]
                                      [--llm NAME] [--chunking NAME] [--filter NAME]
-                                     [--retriever dense|hybrid]
+                                     [--retriever dense|hybrid] [--reranker NAME]
       retrieve.pipeline.run_query with a RetrievalConfig assembled from
       flags + config defaults.
 
@@ -159,6 +159,8 @@ def _add_query_parser(sub: argparse._SubParsersAction, config) -> argparse.Argum
                    help=f"embedder name (see embed/); default {config.DEFAULT_EMBEDDER}")
     p.add_argument("--chunking", default="passage", choices=("passage", "subchunk"),
                    help="which index to search (see `meditations index --chunking`)")
+    p.add_argument("--reranker", default="none", choices=("none", "ce-minilm", "ce-bge"),
+                   help="cross-encoder rerank of 20 candidates down to --k (Phase 4)")
     p.add_argument("--retriever", default="dense", choices=("dense", "hybrid"),
                    help="dense only (default), or hybrid: BM25 over your words fused "
                         "with the dense ranking (Phase 4)")
@@ -406,6 +408,7 @@ def cmd_query(args: argparse.Namespace) -> None:
         chunking=args.chunking,
         filter=args.filter,
         retriever=args.retriever,
+        reranker=args.reranker,
         k=args.k,
     )
     if cfg.router in LLM_ROUTERS:

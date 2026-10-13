@@ -483,7 +483,8 @@ short corpus.
       one list having been struck from the other. Applied after rerank and
       after Phase 4's dedup-to-parent, since 11.18 is 704 words and therefore
       in the sub-chunking set. Phase 2 suppresses whole passages; Phase 4
-      refines 11.18 to precept level.
+      refines 11.18 to precept level. (Not done: see the sub-chunking item.
+      Whole passages are shown, so suppression stays whole-passage.)
       **Gated on the pre-retrieval flag** — if no flag fired, skip entirely:
       zero cost, zero latency, no behaviour change for the queries where none
       of this applies. **No backfill** when passages are suppressed: pulling
@@ -1119,9 +1120,53 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       numbers argue for keeping raw's ranking and *adding* the
       continuation's (see the note under MultiQuery), not for a shorter
       prompt tuned on these results.
-- [ ] **HyDE** (`HyDEQuery`): 1→pseudo-document. Write a short passage in the
+- [x] **HyDE** (`HyDEQuery`): 1→pseudo-document. Write a short passage in the
       corpus's register and embed that instead of the query.
-- [ ] **Multi-query expansion** (`MultiQuery`): 1→N Stoic themes, fused with
+
+      **Result** (`eval/results/phase-4-hyde.md`, prompt `43e6eb9c68`,
+      zero-shot; register and length taken from the corpus, not the set:
+      Chrystal says "you", 785 times against 14 "thou", and the median
+      passage is 56 words. No edit was needed after the smoke test. The
+      prompt restates rule 4 and the death-counsel rule, so a
+      pseudo-passage never pulls what the suppression lists withhold):
+
+      | config | R@1 | R@3 | R@5 | MRR | canary R@5 | content R@5 | vs raw (hit@5) | p50 | $/q |
+      |---|---|---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 | — | 20 ms | — |
+      | `hyde@apertus-v15-70b` | 25% | 30% | 35% | 0.287 | 5/6 | 0/2 | fixed 2, broke 13 | 1.4 s | — |
+      | `hyde@apertus-v15` (8B) | 10% | 35% | 50% | 0.243 | 4/6 | 0/2 | fixed 1, broke 10 | 0.5 s | — |
+      | `hyde@claude` (Sonnet 5) | 20% | 35% | 45% | 0.297 | 6/6 | 1/2 | fixed 1, broke 8 | 2.8 s | $0.0019 |
+
+      **HyDE loses to raw too, as the rewrite results predicted, but it
+      fails differently: it is all or nothing.** Where it hits, it often
+      hits at rank 1. The 40th birthday, "how other people view me" and
+      doom-scrolling all go from raw's rank 4 to rank 1 on at least two of
+      the three LLMs, and every HyDE row finds "not a good mum", which raw
+      misses. Where it misses, the pseudo-passage has landed on the
+      doctrine's most general statements. 9.31 ("Let nothing due to a
+      cause outside yourself disturb your calm…") is in the 70B's top 5
+      for 15 of 28 queries and 5.3 for 13; the 70B's lists cover 52
+      distinct passages, against raw's 91. The pseudo-passages keep
+      Marcus's register and lose the situation, which is the rewrite
+      attractor at document length.
+
+      **The headline comparison** (Apertus-70B against Sonnet 5, below):
+      Sonnet leads by two hard queries at R@5 (45% against 35%), with
+      MRR almost level (0.297 against 0.287) and every canary held. That
+      gap is too small on 20 queries to call style imitation the place
+      where the open model falls behind. And the 8B outscores both at R@5
+      (50%), as it did on introspect. The finding is not Apertus against
+      Claude; it is that no LLM makes a replacing transformation beat raw
+      on this corpus.
+
+      **What fusion could gain, at most.** Taking every hard query that
+      raw *or* one strategy row finds in the top 5, the best rows reach
+      17 of 20 (raw: 15), and all nine rows together 18. Two queries are
+      found by no configuration (the final interview; burnout from
+      deadlines). This is an oracle ceiling, not a prediction: RRF can
+      also push a raw hit out of the top 5. It is the bar the fused
+      variants under MultiQuery have to approach.
+- [x] **Multi-query expansion** (`MultiQuery`): 1→N Stoic themes, fused with
       Reciprocal Rank Fusion.
       **Once RRF lands, refactor the query-rewriting strategies onto it.**
       `RewriteQuery` and `IntrospectQuery` replace or swamp the user's
@@ -1132,7 +1177,81 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       raw's hits are kept and the strategy can only add. Each refactored
       strategy is a new row under a new name, not an edit of the recorded
       ones.
-- [ ] **Parent-child sub-chunking** for the 14 sections over 300 words
+      **Done with this item** (`WithRaw`, the `raw+X` rows below). "Can
+      only add" turned out to be wrong: a fused list can push a raw hit out
+      of the top 5, and every `raw+` row does so at least twice.
+
+      **RRF** (`retrieve/fusion.py`): standard, unweighted, C = 60, each
+      list searched 50 deep before fusing; neither constant tuned. Passages
+      are ordered by RRF score and carry the best cosine any list gave them,
+      so `--scores` and the no-match threshold keep their meaning. A
+      one-string strategy still takes the Phase 2 path unchanged (raw
+      reproduces exactly).
+
+      **MultiQuery result** (`eval/results/phase-4-multi.md`, prompt
+      `6c2bd80138`, three "On …" themes via `complete_json`; unlike the
+      rewrite prompt it lists no subjects, since that list is what collapsed
+      the rewrites):
+
+      | config | R@1 | R@5 | MRR | canary R@5 | content R@5 | vs raw (hit@5) | $/q |
+      |---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 75% | 0.477 | 6/6 | 2/2 | — | — |
+      | `multi@apertus-v15-70b` | 5% | 20% | 0.113 | 2/6 | 0/2 | — | — |
+      | `multi@apertus-v15` (8B) | 10% | 30% | 0.164 | 3/6 | 0/2 | — | — |
+      | `multi@claude` (Sonnet 5) | 5% | 25% | 0.114 | 3/6 | 0/2 | fixed 1, broke 16 | $0.0017 |
+      | `raw+multi@apertus-v15-70b` | 5% | 30% | 0.118 | 3/6 | 0/2 | — | — |
+      | `raw+multi@apertus-v15` (8B) | 15% | 35% | 0.227 | 3/6 | 0/2 | — | — |
+      | `raw+multi@claude` | 15% | 60% | 0.299 | 6/6 | 0/2 | fixed 1, broke 6 | $0.0017 |
+
+      **The weakest strategy, on every LLM, with or without raw.** Three
+      abstract themes are the rewrite failure three times over. They lose
+      the situation, and often the one word a canary turns on: the 70B
+      turned "How to deal with anger" into "On the fleeting nature of
+      provocation" and two more headings without the word, and even fused
+      with the message it found neither labelled anger passage. The top-5
+      lists collapse onto the same doctrinal summaries: 11.16 is the most
+      shown passage for all three LLMs (tied for Sonnet), in the 70B's lists
+      for 13 queries. In unweighted RRF the message is one list of four, so three
+      abstract lists outvote it; only Sonnet's `raw+multi` keeps every
+      canary. Structured output held throughout: 28 of 28 calls schema-valid
+      on each LLM (`response_format` on CSCS, structured on Claude), no
+      fallbacks, which is the first evidence for Risk 2 on a generation
+      schema rather than the router's.
+
+      **The fused rows** (`eval/results/phase-4-fused.md`; every completion
+      served from the earlier rows' cache, so the rewritten text is
+      identical and only the fusion differs):
+
+      | config | R@1 | R@3 | R@5 | MRR | canary R@5 | content R@5 | vs raw (hit@5) |
+      |---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 | — |
+      | `raw+rewrite@apertus-v15-70b` | 10% | 55% | 60% | 0.302 | 6/6 | 1/2 | fixed 0, broke 4 |
+      | `raw+rewrite@apertus-v15` (8B) | 5% | 30% | 35% | 0.171 | 6/6 | 1/2 | fixed 0, broke 9 |
+      | `raw+rewrite@claude` | 25% | 50% | 60% | 0.400 | 6/6 | 2/2 | fixed 0, broke 3 |
+      | `raw+introspect@apertus-v15-70b` | 35% | 45% | 65% | 0.434 | 6/6 | 1/2 | fixed 2, broke 5 |
+      | `raw+introspect@apertus-v15` (8B) | 35% | 50% | 60% | 0.442 | 6/6 | 1/2 | fixed 1, broke 5 |
+      | `raw+introspect@claude` | 30% | 60% | 65% | 0.443 | 4/6 | 0/2 | fixed 1, broke 7 |
+      | `raw+hyde@apertus-v15-70b` | 15% | 75% | 80% | 0.435 | 6/6 | 1/2 | fixed 3, broke 3 |
+      | `raw+hyde@apertus-v15` (8B) | 30% | 55% | 65% | 0.439 | 6/6 | 1/2 | fixed 1, broke 4 |
+      | `raw+hyde@claude` | **50%** | 60% | 75% | **0.583** | 6/6 | 2/2 | fixed 2, broke 2 |
+
+      **Fusing recovers most of each strategy's loss, and only HyDE comes
+      out level with raw or ahead.** Every `raw+` row but one beats its
+      replacing version at R@5, and canaries mostly return; the exception
+      is the 8B's introspect, which fusing takes from 70% down to 60%.
+      Rewrite still only subtracts (it fixes nothing on any LLM).
+      `raw+hyde@claude` matches raw at R@5 (fixing "I said something cruel"
+      and "not a good mum", losing two) and moves five hard queries up to
+      rank 1 (40th birthday, last day at work, patience with a child, how
+      others judge me, doom-scrolling): R@1 50% against 35%, MRR 0.583
+      against 0.477. `raw+hyde@apertus-v15-70b` reaches 16 of 20 hard
+      queries at R@5, one more than raw and one short of the oracle
+      ceiling, but only 15% at R@1. **These are candidates, not findings
+      yet.** The R@5 difference is one query, and the R@1 gain is three;
+      rank 1 is the stable rank (eval/README.md), but 20 queries cannot
+      separate three queries from noise. The fresh-query check before
+      Phase 5 (Risk 5) is where `raw+hyde` either holds or does not.
+- [x] **Parent-child sub-chunking** for the 14 sections over 300 words
       (longest: 1.16 at 754). Embed sub-chunks, dedupe hits back to the parent
       § so citations stay whole. Its own matrix row — an assumption otherwise.
       **Two distinct motivations, which may show up differently in the
@@ -1150,6 +1269,66 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       himself, and whole-passage suppression deletes it. This is the only
       passage where sub-passage handling is honest; everywhere else the text
       supplies no seams and the rule above applies.
+      **Precept-level suppression was not built (decided 2026-10-12).**
+      Results are shown as whole passages ("No cherry-picking"), so showing
+      11.18 to an ABUSE reader because the tenth precept matched would show
+      precepts 4, 5, 7 and 9 with it. Suppression stays whole-passage, and
+      a hit on any 11.18 chunk is withheld exactly as the passage is (a test
+      pins it). Keeping the tenth needs one of two spec changes: show a
+      single precept of this one passage (cutting, for one id), or accept
+      the other nine for that reader. Open.
+
+      **Built** (`index/chunking.py`, `meditations index --chunking
+      subchunk`, row label `bge-base-subchunk`). Measured first: only 4 of
+      the 14 are truncated in earnest (1.16, 11.18, 1.17, 4.3: 647-973
+      tokens), four more lose 2-15 tokens, and six are not truncated at all.
+      11.18 splits on its own ordinals into 11 chunks (intro joined to the
+      first; it is the only passage of 487 with such seams, pinned by a
+      test). The rest split at sentence ends into the fewest balanced chunks
+      of at most 150 words (untuned; about a long ordinary passage), since
+      only 11.18 and 9.1 have paragraphs at all. 529 rows; largest chunk 201
+      tokens. Each list is searched deep enough to keep k distinct parents,
+      deduped to the parent before fusion and suppression, and every shown
+      passage records the child that matched.
+
+      **Result** (`eval/results/phase-4-subchunk.md`, raw strategy):
+
+      | index | R@1 | R@3 | R@5 | MRR | canary R@5 | content R@5 |
+      |---|---|---|---|---|---|---|
+      | passage | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 |
+      | subchunk | 35% | 50% | 70% | 0.456 | 6/6 | 2/2 |
+
+      **Sub-chunking does not help, and it makes the endurance passages
+      far more visible. The passage index stays the default.** Long passages
+      go from 2 appearances in the 28 queries' top 5 to 23, and not one of
+      those 23 is a labelled passage. The four labelled long passages (4.3,
+      9.42, 3.4, 10.33) are not shown under either index, so "I said
+      something cruel" (10.33) stays a miss. One labelled hit is lost:
+      "losing sleep…" drops 12.8 from rank 5 for 3.4's first chunk.
+      **Both motivations fire, and in the same direction.** Of the 23
+      appearances, 10 came through a chunk lying mostly past the 510-token
+      cut (truncation: content the whole-passage vector never saw) and 13
+      through one inside it (granularity). Either way, a long multi-topic
+      passage has some chunk that matches almost anything: 4.3 now appears
+      for 7 queries, 11.18 for 5, 3.4 for 4. The mechanism is multiplicity
+      as much as restored text: a passage is a hit if any of its chunks
+      ranks, so 4.3 enters the ranking four times and 11.18 eleven times,
+      against once for every other passage.
+      **Pooling the chunk vectors into one per passage was considered and
+      not built.** It would remove the multiplicity while keeping every
+      token, but most long passages deal with several themes, and an
+      average of their chunks would blur exactly the distinctions
+      sub-chunking exists to keep.
+      **The safety side effect is the larger finding.** 4.3 and 11.18 are
+      both on the rule-4 list, and the lists apply only to flagged readers.
+      Passages from that list reach unflagged readers 14 times on the
+      sub-chunked index against 3 on the passage index, including "I think
+      I'm in a toxic relationship, but I don't have the courage to break
+      free", which raises no flag and now gets both 11.18 and 4.3. That
+      reader is the case rule 4 was written for, and their safety then rests
+      entirely on the router flagging them. (Death-counsel passages reach
+      unflagged readers 9-10 times under either index; that is raw's
+      behaviour, recorded here because the count surfaced it.)
 - [ ] **Book I as a metadata filter**: Book I is a list of debts to particular
       people ("From Rusticus I learned…"), not counsel, and will match queries
       like "how do I become more patient" for the wrong reason. Cheap
@@ -1187,6 +1366,10 @@ HyDE. HyDE is style imitation rather than classification, so it's where an open
 model is most challenged. If Apertus holds on routing and rewriting but trails
 on HyDE, that's a *finding* about where open models are competitive — worth
 writing up, not a reason to have picked a different default.
+**As measured (v1.5, see the HyDE result):** Sonnet leads by two of 20 hard
+queries, within noise, and the v1.5 8B beats both. All three lose to raw, so
+the comparison that matters turned out to be transformation against raw, not
+Apertus against Claude.
 
 **The Claude comparator column** is `claude-haiku-4-5` for routing ($1/$5 per
 MTok) and `claude-sonnet-5` for rewriting and HyDE ($2/$10 per MTok). A full

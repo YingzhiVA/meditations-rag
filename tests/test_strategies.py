@@ -15,13 +15,26 @@ pinned is the plumbing a quality number silently depends on:
 3. A query the router short-circuits never reaches the strategy's LLM. A
    self-harm disclosure retrieves nothing, so there is no reason to send it
    to a second provider, and chitchat is not worth a round trip.
+
+Fusion (Phase 4, with MultiQuery) adds three:
+
+4. RRF arithmetic, worked by hand, including the carried score: ordered by
+   RRF, scored by the best cosine. A swapped sign or an RRF score in the
+   cosine slot would shift every fused row silently.
+5. raw+X embeds the message and X's output as SEPARATE queries and fuses
+   them; if it concatenated them it would be the one-query strategy again.
+6. MultiQuery keeps at most three themes, so a model that over-delivers
+   does not get more votes in the fusion than another.
 """
 
 import pytest
 
 from meditations_rag.llm.base import LLMError
 from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
-from meditations_rag.retrieve.strategies import IntrospectQuery, RewriteQuery
+from meditations_rag.index.vector_index import SearchHit
+from meditations_rag.retrieve.fusion import rrf
+from meditations_rag.retrieve.strategies import (HyDEQuery, IntrospectQuery, MultiQuery,
+                                                 RewriteQuery, get_strategy)
 from meditations_rag.route.keyword import KeywordRouter
 
 PROBLEM = "My manager praised everyone on the team except me and I keep replaying it"
@@ -86,6 +99,17 @@ def test_the_rewrite_is_what_gets_embedded():
     assert emb.seen == ["on being overlooked by others"]
 
 
+def test_hyde_embeds_the_pseudo_passage_not_the_problem():
+    emb = _RecordingEmbedder()
+    cfg = RetrievalConfig(embedder="bge-base", strategy="hyde", llm="fake",
+                          router="keyword", k=5)
+    with pytest.raises(_Embedded):
+        run_query(PROBLEM, cfg, router=KeywordRouter(),
+                  strategy=HyDEQuery(_FakeClient("Praise is a breath.\nLet it go by.")),
+                  embedder=emb, index=_NoIndex(), passages=[])
+    assert emb.seen == ["Praise is a breath. Let it go by."]
+
+
 def test_introspect_embeds_the_message_then_its_continuation():
     emb = _RecordingEmbedder()
     cfg = RetrievalConfig(embedder="bge-base", strategy="introspect", llm="fake",
@@ -135,3 +159,52 @@ def test_short_circuited_query_never_reaches_the_strategy_llm(problem):
     result = _run(problem, client, _RecordingEmbedder())
     assert client.calls == 0
     assert not result.retrieved
+
+
+def test_rrf_orders_by_rank_and_carries_the_best_cosine():
+    a = [SearchHit("1.1", 0.9), SearchHit("2.2", 0.8), SearchHit("3.3", 0.7)]
+    b = [SearchHit("3.3", 0.95), SearchHit("1.1", 0.6), SearchHit("4.4", 0.5)]
+    fused = rrf([a, b], k=3, c=60)
+    # 1.1: 1/61 + 1/62 = .03252; 3.3: 1/63 + 1/61 = .03226; 2.2: 1/62; 4.4: 1/63
+    assert [h.passage_id for h in fused] == ["1.1", "3.3", "2.2"]
+    assert [h.score for h in fused] == [0.9, 0.95, 0.8]
+
+
+def test_raw_plus_strategy_embeds_message_and_output_separately_and_fuses():
+    import numpy as np
+
+    from meditations_rag.corpus.store import Passage
+    from meditations_rag.index.vector_index import LoadedIndex
+
+    eye = np.eye(3, dtype=np.float32)
+    vectors = {PROBLEM: eye[0], "On being overlooked": eye[1]}
+
+    class _Embedder(_RecordingEmbedder):
+        dim = 3
+
+        def embed_query(self, query):
+            self.seen.append(query)
+            return vectors[query]
+
+    passages = [Passage(id=f"{i}.1", book=i, number=1, text="x") for i in (1, 2, 3)]
+    index = LoadedIndex(embedder="bge-base", ids=["1.1", "2.1", "3.1"], vectors=eye, meta={})
+    emb = _Embedder()
+    cfg = RetrievalConfig(embedder="bge-base", strategy="raw+rewrite", llm="fake",
+                          router="keyword", k=2)
+    result = run_query(PROBLEM, cfg, router=KeywordRouter(),
+                       strategy=get_strategy("raw+rewrite", _FakeClient("On being overlooked")),
+                       embedder=emb, index=index, passages=passages)
+    assert emb.seen == [PROBLEM, "On being overlooked"]
+    assert result.queries == [PROBLEM, "On being overlooked"]
+    # Each query's own top passage ties on RRF (1/61 + 1/63); best cosine 1.0
+    # for both, so the id breaks the tie, deterministically.
+    assert [rp.passage.id for rp in result.passages] == ["1.1", "2.1"]
+    assert [rp.score for rp in result.passages] == [1.0, 1.0]
+
+
+def test_multi_query_keeps_at_most_three_themes():
+    class _JSONClient(_FakeClient):
+        def complete_json(self, system, user, schema):
+            return {"themes": ["On a", " ", "On b", "On c", "On d", "On e"]}
+
+    assert MultiQuery(_JSONClient(None)).expand(PROBLEM) == ["On a", "On b", "On c"]

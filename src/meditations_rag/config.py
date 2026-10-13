@@ -70,6 +70,11 @@ EXPECTED_PER_BOOK_COUNTS = {
 # be silently truncated by a 512-token embedder. Passages over the threshold
 # are flagged is_long; Phase 4 evaluates parent-child sub-chunking for them.
 LONG_PASSAGE_WORDS = 300
+# Phase 4 sub-chunking (index/chunking.py): a long passage without the
+# author's own numbered seams splits at sentence ends into balanced chunks of
+# at most this many words, about a long ordinary passage (p75 is 103), so a
+# chunk competes with whole passages on equal terms. Untuned.
+SUBCHUNK_MAX_WORDS = 150
 
 # --- LLM (Phase 4: query transformation + routing; no synthesis in v1) -------
 # The LLM is a swappable seam (llm/base.py) and an eval axis, not a fixed
@@ -202,6 +207,12 @@ BGE_BASE_MODEL = "BAAI/bge-base-en-v1.5"
 DEFAULT_STRATEGY = "raw"     # baseline; eval winner becomes the default later
 DEFAULT_TOP_K = 5            # results shown by default
 OVERRETRIEVE_K = 20          # candidates fetched before rerank (Phase 4)
+# Reciprocal Rank Fusion (retrieve/fusion.py), for strategies that embed more
+# than one string. Both untuned on purpose: C is the standard constant, and
+# each list is searched this deep before fusing so a passage ranked low in
+# several lists can still rise.
+RRF_C = 60
+RRF_DEPTH = 50
 # Below this cosine score the CLI should say "no strong match" instead of
 # presenting the least-bad passage. Tune against the golden set in Phase 4.
 # This is POST-retrieval rejection; the router handles PRE-retrieval rejection.

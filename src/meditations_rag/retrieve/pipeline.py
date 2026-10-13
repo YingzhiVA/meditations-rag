@@ -28,7 +28,9 @@ adds the language guard, fusion, rerank, and the LLM-backed routers/strategies):
    the query, and the eval can see which rows were not the strategy's.
 2. embedder.embed_query(q) per string  -> query vectors
 3. vector_index.search(vec, k) per vector -> ranked lists
-4. If N > 1 (Phase 4): Reciprocal Rank Fusion. RRF score of passage p =
+4. If N > 1 (Phase 4, retrieve/fusion.py): Reciprocal Rank Fusion, each
+   list searched to config.RRF_DEPTH first. Ordered by RRF, scored by the
+   best cosine any list gave the passage. RRF score of passage p =
    sum over lists of 1 / (C + rank_p), C = 60 (standard). Rank-based, so no
    score-scale reconciliation needed — which is also why RRF is the natural
    place to merge BM25 (Phase 4 hybrid): just add the lexical ranked list
@@ -45,11 +47,14 @@ adds the language guard, fusion, rerank, and the LLM-backed routers/strategies):
    least-bad passage. This is POST-retrieval rejection: the query looked like
    a real problem, and the corpus simply had no good answer.
 
-Phase 4 note — parent-child chunking: when the sub-chunked index is in use,
-search returns sub-chunk ids. Dedupe them back to the parent § here (before
-step 6, since 11.18's suppression is by parent), keeping the best-scoring
-sub-chunk's score, so that citations and rendering always speak in whole
-passages regardless of what was embedded.
+Phase 4 — parent-child chunking (cfg.chunking == "subchunk",
+index/chunking.py): search returns child ids. Each list is searched deep
+enough to still hold k distinct parents, deduped back to the parent § before
+fusion and before step 6 (suppression is by parent, so a hit on any chunk of
+11.18 is withheld from an ABUSE reader exactly as the whole passage is), and
+keeps the best-scoring child's score. Citations and rendering always speak in
+whole passages; RetrievedPassage.chunk names the child that matched, for
+diagnostics.
 
 Telemetry (Phase 3): run_query opens the root CHAIN span and tags it with
 the full config (plus eval_run_id when the harness supplies one); every
@@ -85,6 +90,9 @@ class RetrievalConfig:
     llm: str | None = None
     router: str = config.DEFAULT_ROUTER
     reranker: str = "none"
+    # "passage" (one vector per §) or "subchunk" (the long passages split
+    # into children, deduped back to the parent at query time).
+    chunking: str = "passage"
     # "list": the reviewed lists in retrieve/safety.py, the shipped behaviour.
     # An LLM registry name runs retrieve/safety_llm.LLMSuppressor instead, as
     # a comparator row in the eval; the CLI never sets it.
@@ -96,8 +104,10 @@ class RetrievalConfig:
 
     @property
     def label(self) -> str:
-        """Row label for the matrix: 'bge-base/raw' or 'bge-base/hyde@apertus'."""
-        core = f"{self.embedder}/{self.strategy}"
+        """Row label for the matrix: 'bge-base/raw' or 'bge-base/hyde@apertus'
+        ('bge-base-subchunk/raw' on the sub-chunked index)."""
+        index = self.embedder if self.chunking == "passage" else f"{self.embedder}-{self.chunking}"
+        core = f"{index}/{self.strategy}"
         if self.llm:
             core += f"@{self.llm}"
         if self.reranker != "none":
@@ -112,6 +122,9 @@ class RetrievedPassage:
     passage: Passage
     score: float
     rank: int  # 1-based, in the shown list
+    # On a sub-chunked index, the child that matched ('11.18#11'); None when
+    # the passage was embedded whole.
+    chunk: str | None = None
 
 
 @dataclass(frozen=True)
@@ -186,6 +199,25 @@ def run_query(
         return result
 
 
+def _dedupe_to_parent(hits: list[SearchHit],
+                      matched: dict[str, tuple[float, str]]) -> list[SearchHit]:
+    """Collapse child hits to their parent, keeping the first (best) one per
+    parent, in order. Records in `matched` which child gave each parent its
+    best cosine across every list searched for this query."""
+    from meditations_rag.index.chunking import parent_id
+
+    out, seen = [], set()
+    for h in hits:
+        pid = parent_id(h.passage_id)
+        if pid in seen:
+            continue
+        seen.add(pid)
+        out.append(SearchHit(pid, h.score))
+        if pid not in matched or h.score > matched[pid][0]:
+            matched[pid] = (h.score, h.passage_id)
+    return out
+
+
 def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> QueryResult:
     from meditations_rag.route import get_router
     from meditations_rag.route.keyword import safety_flags
@@ -229,10 +261,6 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
             strategy_fallback = f"{type(exc).__name__}: {exc}"[:300]
             queries = RawQuery().expand(problem)
         telemetry.set_output(sp, {"queries": queries, "fallback": strategy_fallback})
-    if len(queries) != 1:
-        raise NotImplementedError(
-            "multi-query fusion lands in Phase 4; Phase 2 strategies expand 1 -> 1"
-        )
     if cfg.reranker != "none":
         raise NotImplementedError("rerankers land in Phase 4; Phase 2 knows only 'none'")
 
@@ -241,23 +269,46 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
     if embedder is None or index is None or passages is None:
         with telemetry.span("load", "CHAIN"):
             embedder = embedder or get_embedder(cfg.embedder)
-            index = index or load_index(embedder.name, expected_dim=embedder.dim)
+            index = index or load_index(embedder.name, expected_dim=embedder.dim,
+                                        chunking=cfg.chunking)
             passages = passages or load_passages()
     if index.embedder != embedder.name:
         raise ValueError(f"index is for {index.embedder!r}, embedder is {embedder.name!r}")
     by_id = {p.id: p for p in passages}
 
-    with telemetry.span("embed.query", "EMBEDDING", input=queries[0], **{
-        "embedding.model_name": getattr(embedder, "model_id", embedder.name),
-        "embedding.embeddings.0.embedding.text": queries[0],
-    }):
-        vector = embedder.embed_query(queries[0])
+    # One string: search to k, exactly as Phase 2 did. Several: search each
+    # to config.RRF_DEPTH and fuse (retrieve/fusion.py), then cut to k. On a
+    # sub-chunked index, deeper by the number of extra child rows, so k
+    # distinct parents survive the dedupe even if every child ranks first.
+    from meditations_rag.index.chunking import parent_id
 
-    with telemetry.span("index.search", "RETRIEVER", input=queries[0],
-                        **{"meditations.k": cfg.k}) as sp:
-        hits: list[SearchHit] = search(vector, index, cfg.k)
-        telemetry.set_documents(sp, [(h.passage_id, h.score, by_id[h.passage_id].text)
-                                     for h in hits])
+    subchunked = cfg.chunking != "passage"
+    extra = len(index) - len({parent_id(i) for i in index.ids}) if subchunked else 0
+    depth = (cfg.k if len(queries) == 1 else max(cfg.k, config.RRF_DEPTH)) + extra
+    matched: dict[str, tuple[float, str]] = {}   # parent -> (best cosine, child)
+    lists: list[list[SearchHit]] = []
+    for q in queries:
+        with telemetry.span("embed.query", "EMBEDDING", input=q, **{
+            "embedding.model_name": getattr(embedder, "model_id", embedder.name),
+            "embedding.embeddings.0.embedding.text": q,
+        }):
+            vector = embedder.embed_query(q)
+        with telemetry.span("index.search", "RETRIEVER", input=q,
+                            **{"meditations.k": depth}) as sp:
+            found = search(vector, index, depth)
+            if subchunked:
+                found = _dedupe_to_parent(found, matched)
+            telemetry.set_documents(sp, [(h.passage_id, h.score, by_id[h.passage_id].text)
+                                         for h in found[:cfg.k]])
+        lists.append(found)
+    if len(lists) == 1:
+        hits: list[SearchHit] = lists[0][:cfg.k]
+    else:
+        from meditations_rag.retrieve.fusion import rrf
+
+        with telemetry.span("fuse", "CHAIN", **{"meditations.lists": len(lists)}) as sp:
+            hits = rrf(lists, cfg.k)
+            telemetry.set_output(sp, [h.passage_id for h in hits])
 
     # Gated on the flag like apply_suppression itself: no flag, no span.
     suppression_fallback = None
@@ -280,7 +331,9 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
         kept, withheld = hits, []
 
     shown = [
-        RetrievedPassage(passage=by_id[h.passage_id], score=h.score, rank=r)
+        RetrievedPassage(passage=by_id[h.passage_id], score=h.score, rank=r,
+                         chunk=matched[h.passage_id][1] if h.passage_id in matched
+                         and "#" in matched[h.passage_id][1] else None)
         for r, h in enumerate(kept, start=1)
     ]
     no_strong_match = bool(hits) and hits[0].score < config.MIN_SCORE_THRESHOLD

@@ -194,15 +194,16 @@ def describe_device(emb) -> str:
     return device
 
 
-def build_grid(embedders, strategies, llms) -> list[RetrievalConfig]:
+def build_grid(embedders, strategies, llms, chunkings=("passage",)) -> list[RetrievalConfig]:
     """Derived from the registries, so Phase 4's cells appear with no edit.
 
     The llm axis only varies for LLM-USING strategies: 'raw' takes none, so
     running it once per provider would report identical configurations as
     distinct rows. With no llm named, the LLM strategies are left out."""
     return [
-        RetrievalConfig(embedder=e, strategy=s, llm=m, k=max(KS))
+        RetrievalConfig(embedder=e, strategy=s, llm=m, chunking=c, k=max(KS))
         for e in embedders
+        for c in chunkings
         for s in strategies
         for m in (llms if s in LLM_STRATEGIES else [None])
     ]
@@ -221,6 +222,9 @@ def run_config(cfg, hard, canary, content, oos, resources, run_id=None) -> dict:
     """One grid cell over every scored entry. Returns metrics plus the
     per-query records the error-analysis file is built from."""
     emb, idx, passages = resources[cfg.embedder]
+    if cfg.chunking != "passage":
+        # The sub-chunked index (index/chunking.py), loaded once per cell.
+        idx = load_index(emb.name, expected_dim=emb.dim, chunking=cfg.chunking)
     # Built once per cell, not per query: the client is the same for all of them.
     strategy = get_strategy(cfg.strategy, get_llm(cfg.llm) if cfg.llm else None)
     records, latencies = [], []
@@ -248,6 +252,8 @@ def run_config(cfg, hard, canary, content, oos, resources, run_id=None) -> dict:
                 "safety": sorted(f.value for f in res.safety),
                 "no_strong_match": res.no_strong_match,
                 "embedded": res.queries,
+                # Which child matched, per shown passage (None: embedded whole).
+                "chunks": [rp.chunk for rp in res.passages],
                 "strategy_fallback": res.strategy_fallback,
                 **llm_usage(calls),
             })
@@ -828,6 +834,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--embedder", nargs="*", default=list(EMBEDDER_NAMES))
     ap.add_argument("--strategy", nargs="*", default=list(STRATEGY_NAMES))
+    ap.add_argument("--chunking", nargs="*", default=["passage"], choices=["passage", "subchunk"],
+                    help="which indexes to score; 'subchunk' needs `meditations index "
+                         "--chunking subchunk` first")
     # LLM strategies spend per query too, so they run only with an --llm.
     ap.add_argument("--llm", nargs="*", default=[],
                     help=f"LLMs to run the LLM strategies ({', '.join(sorted(LLM_STRATEGIES))}) "
@@ -898,7 +907,12 @@ def main() -> int:
             for s in args.strategy:
                 if s in LLM_STRATEGIES and args.llm:
                     stamp[f"prompt ({s})"] = PROMPT_VERSIONS[s]
-        for cfg in build_grid(args.embedder, args.strategy, args.llm):
+        if "subchunk" in args.chunking:
+            for name in args.embedder:
+                sub = load_index(name, chunking="subchunk").meta
+                stamp[f"subchunk index ({name})"] = (
+                    f"{sub['count']} rows, max {config.SUBCHUNK_MAX_WORDS} words per chunk")
+        for cfg in build_grid(args.embedder, args.strategy, args.llm, args.chunking):
             print(f"  {cfg.label} …", flush=True)
             results.append(run_config(cfg, hard, canary, content, oos, resources, run_id))
 

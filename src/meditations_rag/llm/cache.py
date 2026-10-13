@@ -42,7 +42,7 @@ import json
 from pathlib import Path
 
 from meditations_rag import config
-from meditations_rag.llm.base import CALLS, CallRecord, LLMClient, current_repeat
+from meditations_rag.llm.base import CALLS, CallRecord, LLMClient, capture_calls, current_repeat
 
 
 class CachedClient:
@@ -98,15 +98,16 @@ class CachedClient:
             entry = json.loads(path.read_text(encoding="utf-8"))
             CALLS.extend(CallRecord(**{**r, "cached": True}) for r in entry["calls"])
             return entry["output"]
-        start = len(CALLS)
-        output = call()   # raises on failure; nothing is written
+        with capture_calls() as mine:
+            output = call()   # raises on failure; nothing is written
         entry = {"llm": self.name, "model": self.model, "kind": kind,
                  "sampling": self.sampling, "provider": self.provider,
                  "repeat": current_repeat(),
                  "user": user, "output": output,
-                 # Every provider call this completion took, retries included.
+                 # Every provider call this completion took, retries included:
+                 # this thread's own, so concurrent callers cannot mix in.
                  "calls": [{k: v for k, v in vars(r).items() if k != "cached"}
-                           for r in CALLS[start:]]}
+                           for r in mine]}
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(entry, ensure_ascii=False, indent=1), encoding="utf-8")
         return output

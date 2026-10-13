@@ -201,7 +201,8 @@ def describe_device(emb) -> str:
 
 
 def build_grid(embedders, strategies, llms, chunkings=("passage",),
-               filters=("none",), retrievers=("dense",)) -> list[RetrievalConfig]:
+               filters=("none",), retrievers=("dense",),
+               rerankers=("none",)) -> list[RetrievalConfig]:
     """Derived from the registries, so Phase 4's cells appear with no edit.
 
     The llm axis only varies for LLM-USING strategies: 'raw' takes none, so
@@ -209,10 +210,11 @@ def build_grid(embedders, strategies, llms, chunkings=("passage",),
     distinct rows. With no llm named, the LLM strategies are left out."""
     return [
         RetrievalConfig(embedder=e, strategy=s, llm=m, chunking=c, filter=f,
-                        retriever=r, k=max(KS))
+                        retriever=r, reranker=rr, k=max(KS))
         for e in embedders
         for c in chunkings
         for r in retrievers
+        for rr in rerankers
         for f in filters
         for s in strategies
         for m in (llms if s in LLM_STRATEGIES else [None])
@@ -272,6 +274,7 @@ def run_config(cfg, hard, canary, content, oos, resources, run_id=None) -> dict:
                 "embedded": res.queries,
                 # Which child matched, per shown passage (None: embedded whole).
                 "chunks": [rp.chunk for rp in res.passages],
+                "rerank_scores": [rp.rerank_score for rp in res.passages],
                 "strategy_fallback": res.strategy_fallback,
                 **llm_usage(calls),
             })
@@ -926,6 +929,9 @@ def main() -> int:
     ap.add_argument("--chunking", nargs="*", default=["passage"], choices=["passage", "subchunk"],
                     help="which indexes to score; 'subchunk' needs `meditations index "
                          "--chunking subchunk` first")
+    ap.add_argument("--reranker", nargs="*", default=["none"],
+                    choices=["none", "ce-minilm", "ce-bge"],
+                    help="cross-encoder rerankers to score, one row each (Phase 4)")
     ap.add_argument("--retriever", nargs="*", default=["dense"], choices=["dense", "hybrid"],
                     help="dense only, or hybrid (BM25 fused with dense); one row each")
     ap.add_argument("--exposure-llm", action="store_true",
@@ -1008,8 +1014,13 @@ def main() -> int:
                 sub = load_index(name, chunking="subchunk").meta
                 stamp[f"subchunk index ({name})"] = (
                     f"{sub['count']} rows, max {config.SUBCHUNK_MAX_WORDS} words per chunk")
+        from meditations_rag.retrieve.rerank import RERANKER_MODELS
+
+        for name in args.reranker:
+            if name != "none":
+                stamp[f"reranker ({name})"] = RERANKER_MODELS[name]
         for cfg in build_grid(args.embedder, args.strategy, args.llm, args.chunking,
-                              args.filter, args.retriever):
+                              args.filter, args.retriever, args.reranker):
             print(f"  {cfg.label} …", flush=True)
             results.append(run_config(cfg, hard, canary, content, oos, resources, run_id))
 

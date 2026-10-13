@@ -97,6 +97,9 @@ class RetrievalConfig:
     # A metadata filter (FILTERS): "none", or "no-book-1" to exclude Book I,
     # the list of debts to particular people, which is not counsel.
     filter: str = "none"
+    # "dense", or "hybrid": BM25 over the user's own words (index/lexical.py)
+    # fused (RRF) with the dense list(s).
+    retriever: str = "dense"
     # "list": the reviewed lists in retrieve/safety.py, the shipped behaviour.
     # An LLM registry name runs retrieve/safety_llm.LLMSuppressor instead, as
     # a comparator row in the eval; the CLI never sets it.
@@ -111,6 +114,8 @@ class RetrievalConfig:
         """Row label for the matrix: 'bge-base/raw' or 'bge-base/hyde@apertus'
         ('bge-base-subchunk/raw' on the sub-chunked index)."""
         index = self.embedder if self.chunking == "passage" else f"{self.embedder}-{self.chunking}"
+        if self.retriever == "hybrid":
+            index += "+bm25"
         core = f"{index}/{self.strategy}"
         if self.llm:
             core += f"@{self.llm}"
@@ -237,6 +242,26 @@ def _dedupe_to_parent(hits: list[SearchHit],
     return out
 
 
+def _lexical_list(problem: str, index: LoadedIndex, passages: list[Passage],
+                  excluded: set[str], vector, depth: int) -> list[SearchHit]:
+    """BM25 over the user's own words (index/lexical.py), as one more ranked
+    list for RRF. Always the message as typed, whatever the strategy wrote:
+    the lexical anchors are in the user's words. Each hit carries its cosine
+    to the first embedded query (the best child's, on a sub-chunked index),
+    so the fused list keeps carrying cosines, never BM25 scores."""
+    from meditations_rag.index.chunking import parent_id
+    from meditations_rag.index.lexical import lexical_index
+
+    ids = [i for i in lexical_index(passages).search(problem, depth + len(excluded))
+           if i not in excluded][:depth]
+    sims = index.vectors @ vector
+    best: dict[str, float] = {}
+    for row, cid in enumerate(index.ids):
+        pid = parent_id(cid)
+        best[pid] = max(best.get(pid, float("-inf")), float(sims[row]))
+    return [SearchHit(pid, best[pid]) for pid in ids]
+
+
 def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> QueryResult:
     from meditations_rag.route import get_router
     from meditations_rag.route.keyword import safety_flags
@@ -311,15 +336,22 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
     if excluded:
         # Every excluded row could rank above the first allowed one.
         extra += sum(1 for i in index.ids if parent_id(i) in excluded)
-    depth = (cfg.k if len(queries) == 1 else max(cfg.k, config.RRF_DEPTH)) + extra
+    if cfg.retriever not in ("dense", "hybrid"):
+        raise ValueError(f"unknown retriever {cfg.retriever!r}; known: dense, hybrid")
+    hybrid = cfg.retriever == "hybrid"
+    fused = len(queries) > 1 or hybrid
+    depth = (max(cfg.k, config.RRF_DEPTH) if fused else cfg.k) + extra
     matched: dict[str, tuple[float, str]] = {}   # parent -> (best cosine, child)
     lists: list[list[SearchHit]] = []
+    first_vector = None
     for q in queries:
         with telemetry.span("embed.query", "EMBEDDING", input=q, **{
             "embedding.model_name": getattr(embedder, "model_id", embedder.name),
             "embedding.embeddings.0.embedding.text": q,
         }):
             vector = embedder.embed_query(q)
+        if first_vector is None:
+            first_vector = vector
         with telemetry.span("index.search", "RETRIEVER", input=q,
                             **{"meditations.k": depth}) as sp:
             found = search(vector, index, depth)
@@ -330,6 +362,13 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
             telemetry.set_documents(sp, [(h.passage_id, h.score, by_id[h.passage_id].text)
                                          for h in found[:cfg.k]])
         lists.append(found)
+    if hybrid:
+        with telemetry.span("lexical.search", "RETRIEVER", input=problem,
+                            **{"meditations.k": depth}) as sp:
+            lexical = _lexical_list(problem, index, passages, excluded, first_vector,
+                                    max(cfg.k, config.RRF_DEPTH))
+            telemetry.set_output(sp, [h.passage_id for h in lexical[:cfg.k]])
+        lists.append(lexical)
     if len(lists) == 1:
         hits: list[SearchHit] = lists[0][:cfg.k]
     else:

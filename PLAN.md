@@ -1439,7 +1439,8 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
 - [x] **Rerank** (`retrieve/rerank.py`): over-retrieve ~20, rerank to top 5.
       Cross-encoder (local, free) first; LLM listwise rerank as a comparison.
       **Scoped down for the delivery:** cross-encoder only; the LLM
-      listwise comparison moves to Phase 7.
+      listwise comparison moves to Phase 7. (Brought back the same day,
+      once both cross-encoders lost: see below.)
 
       **Built** (`--reranker ce-minilm|ce-bge`): two cross-encoders as
       published, untuned, one row each: `cross-encoder/ms-marco-MiniLM-L-6-v2`
@@ -1478,6 +1479,51 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       death-counsel passages to unflagged readers from 23 to 9. Neither
       changes the decision. A reranker fine-tuned on this kind of relevance
       would need labelled pairs at a scale the golden set is not.
+
+      **LLM listwise rerank, brought back from Phase 7 (2026-10-13)** after
+      the cross-encoders failed on the kind of relevance, since an LLM can
+      be told which kind is meant (`--reranker llm:<name>`, prompt
+      `ede330a1ee`). One call per query: the message as typed and the 20
+      candidates numbered 1..20 (not by passage id), relevance stated as in
+      the labelling guidance ("what a passage would do for this reader",
+      oblique help included), zero-shot. The answer is checked, never
+      trusted: out-of-range numbers and repeats are dropped, a short answer
+      is filled from the retrieval order, and a failure keeps the retrieval
+      order with `rerank_fallback` set. No fallbacks in the run.
+
+      | config | R@1 | R@5 | MRR | canary R@5 | content R@5 | vs no rerank (hit@5) | $/q |
+      |---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 75% | 0.477 | 6/6 | 2/2 | — | — |
+      | `raw` + `llm:apertus-v15-70b` | 30% | 65% | 0.401 | 6/6 | 0/2 | fixed 4, broke 8 | — |
+      | `raw` + `llm:apertus-v15` (8B) | 20% | 55% | 0.331 | 6/6 | 1/2 | fixed 1, broke 6 | — |
+      | `raw` + `llm:claude` (Sonnet 5) | 20% | 70% | 0.393 | 6/6 | 2/2 | fixed 2, broke 3 | $0.0086 |
+
+      **They lose too, but they are the first technique that reaches the
+      queries dense cannot.** All three find "I am in the last round of the
+      interview…", which no configuration had found; the 70B also finds "I
+      said something cruel", "toxic relationship" and "not a good mum".
+      What sinks them is replacing the order: each drops hits raw had (the
+      70B 8, including both content questions). Taking every hard query
+      that raw *or* the LLM rerank finds, the 70B reaches **19 of 20** (only
+      "burning out at work" stays unfound) against 17 for the best strategy
+      fusion: the highest ceiling of the phase. **But that union shows up to
+      ten passages, not five**, so at k = 5 something has to give, and RRF
+      cannot do the combining: every LLM pick is also in raw's candidate
+      list, so it scores in both lists and the fusion would reproduce the
+      LLM's five. What the result supports is a presentation choice for
+      Phase 5 rather than a ranking: raw's five, plus the LLM's picks that
+      raw missed as a separate, clearly labelled second group. The models
+      favour 8.47 ("Quit life then…"): it is among the three most shown for
+      every LLM.
+
+      **A structured-output failure on CSCS** (Risk 2): with this ~3,300
+      token prompt, `response_format` made Apertus-v1.5-70B emit whitespace
+      until max_tokens (15 s, ~1,000 tokens a call), with an integer array,
+      fixed integer fields and string enums alike, while the prompt-JSON
+      path answered in ~1 s. The router's and MultiQuery's shorter prompts
+      never hit it. `complete_json` gained `structured=False` to skip the
+      `response_format` attempt; the reranker uses it, and Claude ignores
+      it. A test pins that the flag reaches the request.
 - [ ] **"No good match" handling**: score threshold or LLM relevance check.
       **Scoped down for the delivery:** the threshold only, set from
       evidence once rerank has landed.
@@ -1702,9 +1748,6 @@ none of it needs re-planning:
 - [ ] **One SQLite store** (`sqlite-vec` for vectors beside FTS5), from the
       Phase 4 hybrid item: one file for both halves, the Book I filter as a
       `WHERE` clause, sub-chunk dedup as a join. Pre-v1, so pin it.
-- [ ] **LLM listwise rerank** as a comparator to the cross-encoder: the
-      problem and the ~20 candidates in one prompt, ids back in order via
-      structured output, Apertus against Sonnet.
 - [ ] `bench/ann_scaling.py`: **at what corpus size does ANN start to pay?**
       At 487 vectors HNSW cannot win — exact cosine is one matmul, and
       approximate search would be both slower and less accurate. So measure the

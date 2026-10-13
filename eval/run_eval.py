@@ -200,6 +200,18 @@ def describe_device(emb) -> str:
     return device
 
 
+def _reranker_name(name: str) -> str:
+    """argparse type for --reranker: a cross-encoder name or llm:<registry name>."""
+    from meditations_rag.llm import LLM_NAMES
+    from meditations_rag.retrieve.rerank import RERANKER_NAMES
+
+    if name in RERANKER_NAMES or (name.startswith("llm:") and name[4:] in LLM_NAMES):
+        return name
+    raise argparse.ArgumentTypeError(
+        f"unknown reranker {name!r}: use one of {', '.join(RERANKER_NAMES)} or llm:<name> "
+        f"with <name> in {', '.join(LLM_NAMES)}")
+
+
 def build_grid(embedders, strategies, llms, chunkings=("passage",),
                filters=("none",), retrievers=("dense",),
                rerankers=("none",)) -> list[RetrievalConfig]:
@@ -276,6 +288,7 @@ def run_config(cfg, hard, canary, content, oos, resources, run_id=None) -> dict:
                 "chunks": [rp.chunk for rp in res.passages],
                 "rerank_scores": [rp.rerank_score for rp in res.passages],
                 "strategy_fallback": res.strategy_fallback,
+                "rerank_fallback": res.rerank_fallback,
                 **llm_usage(calls),
             })
     return {"config": cfg, "records": records,
@@ -683,7 +696,7 @@ def render_exposure(records: list[dict], skipped_llm: list[str]) -> str:
     L += [table(["config", "queries retrieved", "Book I shown", "rule-4 list, unflagged",
                  "death-counsel list, unflagged", "distinct / shown", "most shown"], rows), ""]
     if skipped_llm:
-        L += [f"*Not run for the {len(skipped_llm)} LLM-strategy rows: their completions "
+        L += [f"*Not run for the {len(skipped_llm)} LLM rows (strategy or reranker): their completions "
               "are cached for the golden set only, so every other query would be a new "
               "call. Pass --exposure-llm to include them.*", ""]
     return "\n".join(L) + "\n"
@@ -857,6 +870,10 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
         L += [table(["config", "n", "R@1", "R@3", "R@5", "MRR", "canary R@5",
                      "content R@5", "oos acc", "p50 ms", "p95 ms", "tok", "$/q"], rows), ""]
         for r in results:
+            n_rr = sum(1 for rec in r["records"] if rec["rerank_fallback"])
+            if n_rr:
+                L += [f"***`{r['config'].label}`: {n_rr} of {len(r['records'])} queries kept "
+                      "the retrieval order because the LLM reranker failed.***", ""]
             n_fb = sum(1 for rec in r["records"] if rec["strategy_fallback"])
             if n_fb:
                 L += [f"***`{r['config'].label}`: {n_fb} of {len(r['records'])} queries fell "
@@ -929,9 +946,9 @@ def main() -> int:
     ap.add_argument("--chunking", nargs="*", default=["passage"], choices=["passage", "subchunk"],
                     help="which indexes to score; 'subchunk' needs `meditations index "
                          "--chunking subchunk` first")
-    ap.add_argument("--reranker", nargs="*", default=["none"],
-                    choices=["none", "ce-minilm", "ce-bge"],
-                    help="cross-encoder rerankers to score, one row each (Phase 4)")
+    ap.add_argument("--reranker", nargs="*", default=["none"], type=_reranker_name,
+                    help="rerankers to score, one row each: none, ce-minilm, ce-bge, or "
+                         "llm:<llm name> for an LLM listwise rerank (costs a call per query)")
     ap.add_argument("--retriever", nargs="*", default=["dense"], choices=["dense", "hybrid"],
                     help="dense only, or hybrid (BM25 fused with dense); one row each")
     ap.add_argument("--exposure-llm", action="store_true",
@@ -1017,7 +1034,12 @@ def main() -> int:
         from meditations_rag.retrieve.rerank import RERANKER_MODELS
 
         for name in args.reranker:
-            if name != "none":
+            if name.startswith("llm:"):
+                from meditations_rag.retrieve.rerank import LLM_RERANK_PROMPT_VERSION
+
+                stamp[f"reranker ({name})"] = _llm_stamp(get_llm(name[4:]))
+                stamp["prompt (llm rerank)"] = LLM_RERANK_PROMPT_VERSION
+            elif name != "none":
                 stamp[f"reranker ({name})"] = RERANKER_MODELS[name]
         for cfg in build_grid(args.embedder, args.strategy, args.llm, args.chunking,
                               args.filter, args.retriever, args.reranker):
@@ -1086,7 +1108,8 @@ def main() -> int:
         english = list(dict.fromkeys(e["query"] for e in load_jsonl(golden_p) + router_set
                                      + safety_set))
         cells = [r["config"] for r in results]
-        free = [c for c in cells if c.strategy not in LLM_STRATEGIES or args.exposure_llm]
+        free = [c for c in cells if args.exposure_llm or (
+            c.strategy not in LLM_STRATEGIES and not c.reranker.startswith("llm:"))]
         skipped_llm = [c.label for c in cells if c not in free]
         exposure_records = run_exposure(free, english, resources, run_id)
 

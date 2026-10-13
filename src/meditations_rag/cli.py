@@ -11,14 +11,15 @@ Three subcommands + a default query mode (argparse; stdlib is enough):
       passages.jsonl is left alone and the cached download is never re-fetched
       (Gutenberg etiquette).
 
-  meditations index [--embedder NAME]   (Phase 2)
+  meditations index [--embedder NAME] [--chunking passage|subchunk]
       corpus.store.load_passages -> embed.get_embedder
       -> index.vector_index.build_index. Prints where the index landed and
-      the versions stamped into its meta.json.
+      the versions stamped into its meta.json. --chunking subchunk (Phase 4)
+      builds the second index, with the long passages split into children.
 
   meditations "problem statement..." [--k N] [--all] [--strategy NAME]
                                      [--embedder NAME] [--router NAME]
-                                     [--llm NAME]
+                                     [--llm NAME] [--chunking NAME]
       retrieve.pipeline.run_query with a RetrievalConfig assembled from
       flags + config defaults.
 
@@ -131,6 +132,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=config.DEFAULT_EMBEDDER,
         help=f"embedder name (see embed/); default {config.DEFAULT_EMBEDDER}",
     )
+    p_index.add_argument(
+        "--chunking", default="passage", choices=("passage", "subchunk"),
+        help="one vector per passage (default), or the long passages split into "
+             "sub-chunks (Phase 4)",
+    )
 
     p_show = sub.add_parser("show", help="print one passage in full by id, e.g. 4.7")
     p_show.add_argument("passage_id", help="passage id as BOOK.SECTION, e.g. 4.7")
@@ -150,6 +156,8 @@ def _add_query_parser(sub: argparse._SubParsersAction, config) -> argparse.Argum
                    help=f"query strategy (see retrieve/); default {config.DEFAULT_STRATEGY}")
     p.add_argument("--embedder", default=config.DEFAULT_EMBEDDER,
                    help=f"embedder name (see embed/); default {config.DEFAULT_EMBEDDER}")
+    p.add_argument("--chunking", default="passage", choices=("passage", "subchunk"),
+                   help="which index to search (see `meditations index --chunking`)")
     p.add_argument("--router", default=config.DEFAULT_ROUTER,
                    help=f"intent router (see route/); default {config.DEFAULT_ROUTER}")
     p.add_argument("--llm", default=None,
@@ -189,7 +197,7 @@ def main(argv: list[str] | None = None) -> None:
         if args.command == "ingest":
             cmd_ingest(force=args.force)
         elif args.command == "index":
-            cmd_index(embedder_name=args.embedder)
+            cmd_index(embedder_name=args.embedder, chunking=args.chunking)
         elif args.command == "show":
             cmd_show(args.passage_id)
         elif args.command == "query":
@@ -257,16 +265,17 @@ def _get_embedder(name: str):
         raise CLIError(exc.args[0]) from None
 
 
-def cmd_index(embedder_name: str) -> None:
+def cmd_index(embedder_name: str, chunking: str = "passage") -> None:
     """Embed every passage and persist the index for one embedder."""
     from meditations_rag.index.vector_index import build_index, load_index
 
     passages = _load_corpus()
     print(f"loading embedder {embedder_name!r} (first run downloads the weights)...")
     embedder = _get_embedder(embedder_name)
-    print(f"embedding {len(passages)} passages ({embedder.dim}-dim)...")
-    path = build_index(passages, embedder)
-    meta = load_index(embedder.name, expected_dim=embedder.dim).meta
+    what = "passages" if chunking == "passage" else "passages, long ones as sub-chunks"
+    print(f"embedding {len(passages)} {what} ({embedder.dim}-dim)...")
+    path = build_index(passages, embedder, chunking)
+    meta = load_index(embedder.name, expected_dim=embedder.dim, chunking=chunking).meta
     stamp = ", ".join(f"{k}={v}" for k, v in meta.items() if k not in ("embedder", "dim", "count"))
     print(f"index written: {path}  ({meta['count']} x {meta['dim']})")
     print(f"  {stamp}")
@@ -387,6 +396,7 @@ def cmd_query(args: argparse.Namespace) -> None:
         strategy=args.strategy,
         llm=llm_name,
         router=args.router,
+        chunking=args.chunking,
         k=args.k,
     )
     if cfg.router in LLM_ROUTERS:

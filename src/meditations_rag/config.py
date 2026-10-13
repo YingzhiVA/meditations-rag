@@ -70,6 +70,11 @@ EXPECTED_PER_BOOK_COUNTS = {
 # be silently truncated by a 512-token embedder. Passages over the threshold
 # are flagged is_long; Phase 4 evaluates parent-child sub-chunking for them.
 LONG_PASSAGE_WORDS = 300
+# Phase 4 sub-chunking (index/chunking.py): a long passage without the
+# author's own numbered seams splits at sentence ends into balanced chunks of
+# at most this many words, about a long ordinary passage (p75 is 103), so a
+# chunk competes with whole passages on equal terms. Untuned.
+SUBCHUNK_MAX_WORDS = 150
 
 # --- LLM (Phase 4: query transformation + routing; no synthesis in v1) -------
 # The LLM is a swappable seam (llm/base.py) and an eval axis, not a fixed

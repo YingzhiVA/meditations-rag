@@ -185,6 +185,8 @@ class QueryResult:
     # Set when an LLM strategy (cfg.strategy) lost its provider and the raw
     # query was embedded instead.
     strategy_fallback: str | None = None
+    # Set when an LLM reranker failed and the retrieval order was kept.
+    rerank_fallback: str | None = None
 
     @property
     def retrieved(self) -> bool:
@@ -227,6 +229,7 @@ def run_query(
             "no_strong_match": result.no_strong_match,
             "router_fallback": result.router_fallback,
             "strategy_fallback": result.strategy_fallback,
+            "rerank_fallback": result.rerank_fallback,
         })
         return result
 
@@ -393,16 +396,25 @@ def _run_query(problem, cfg, router, strategy, reranker, embedder, index,
             telemetry.set_output(sp, [h.passage_id for h in hits])
 
     # Step 5: rerank against the problem as typed, never the strategy's text.
+    # An LLM reranker can fail; the retrieval order is kept and the result
+    # says so, as with a strategy fallback.
     rerank_scores: dict[str, float] = {}
+    rerank_fallback = None
     if reranker is not None:
         with telemetry.span("rerank", "RERANKER", input=problem,
                             **{"meditations.reranker": reranker.name,
                                "meditations.candidates": len(hits)}) as sp:
-            ranked = reranker.rerank(problem, hits, {pid: by_id[pid].text for pid in
-                                                     (h.passage_id for h in hits)}, cfg.k)
-            hits = [h for h, _ in ranked]
-            rerank_scores = {h.passage_id: sc for h, sc in ranked}
-            telemetry.set_output(sp, [(h.passage_id, round(sc, 3)) for h, sc in ranked])
+            try:
+                ranked = reranker.rerank(problem, hits, {pid: by_id[pid].text for pid in
+                                                         (h.passage_id for h in hits)}, cfg.k)
+                hits = [h for h, _ in ranked]
+                rerank_scores = {h.passage_id: sc for h, sc in ranked}
+            except LLMError as exc:
+                rerank_fallback = f"{type(exc).__name__}: {exc}"[:300]
+                hits = hits[:cfg.k]
+            telemetry.set_output(sp, {"ranked": [(h.passage_id, rerank_scores.get(h.passage_id))
+                                                 for h in hits],
+                                      "fallback": rerank_fallback})
 
     # Gated on the flag like apply_suppression itself: no flag, no span.
     suppression_fallback = None
@@ -444,4 +456,5 @@ def _run_query(problem, cfg, router, strategy, reranker, embedder, index,
         language=verdict.language,
         suppression_fallback=suppression_fallback,
         strategy_fallback=strategy_fallback,
+        rerank_fallback=rerank_fallback,
     )

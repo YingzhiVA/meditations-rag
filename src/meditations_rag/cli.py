@@ -159,8 +159,9 @@ def _add_query_parser(sub: argparse._SubParsersAction, config) -> argparse.Argum
                    help=f"embedder name (see embed/); default {config.DEFAULT_EMBEDDER}")
     p.add_argument("--chunking", default="passage", choices=("passage", "subchunk"),
                    help="which index to search (see `meditations index --chunking`)")
-    p.add_argument("--reranker", default="none", choices=("none", "ce-minilm", "ce-bge"),
-                   help="cross-encoder rerank of 20 candidates down to --k (Phase 4)")
+    p.add_argument("--reranker", default="none",
+                   help="rerank 20 candidates down to --k: none (default), ce-minilm, "
+                        "ce-bge, or llm:<llm name> (Phase 4)")
     p.add_argument("--retriever", default="dense", choices=("dense", "hybrid"),
                    help="dense only (default), or hybrid: BM25 over your words fused "
                         "with the dense ranking (Phase 4)")

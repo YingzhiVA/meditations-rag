@@ -616,6 +616,10 @@ without a measurement.
       Valid ids are `1.1`–`12.36` within the per-book counts. Labels are
       sparse, not exhaustive — see `eval/README.md` for the pooling protocol
       that makes this tractable, and why it has to follow Phase 2.
+      **As done:** the labels came from one read of the whole book with the
+      queries in mind, not from the pool, so new configurations are scored
+      against them with no re-judging round (`eval/README.md`, "How the
+      labels were made").
       **Start from `eval/pool.py`, do not rewrite it.** It is the probe
       script that produced the Phase 2 notes: model loaded once, a list of
       queries, top-k ids with scores and first words per query, plus the
@@ -1022,13 +1026,112 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       cache). The substitution stays a named residual for the fresh-query
       check before Phase 5 (Risk 5): new passive-ideation phrasings the
       floor does not anticipate are where it would show.
-- [ ] **Query rewriting** (`RewriteQuery`): 1→1. Strip affect and narrative,
+- [x] **Query rewriting** (`RewriteQuery`): 1→1. Strip affect and narrative,
       restate in the corpus's conceptual vocabulary. Cheaper and more
       predictable than HyDE, and it degrades more gracefully.
+
+      **Result** (`eval/results/phase-4-rewrite.md`, prompt `e4774986cb`,
+      zero-shot, one plain completion per query, keyword router):
+
+      | config | R@1 | R@3 | R@5 | MRR | canary R@5 | content R@5 | p50 | tok/q | $/q |
+      |---|---|---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 | 17 ms | — | — |
+      | `rewrite@apertus-v15-70b` | 10% | 20% | 35% | 0.182 | 4/6 | 1/2 | 351 ms | 296 | — |
+      | `rewrite@apertus-v15` (8B) | 10% | 20% | 30% | 0.167 | 6/6 | 0/2 | 181 ms | 293 | — |
+      | `rewrite@claude` (Sonnet 5) | 15% | 40% | 40% | 0.250 | 5/6 | 1/2 | 1.3 s | 401 | $0.001 |
+
+      **Rewriting loses, on every LLM, and the per-query file says why.**
+      Against raw's hits in the top 5 over all 28 scored entries, the 70B
+      fixes 0 and breaks 11, the 8B fixes 2 and breaks 13, Sonnet fixes 1
+      and breaks 10. No fallbacks. Two mechanisms:
+      - **The rewrite throws away what matched.** The labels were picked
+        for the *situation* (a 40th birthday, a jealous friend, a child),
+        and raw's concrete words reach the passages that answer it. A
+        heading such as "On jealousy of another's success and what is not
+        in our power" keeps the topic and loses the situation. This holds
+        for Sonnet too, whose rewrites are the most faithful.
+      - **The corpus's own vocabulary is an attractor.** Asked to speak the
+        book's language, the rewrites match the passages that *are* that
+        language, the doctrinal summaries, rather than the ones that apply
+        it: 11.16 ("To live the best life is within the power of the soul,
+        if it be indifferent to indifferent things…") is in the 70B's top 5
+        for 10 queries and 5.3 for 5; under raw no passage appears more
+        than 5 times. The prompt's subject list makes this worse: 16 of the
+        70B's 28 rewrites end on "what is (not) in our power", and the 8B's
+        top-5 lists cover only 65 distinct passages to raw's 91.
+      **Content questions may not need it.** Raw already finds both
+      labelled content questions, at ranks 1 and 2: on this small sample,
+      bge ignores the "what does Marcus say about…" frame better than this
+      plan assumed ("Why they matter to the Phase 4 strategies"). Two
+      entries are a smoke test, not a measurement.
+      The prompt was not tuned against the set, so a better prompt may do
+      better; but Sonnet's faithful rewrites lose too, so the loss is the
+      strategy's on this corpus and this embedder, not one prompt's. It
+      bears on the next two items: HyDE writes in the corpus's register
+      (the same attractor, at document length), and MultiQuery fans out
+      into exactly these abstract themes. Fusing them *with the raw query*
+      rather than replacing it is the variant these numbers argue for.
+- [x] **Introspective continuation** (`IntrospectQuery`): 1→1. Keep the
+      message as typed and append two or three sentences in the user's own
+      voice on what lies under it, as if they paused and asked themselves
+      why they said it and how they feel. Added after reading the rewrite
+      losses, which it targets directly: the situation stays in the query
+      and the register stays the user's. Because it was proposed after
+      seeing those results, the fresh-query check before Phase 5 (Risk 5)
+      is its independent test. Zero-shot, with one rule beyond form:
+      nothing darker than the message (no despair, death or self-harm it
+      does not point to), since the continuation is invented and would
+      otherwise pull death passages for readers no flag protects.
+
+      **Result** (`eval/results/phase-4-introspect.md`, prompt
+      `9a0b969180`, embedded as one query):
+
+      | config | R@1 | R@3 | R@5 | MRR | canary R@5 | content R@5 | vs raw (hit@5) | p50 | $/q |
+      |---|---|---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 | — | 21 ms | — |
+      | `introspect@apertus-v15-70b` | 25% | 40% | 50% | 0.333 | 5/6 | 1/2 | fixed 0, broke 7 | 0.9 s | — |
+      | `introspect@apertus-v15` (8B) | 25% | 45% | 70% | 0.402 | 5/6 | 2/2 | fixed 2, broke 4 | 0.4 s | — |
+      | `introspect@claude` (Sonnet 5) | 30% | 50% | 60% | 0.406 | 6/6 | 0/2 | fixed 1, broke 6 | 2.2 s | $0.0016 |
+
+      **Much better than rewriting, still below raw.** It recovers most of
+      what `rewrite` lost (R@5 30-40% there), so keeping the user's words
+      and register is the right direction. And it reaches what raw cannot:
+      the 8B fixed "toxic relationship" and "not a good mum", and Sonnet
+      the one hard query no configuration had found ("I said something
+      cruel and I can't take it back"). On the 40th birthday the 8B wrote
+      "a sudden, quiet panic about how time has slipped away… regret for
+      things left undone" and moved a labelled passage from rank 4 to 2.
+      Why it still loses:
+      - **The continuation drowns the message.** At ~50-60 words it is two
+        to three times most queries, so it dominates the one embedding.
+      - **A stock introspective voice becomes the new attractor.** "I keep
+        replaying", "wondering", "quiet", "feels" recur across unrelated
+        queries and pull toward the generic passages on opinion and pain:
+        8.40 ("Take away your opinion about the things that seem to give
+        you pain…") is in the 70B's top 5 for 13 of 28 queries, and 9.21
+        and 8.40 in Sonnet's for 10 each. Sonnet's top-5 lists cover 54
+        distinct passages, against raw's 91.
+      - **Content questions lose their topic.** Sonnet obeyed the rule to
+        continue with *why* the topic is on the user's mind, and the
+        continuation outweighed the topic: both content entries missed.
+        The 70B ignored the rule and named Marcus anyway.
+      The 8B's 70% is one query short of raw: within noise, not a win. The
+      numbers argue for keeping raw's ranking and *adding* the
+      continuation's (see the note under MultiQuery), not for a shorter
+      prompt tuned on these results.
 - [ ] **HyDE** (`HyDEQuery`): 1→pseudo-document. Write a short passage in the
       corpus's register and embed that instead of the query.
 - [ ] **Multi-query expansion** (`MultiQuery`): 1→N Stoic themes, fused with
       Reciprocal Rank Fusion.
+      **Once RRF lands, refactor the query-rewriting strategies onto it.**
+      `RewriteQuery` and `IntrospectQuery` replace or swamp the user's
+      message today, and both lose to raw for that reason (see their
+      results above). With fusion available, each should return the raw
+      query *alongside* its own output (1→2), with the message and the
+      continuation embedded separately and their ranked lists fused, so
+      raw's hits are kept and the strategy can only add. Each refactored
+      strategy is a new row under a new name, not an edit of the recorded
+      ones.
 - [ ] **Parent-child sub-chunking** for the 14 sections over 300 words
       (longest: 1.16 at 754). Embed sub-chunks, dedupe hits back to the parent
       § so citations stay whole. Its own matrix row — an assumption otherwise.

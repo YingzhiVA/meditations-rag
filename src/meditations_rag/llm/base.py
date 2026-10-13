@@ -169,8 +169,11 @@ class ChatJSONClient:
     def complete(self, system: str, user: str) -> str:
         return self._chat(system, user, json_path=None)
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict:
-        if self._structured is not False:
+    def complete_json(self, system: str, user: str, schema: dict,
+                      structured: bool = True) -> dict:
+        # structured=False: the caller knows response_format misbehaves for
+        # its prompt and goes straight to prompt-instructed JSON.
+        if structured and self._structured is not False:
             fmt = {"type": "json_schema",
                    "json_schema": {"name": "output", "schema": schema, "strict": True}}
             try:
@@ -278,8 +281,15 @@ class LLMClient(Protocol):
         """Plain text completion. Used for HyDE."""
         ...
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict:
+    def complete_json(self, system: str, user: str, schema: dict,
+                      structured: bool = True) -> dict:
         """Schema-constrained JSON completion. Used for multi-query expansion,
         router classification, and LLM rerank. Implementations must return a
-        parsed dict or raise — never hand back prose for the caller to regex."""
+        parsed dict or raise — never hand back prose for the caller to regex.
+
+        structured=False asks a provider WITHOUT guaranteed structured output
+        to skip its response_format attempt and use prompt-instructed JSON
+        (schema-checked, one retry). Providers with guaranteed structured
+        output (Claude) ignore it. For prompts where constrained decoding is
+        known to loop: see retrieve/rerank.LLMReranker."""
         ...

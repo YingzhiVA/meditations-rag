@@ -73,9 +73,13 @@ class CachedClient:
         return self._through("complete", system, user, None,
                              lambda: self._inner.complete(system, user))
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict:
+    def complete_json(self, system: str, user: str, schema: dict,
+                      structured: bool = True) -> dict:
+        # Not in the key: both paths answer the same prompt under the same
+        # schema check, and every entry written so far used the default.
         return self._through("complete_json", system, user, schema,
-                             lambda: self._inner.complete_json(system, user, schema))
+                             lambda: self._inner.complete_json(system, user, schema,
+                                                               structured=structured))
 
     def key(self, kind: str, system: str, user: str, schema: dict | None) -> str:
         parts: list = [self.name, self.model, kind, system, user, schema]

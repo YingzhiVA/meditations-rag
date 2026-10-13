@@ -95,6 +95,12 @@ HF_PROVIDER = "publicai"          # the default; entries may name another (below
 # same model behind another serving stack is a different row.
 HF_GEN_PROVIDER = "featherless-ai"
 HF_ROUTER_PROVIDER = "publicai"
+# The blind eval's judge (eval/blind.py): an open-weight model of a third
+# lineage, so it can favour neither Apertus's picks nor Claude's.
+# Non-reasoning (no thinking tokens to pay for); deepinfra, not
+# featherless-ai, which did not honour response_format (Risk 2).
+JUDGE_MODEL = "Qwen/Qwen3-235B-A22B-Instruct-2507"
+JUDGE_PROVIDER = "deepinfra"
 
 # OpenAI-compatible gateways called directly (llm/gateway.py), for models HF
 # Inference Providers does not serve: Apertus v1.5 has no live HF provider.

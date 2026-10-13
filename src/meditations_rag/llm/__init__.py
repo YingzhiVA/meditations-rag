@@ -86,6 +86,8 @@ _REGISTRY: dict[str, Callable[[], LLMClient]] = {
     "apertus-v15-70b": _gateway("apertus-v15-70b", config.CSCS_GEN_MODEL, "cscs"),
     "claude": _claude("claude", config.CLAUDE_MODEL),
     "claude-haiku": _claude("claude-haiku", config.CLAUDE_ROUTER_MODEL),
+    # The blind eval's judge (eval/blind.py): neither Apertus nor Claude.
+    "qwen3-judge": _hf("qwen3-judge", config.JUDGE_MODEL, config.JUDGE_PROVIDER),
 }
 
 LLM_NAMES: tuple[str, ...] = tuple(_REGISTRY)

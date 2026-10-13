@@ -483,7 +483,8 @@ short corpus.
       one list having been struck from the other. Applied after rerank and
       after Phase 4's dedup-to-parent, since 11.18 is 704 words and therefore
       in the sub-chunking set. Phase 2 suppresses whole passages; Phase 4
-      refines 11.18 to precept level.
+      refines 11.18 to precept level. (Not done: see the sub-chunking item.
+      Whole passages are shown, so suppression stays whole-passage.)
       **Gated on the pre-retrieval flag** — if no flag fired, skip entirely:
       zero cost, zero latency, no behaviour change for the queries where none
       of this applies. **No backfill** when passages are suppressed: pulling
@@ -1250,7 +1251,7 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       rank 1 is the stable rank (eval/README.md), but 20 queries cannot
       separate three queries from noise. The fresh-query check before
       Phase 5 (Risk 5) is where `raw+hyde` either holds or does not.
-- [ ] **Parent-child sub-chunking** for the 14 sections over 300 words
+- [x] **Parent-child sub-chunking** for the 14 sections over 300 words
       (longest: 1.16 at 754). Embed sub-chunks, dedupe hits back to the parent
       § so citations stay whole. Its own matrix row — an assumption otherwise.
       **Two distinct motivations, which may show up differently in the
@@ -1268,6 +1269,66 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       himself, and whole-passage suppression deletes it. This is the only
       passage where sub-passage handling is honest; everywhere else the text
       supplies no seams and the rule above applies.
+      **Precept-level suppression was not built (decided 2026-10-12).**
+      Results are shown as whole passages ("No cherry-picking"), so showing
+      11.18 to an ABUSE reader because the tenth precept matched would show
+      precepts 4, 5, 7 and 9 with it. Suppression stays whole-passage, and
+      a hit on any 11.18 chunk is withheld exactly as the passage is (a test
+      pins it). Keeping the tenth needs one of two spec changes: show a
+      single precept of this one passage (cutting, for one id), or accept
+      the other nine for that reader. Open.
+
+      **Built** (`index/chunking.py`, `meditations index --chunking
+      subchunk`, row label `bge-base-subchunk`). Measured first: only 4 of
+      the 14 are truncated in earnest (1.16, 11.18, 1.17, 4.3: 647-973
+      tokens), four more lose 2-15 tokens, and six are not truncated at all.
+      11.18 splits on its own ordinals into 11 chunks (intro joined to the
+      first; it is the only passage of 487 with such seams, pinned by a
+      test). The rest split at sentence ends into the fewest balanced chunks
+      of at most 150 words (untuned; about a long ordinary passage), since
+      only 11.18 and 9.1 have paragraphs at all. 529 rows; largest chunk 201
+      tokens. Each list is searched deep enough to keep k distinct parents,
+      deduped to the parent before fusion and suppression, and every shown
+      passage records the child that matched.
+
+      **Result** (`eval/results/phase-4-subchunk.md`, raw strategy):
+
+      | index | R@1 | R@3 | R@5 | MRR | canary R@5 | content R@5 |
+      |---|---|---|---|---|---|---|
+      | passage | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 |
+      | subchunk | 35% | 50% | 70% | 0.456 | 6/6 | 2/2 |
+
+      **Sub-chunking does not help, and it makes the endurance passages
+      far more visible. The passage index stays the default.** Long passages
+      go from 2 appearances in the 28 queries' top 5 to 23, and not one of
+      those 23 is a labelled passage. The four labelled long passages (4.3,
+      9.42, 3.4, 10.33) are not shown under either index, so "I said
+      something cruel" (10.33) stays a miss. One labelled hit is lost:
+      "losing sleep…" drops 12.8 from rank 5 for 3.4's first chunk.
+      **Both motivations fire, and in the same direction.** Of the 23
+      appearances, 10 came through a chunk lying mostly past the 510-token
+      cut (truncation: content the whole-passage vector never saw) and 13
+      through one inside it (granularity). Either way, a long multi-topic
+      passage has some chunk that matches almost anything: 4.3 now appears
+      for 7 queries, 11.18 for 5, 3.4 for 4. The mechanism is multiplicity
+      as much as restored text: a passage is a hit if any of its chunks
+      ranks, so 4.3 enters the ranking four times and 11.18 eleven times,
+      against once for every other passage.
+      **Pooling the chunk vectors into one per passage was considered and
+      not built.** It would remove the multiplicity while keeping every
+      token, but most long passages deal with several themes, and an
+      average of their chunks would blur exactly the distinctions
+      sub-chunking exists to keep.
+      **The safety side effect is the larger finding.** 4.3 and 11.18 are
+      both on the rule-4 list, and the lists apply only to flagged readers.
+      Passages from that list reach unflagged readers 14 times on the
+      sub-chunked index against 3 on the passage index, including "I think
+      I'm in a toxic relationship, but I don't have the courage to break
+      free", which raises no flag and now gets both 11.18 and 4.3. That
+      reader is the case rule 4 was written for, and their safety then rests
+      entirely on the router flagging them. (Death-counsel passages reach
+      unflagged readers 9-10 times under either index; that is raw's
+      behaviour, recorded here because the count surfaced it.)
 - [ ] **Book I as a metadata filter**: Book I is a list of debts to particular
       people ("From Rusticus I learned…"), not counsel, and will match queries
       like "how do I become more patient" for the wrong reason. Cheap

@@ -1436,10 +1436,48 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       larger set rather than tuned here. Exposure (raw): Book I shown 1 to
       4 times over the 73 retrieving queries, rule-4 passages to unflagged
       readers 5 to 9, distinct passages 152 to 171.
-- [ ] **Rerank** (`retrieve/rerank.py`): over-retrieve ~20, rerank to top 5.
+- [x] **Rerank** (`retrieve/rerank.py`): over-retrieve ~20, rerank to top 5.
       Cross-encoder (local, free) first; LLM listwise rerank as a comparison.
       **Scoped down for the delivery:** cross-encoder only; the LLM
       listwise comparison moves to Phase 7.
+
+      **Built** (`--reranker ce-minilm|ce-bge`): two cross-encoders as
+      published, untuned, one row each: `cross-encoder/ms-marco-MiniLM-L-6-v2`
+      (22M) and `BAAI/bge-reranker-base` (278M). Retrieval hands the reranker
+      `OVERRETRIEVE_K` = 20 candidates after fusion, the filter and the
+      dedupe; it scores each against the problem as typed (never a HyDE
+      passage or a rewrite) and cuts to k; suppression runs after it. Tests
+      pin all three, including that a listed passage the reranker promotes
+      to first is still withheld.
+
+      **Result** (`eval/results/phase-4-rerank.md`, LLM rows from cache):
+
+      | config | R@1 | R@5 | MRR | canary R@5 | content R@5 | vs no rerank (hit@5) | p50 (GPU) |
+      |---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 75% | 0.477 | 6/6 | 2/2 | — | 15 ms |
+      | `raw` + MiniLM | 10% | 55% | 0.241 | 6/6 | 2/2 | fixed 1, broke 5 | 54 ms |
+      | `raw` + bge-reranker | 10% | 45% | 0.231 | 6/6 | 1/2 | fixed 0, broke 7 | 193 ms |
+      | `raw+hyde@claude` + MiniLM | 20% | 60% | 0.333 | 6/6 | 2/2 | — | — |
+      | `raw+hyde@apertus-v15-70b` + MiniLM | 10% | 70% | 0.301 | 6/6 | 2/2 | — | — |
+
+      **Both rerankers hurt every row; no rerank stays the default.** They
+      were trained on web search, where relevant means "answers the
+      query", and they rerank by that. This corpus's labels mean "helps
+      the person", which is often oblique (eval/README, "judge what a
+      passage does"). So the rerankers promote passages with a clear,
+      quotable answer shape: across the 73 retrieving queries MiniLM's most
+      shown passage is 4.49 ("Be like a promontory…", 10 times), bge's is
+      10.30 ("When you are offended at any one's fault…", 11 times). For
+      "I really wish I'm more patient with my child" both drop the labelled
+      6.11 and lift 9.3. bge-reranker also judges almost everything
+      irrelevant (sigmoid scores at or below 0.002), so its order is close
+      to noise. MiniLM does reach the one hard query no dense row finds
+      ("I said something cruel", 4.49 at rank 2), and it keeps every
+      canary and both content questions, but it breaks five queries for it.
+      Exposure (raw): MiniLM shows Book I 6 times against 1; bge cuts
+      death-counsel passages to unflagged readers from 23 to 9. Neither
+      changes the decision. A reranker fine-tuned on this kind of relevance
+      would need labelled pairs at a scale the golden set is not.
 - [ ] **"No good match" handling**: score threshold or LLM relevance check.
       **Scoped down for the delivery:** the threshold only, set from
       evidence once rerank has landed.

@@ -1,0 +1,602 @@
+{
+ "S001": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "9.32"
+ },
+ "S002": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "7.35"
+ },
+ "S003": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "5.36"
+ },
+ "S004": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "5.10"
+ },
+ "S005": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "8.48"
+ },
+ "S006": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "5.12"
+ },
+ "S007": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "11.9"
+ },
+ "S008": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "8.47"
+ },
+ "S009": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "11.19"
+ },
+ "S010": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "6.30"
+ },
+ "S011": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "12.31"
+ },
+ "S012": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "12.19"
+ },
+ "S013": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "2.9"
+ },
+ "S014": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "7.11"
+ },
+ "S015": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "5.12"
+ },
+ "S016": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "4.24"
+ },
+ "S017": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "5.25"
+ },
+ "S018": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "8.1"
+ },
+ "S019": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "11.2"
+ },
+ "S020": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "11.18"
+ },
+ "S021": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "10.12"
+ },
+ "S022": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "10.34"
+ },
+ "S023": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "9.11"
+ },
+ "S024": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "7.26"
+ },
+ "S025": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "6.13"
+ },
+ "S026": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "11.18"
+ },
+ "S027": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "5.5"
+ },
+ "S028": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "7.26"
+ },
+ "S029": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "9.22"
+ },
+ "S030": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "8.48"
+ },
+ "S031": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "3.5"
+ },
+ "S032": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "2.9"
+ },
+ "S033": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "8.29"
+ },
+ "S034": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "7.55"
+ },
+ "S035": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "10.19"
+ },
+ "S036": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "6.46"
+ },
+ "S037": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "12.1"
+ },
+ "S038": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "8.47"
+ },
+ "S039": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "7.68"
+ },
+ "S040": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "8.29"
+ },
+ "S041": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "7.8"
+ },
+ "S042": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "6.16"
+ },
+ "S043": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "8.60"
+ },
+ "S044": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "7.16"
+ },
+ "S045": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "8.48"
+ },
+ "S046": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "8.40"
+ },
+ "S047": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "7.55"
+ },
+ "S048": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "11.18"
+ },
+ "S049": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "10.22"
+ },
+ "S050": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "9.32"
+ },
+ "S051": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "4.26"
+ },
+ "S052": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "7.73"
+ },
+ "S053": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "6.16"
+ },
+ "S054": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "5.5"
+ },
+ "S055": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "5.1"
+ },
+ "S056": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "3.11"
+ },
+ "S057": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "9.21"
+ },
+ "S058": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "7.27"
+ },
+ "S059": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "10.36"
+ },
+ "S060": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "3.16"
+ },
+ "S061": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "5.36"
+ },
+ "S062": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "12.1"
+ },
+ "S063": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "6.11"
+ },
+ "S064": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "7.68"
+ },
+ "S065": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "6.16"
+ },
+ "S066": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "2.12"
+ },
+ "S067": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "10.6"
+ },
+ "S068": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "4.50"
+ },
+ "S069": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "6.49"
+ },
+ "S070": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "6.30"
+ },
+ "S071": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "11.16"
+ },
+ "S072": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "4.26"
+ },
+ "S073": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "9.21"
+ },
+ "S074": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "2.4"
+ },
+ "S075": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "8.47"
+ },
+ "S076": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "7.5"
+ },
+ "S077": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "5.5"
+ },
+ "S078": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "7.22"
+ },
+ "S079": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "8.32"
+ },
+ "S080": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "4.50"
+ },
+ "S081": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "9.3"
+ },
+ "S082": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "6.30"
+ },
+ "S083": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "10.30"
+ },
+ "S084": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "8.48"
+ },
+ "S085": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "6.21"
+ },
+ "S086": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "4.24"
+ },
+ "S087": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "5.23"
+ },
+ "S088": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "7.16"
+ },
+ "S089": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "3.4"
+ },
+ "S090": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "4.48"
+ },
+ "S091": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "8.36"
+ },
+ "S092": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "4.3"
+ },
+ "S093": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "2.4"
+ },
+ "S094": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "9.31"
+ },
+ "S095": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "5.9"
+ },
+ "S096": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "5.36"
+ },
+ "S097": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "9.37"
+ },
+ "S098": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "7.55"
+ },
+ "S099": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "7.65"
+ },
+ "S100": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "6.9"
+ },
+ "S101": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "9.26"
+ },
+ "S102": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "7.11"
+ },
+ "S103": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "7.16"
+ },
+ "S104": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "7.5"
+ },
+ "S105": {
+  "query": "How do I stop fearing death",
+  "passage_id": "8.47"
+ },
+ "S106": {
+  "query": "How do I stop fearing death",
+  "passage_id": "7.24"
+ },
+ "S107": {
+  "query": "How do I stop fearing death",
+  "passage_id": "8.28"
+ },
+ "S108": {
+  "query": "How do I stop fearing death",
+  "passage_id": "8.58"
+ },
+ "S109": {
+  "query": "How do I stop fearing death",
+  "passage_id": "3.11"
+ },
+ "S110": {
+  "query": "How do I stop fearing death",
+  "passage_id": "11.16"
+ },
+ "S111": {
+  "query": "How do I stop fearing death",
+  "passage_id": "7.64"
+ },
+ "S112": {
+  "query": "How to deal with anger",
+  "passage_id": "10.30"
+ },
+ "S113": {
+  "query": "How to deal with anger",
+  "passage_id": "2.10"
+ },
+ "S114": {
+  "query": "How to deal with anger",
+  "passage_id": "6.26"
+ },
+ "S115": {
+  "query": "On fame and being remembered after death",
+  "passage_id": "12.7"
+ },
+ "S116": {
+  "query": "On fame and being remembered after death",
+  "passage_id": "4.3"
+ },
+ "S117": {
+  "query": "on how to live with discomfort and pain",
+  "passage_id": "9.32"
+ },
+ "S118": {
+  "query": "on how to live with discomfort and pain",
+  "passage_id": "9.1"
+ },
+ "S119": {
+  "query": "How to be calm and clear-minded?",
+  "passage_id": "8.5"
+ },
+ "S120": {
+  "query": "How to be calm and clear-minded?",
+  "passage_id": "6.52"
+ },
+ "S121": {
+  "query": "How to be calm and clear-minded?",
+  "passage_id": "8.54"
+ },
+ "S122": {
+  "query": "How to be calm and clear-minded?",
+  "passage_id": "8.51"
+ },
+ "S123": {
+  "query": "How to be calm and clear-minded?",
+  "passage_id": "8.29"
+ },
+ "S124": {
+  "query": "How to be calm and clear-minded?",
+  "passage_id": "4.24"
+ },
+ "S125": {
+  "query": "How to deal with change?",
+  "passage_id": "6.11"
+ },
+ "S126": {
+  "query": "How to deal with change?",
+  "passage_id": "8.36"
+ },
+ "S127": {
+  "query": "How to deal with change?",
+  "passage_id": "4.12"
+ },
+ "S128": {
+  "query": "How to deal with change?",
+  "passage_id": "7.27"
+ },
+ "S129": {
+  "query": "Does Marcus say anything about wanting praise?",
+  "passage_id": "10.13"
+ },
+ "S130": {
+  "query": "Does Marcus say anything about wanting praise?",
+  "passage_id": "3.7"
+ },
+ "S131": {
+  "query": "Does Marcus say anything about wanting praise?",
+  "passage_id": "9.37"
+ },
+ "S132": {
+  "query": "Does Marcus say anything about wanting praise?",
+  "passage_id": "3.5"
+ },
+ "S133": {
+  "query": "Does Marcus say anything about wanting praise?",
+  "passage_id": "7.73"
+ },
+ "S134": {
+  "query": "Does Marcus say anything about wanting praise?",
+  "passage_id": "11.18"
+ },
+ "S135": {
+  "query": "Does Marcus say anything about wanting praise?",
+  "passage_id": "8.53"
+ },
+ "S136": {
+  "query": "Does Marcus say anything about wanting praise?",
+  "passage_id": "12.4"
+ },
+ "S137": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "8.51"
+ },
+ "S138": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "11.16"
+ },
+ "S139": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "10.11"
+ },
+ "S140": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "2.4"
+ },
+ "S141": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "7.28"
+ },
+ "S142": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "7.4"
+ },
+ "S143": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "10.2"
+ },
+ "S144": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "10.9"
+ },
+ "S145": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "4.36"
+ },
+ "S146": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "4.26"
+ },
+ "S147": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "8.32"
+ },
+ "S148": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "2.14"
+ },
+ "S149": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "10.27"
+ },
+ "S150": {
+  "query": "What does Marcus teach about living in the present moment?",
+  "passage_id": "5.36"
+ }
+}

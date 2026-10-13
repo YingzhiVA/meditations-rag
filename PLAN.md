@@ -309,6 +309,16 @@ Note 9.3 appears here having been struck from the `ABUSE` list — the clearest
 demonstration that hazard is a function of the *user's situation*, not a
 property of the passage, and therefore that suppression has to be per flag.
 
+**Unflagged readers see the book as published (decided 2026-10-13).** The
+lists exist for the vulnerable groups rule 3 names, and only for them. For a
+reader in none of them, a rule-4 or death-counsel passage is not a hazard:
+the *Meditations* is published unredacted and widely read, and this tool
+does not edit it for everyone. What the lists cannot cover is a vulnerable
+reader the router *misses*: "unflagged" means no flag was raised, not that
+none was owed. So counting listed passages shown to unflagged readers (the
+Exposure table in `run_eval.py`) measures what a missed flag would expose,
+which makes it a reason to improve flag recall, never to widen the lists.
+
 ### No cherry-picking
 
 Showing part of a passage is out for v1, even though some passages are part
@@ -1298,8 +1308,8 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       | passage | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 |
       | subchunk | 35% | 50% | 70% | 0.456 | 6/6 | 2/2 |
 
-      **Sub-chunking does not help, and it makes the endurance passages
-      far more visible. The passage index stays the default.** Long passages
+      **Sub-chunking does not help. The passage index stays the
+      default.** Long passages
       go from 2 appearances in the 28 queries' top 5 to 23, and not one of
       those 23 is a labelled passage. The four labelled long passages (4.3,
       9.42, 3.4, 10.33) are not shown under either index, so "I said
@@ -1319,20 +1329,57 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       token, but most long passages deal with several themes, and an
       average of their chunks would blur exactly the distinctions
       sub-chunking exists to keep.
-      **The safety side effect is the larger finding.** 4.3 and 11.18 are
-      both on the rule-4 list, and the lists apply only to flagged readers.
-      Passages from that list reach unflagged readers 14 times on the
-      sub-chunked index against 3 on the passage index, including "I think
-      I'm in a toxic relationship, but I don't have the courage to break
-      free", which raises no flag and now gets both 11.18 and 4.3. That
-      reader is the case rule 4 was written for, and their safety then rests
-      entirely on the router flagging them. (Death-counsel passages reach
-      unflagged readers 9-10 times under either index; that is raw's
-      behaviour, recorded here because the count surfaced it.)
-- [ ] **Book I as a metadata filter**: Book I is a list of debts to particular
+      **What a missed flag would expose** (see "Unflagged readers see the
+      book as published"): 4.3 and 11.18 are on the rule-4 list, so the
+      sub-chunked index shows rule-4 passages to unflagged readers 14 times
+      against 3. Not a hazard for readers outside the vulnerable groups;
+      it matters only where the router misses one. "I think I'm in a toxic
+      relationship, but I don't have the courage to break free" raises no
+      flag and gets both 11.18 and 4.3, which makes it a case for flag
+      recall, not for the lists.
+- [x] **Book I as a metadata filter**: Book I is a list of debts to particular
       people ("From Rusticus I learned…"), not counsel, and will match queries
       like "how do I become more patient" for the wrong reason. Cheap
       experiment: eval with and without `book == 1`.
+
+      **Built** as a generic metadata filter (`RetrievalConfig.filter`,
+      `pipeline.FILTERS`; `--filter no-book-1` on the CLI and in
+      `run_eval.py`). It excludes passages from the search itself, before
+      fusion, suppression and the cut, and searches deeper by the number
+      of excluded rows, so a filtered query still returns k passages (a
+      test pins both, sub-chunked Book I children included).
+
+      **Result** (`eval/results/phase-4-bookone.md`, all LLM rows from
+      cache): **no measurable effect, because the noise is rare.**
+      - **The labels cannot lose by it.** The full read labelled no Book I
+        passage for any of the 28 queries, so the filter can only tie or
+        help on recall. Raw ties exactly (R@5 75%, MRR 0.477), on the
+        passage index and the sub-chunked one.
+      - **Fused rows move by rank-5 noise.** Removing 1.2 from raw's list
+        moves every passage below it up a rank, which changes RRF scores:
+        on the dementia query `raw+hyde@claude` loses 9.21 at rank 5
+        (75% to 70%) and `raw+hyde@apertus-v15-70b` gains it (80% to 85%).
+        Same query, opposite directions.
+      - **Exposure, measured without labels** (the new Exposure table in
+        `run_eval.py`, in the same results file): across the 73 queries
+        of all three sets that retrieve, raw shows a Book I passage once
+        (1.2 at rank 2, "My father has dementia…"). The README's "how do I
+        become more patient" example does not surface Book I at all on
+        this embedder. **On the sub-chunked index it is 7 times**, 5 of
+        them 1.17's chunks: there the filter does real work.
+      - **What a missed flag would expose.** On the shipped path (raw,
+        passage index), death-counsel passages appear for unflagged
+        readers 23 times across 18 of the 73 queries (8.47, "Quit life
+        then…", 11 times) and rule-4 passages 5 times; on the sub-chunked
+        index, rule-4 passages 24 times. For readers outside the
+        vulnerable groups that is the book as published, and intended
+        (see "Unflagged readers see the book as published"). The counts
+        matter only where the router misses a flag that was owed.
+      Book I noise was a Phase 2 observation on a handful of phrasings; at
+      this embedder and k it is a rare failure. Whether the shipped
+      default should exclude Book I anyway (no measured cost, one fewer
+      wrong-reason passage in 73 queries) is a Phase 5 call, made with the
+      rest of the winning configuration; the eval baseline stays unfiltered.
 - [ ] **More embedders** — two rows, one controlled variable each:
       - `BAAI/bge-small-en-v1.5` (33M, 384-dim, same family, same query
         prefix, one constructor argument). Isolates encoder *size*: does a 3x

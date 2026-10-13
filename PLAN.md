@@ -1524,6 +1524,65 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       never hit it. `complete_json` gained `structured=False` to skip the
       `response_format` attempt; the reranker uses it, and Claude ignores
       it. A test pins that the flag reaches the request.
+- [x] **Blind re-judging of every configuration's top 5** (added
+      2026-10-13). The golden labels were picked while raw was the only
+      retriever, so they may lean toward what raw surfaces; every row so
+      far was scored against them. Protocol, fixed before any judging
+      (`eval/blind.py`):
+      - *pool*: every (query, passage) pair any of the 52 Phase 4
+        configurations put in a top 5, from the committed per-query files:
+        1,254 pairs, each judged once whoever showed it. Which
+        configurations showed a pair is re-derived from those files at
+        score time and never shown to a judge;
+      - *human sample*: 150 pairs drawn with seed 20261013, grouped by
+        message and shuffled within it, passage text and citation (no rank
+        or configuration; the citation added at the labeller's request, to
+        look passages up, at the cost that old gold picks are recognisable). A tick strikes a passage as definitely not
+        helping; anything that could reasonably help, even obliquely,
+        stays. The full pool would have been ~167,000 words to read, about
+        12 hours; the sample is about 1.5;
+      - *judge*: `Qwen/Qwen3-235B-A22B-Instruct-2507` (deepinfra), an open
+        model of a third lineage so it favours neither Apertus's picks nor
+        Claude's, on every pair, under the same instruction, cached;
+      - *gate*: configurations are scored on the judge's verdicts only if
+        its agreement with the human sample reaches **Cohen's kappa
+        >= 0.6**; below that, the report gives the agreement and stops;
+      - *score*: per configuration on the hard queries, helpful@5 (share of
+        the top 5 not struck) and how many queries keep at least one
+        helpful passage. A measure of what each row shows, alongside the
+        recall it was scored on, not a replacement for it.
+
+      **Result** (`eval/results/phase-4-blind.md`). **The judge failed the
+      gate: Cohen's kappa 0.34** (raw agreement 69%), so it scores no
+      configuration. The disagreement is one-sided: of the judge's 30
+      strikes the human made 25, but of the human's 66 strikes the judge
+      made only 25. It is far more lenient than the labeller, so its
+      "helps" means little. Recalibrating its prompt on these 150 would
+      fit the sample it is measured on; it would need a held-out split.
+      Judge cost: 1,254 calls, 463k input and 39k output tokens.
+
+      **The human sample alone** (exploratory, added after the gate;
+      small n) answers the question that prompted this item:
+      - **The gold labels hold up.** None of the 9 gold pairs met blind
+        was struck.
+      - **Beyond gold, raw shows nothing better than the rest.** Raw's
+        non-gold passages were struck 5 of 11 times (45%); passages raw
+        never showed, 61 of 130 (47%).
+      - **The bias is in the labels' coverage, not their quality.** 75
+        kept pairs are not gold, 69 of them never shown by raw, 48 on hard
+        queries. "Not definitely unhelpful" is a looser bar than a gold
+        pick, so these are candidates, but recall@5 against gold does
+        undercount every configuration that is not raw.
+      - **The rerankers showed the fewest duds**, the same ones that lost
+        on recall: cross-encoder rows 21% struck (10/48), LLM rerank 24%
+        (8/34); MultiQuery the most, 49% (18/37). Only that spread clearly
+        exceeds the noise.
+      - **Apertus and Claude cannot be told apart this way:** 35% (70B),
+        37% (8B) and 36% (Claude) of their rows' passages struck.
+      Raw stays the default: no configuration beat it on recall, and on
+      this sample none clearly beats it on duds either. Growing the golden
+      set from the kept candidates is the way to make recall stop favouring
+      raw; it is a labelling job, so it goes to Phase 7.
 - [ ] **"No good match" handling**: score threshold or LLM relevance check.
       **Scoped down for the delivery:** the threshold only, set from
       evidence once rerank has landed.
@@ -1748,6 +1807,10 @@ none of it needs re-planning:
 - [ ] **One SQLite store** (`sqlite-vec` for vectors beside FTS5), from the
       Phase 4 hybrid item: one file for both halves, the Book I filter as a
       `WHERE` clause, sub-chunk dedup as a join. Pre-v1, so pin it.
+- [ ] **Grow the golden set from the blind sample's kept passages** (Phase 4
+      blind re-judging): 75 kept pairs are not gold, 69 never shown by raw.
+      Judged as confident picks, the ones that qualify make recall stop
+      favouring raw. In their own commits, as every golden-set edit is.
 - [ ] `bench/ann_scaling.py`: **at what corpus size does ANN start to pay?**
       At 487 vectors HNSW cannot win — exact cosine is one matmul, and
       approximate search would be both slower and less accurate. So measure the

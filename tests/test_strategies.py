@@ -21,7 +21,7 @@ import pytest
 
 from meditations_rag.llm.base import LLMError
 from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
-from meditations_rag.retrieve.strategies import IntrospectQuery, RewriteQuery
+from meditations_rag.retrieve.strategies import HyDEQuery, IntrospectQuery, RewriteQuery
 from meditations_rag.route.keyword import KeywordRouter
 
 PROBLEM = "My manager praised everyone on the team except me and I keep replaying it"
@@ -84,6 +84,17 @@ def test_the_rewrite_is_what_gets_embedded():
     with pytest.raises(_Embedded):
         _run(PROBLEM, _FakeClient('  "on being overlooked\nby others"  '), emb)
     assert emb.seen == ["on being overlooked by others"]
+
+
+def test_hyde_embeds_the_pseudo_passage_not_the_problem():
+    emb = _RecordingEmbedder()
+    cfg = RetrievalConfig(embedder="bge-base", strategy="hyde", llm="fake",
+                          router="keyword", k=5)
+    with pytest.raises(_Embedded):
+        run_query(PROBLEM, cfg, router=KeywordRouter(),
+                  strategy=HyDEQuery(_FakeClient("Praise is a breath.\nLet it go by.")),
+                  embedder=emb, index=_NoIndex(), passages=[])
+    assert emb.seen == ["Praise is a breath. Let it go by."]
 
 
 def test_introspect_embeds_the_message_then_its_continuation():

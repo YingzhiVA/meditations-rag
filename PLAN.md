@@ -1769,7 +1769,9 @@ section that tells this is a Phase 5 item.
       with…" and "raw+hyde with…" status lines print even when no call
       follows (chitchat, a declined language).
 - [ ] Repo hygiene: license note (Gutenberg text is public domain; state the
-      edition and translator), reproducibility instructions, `HF_TOKEN` setup.
+      edition and translator), reproducibility instructions, key setup
+      (`CSCS_INFERENCE_API_KEY` for the shipped path; `HF_TOKEN` only to
+      reproduce the 2509 rows).
 
 ### Web UI: public, for showcase and outside testing
 
@@ -1779,6 +1781,16 @@ winner, so the public sees the tuned pipeline, and after Phase 4's language
 guard, so a non-English crisis disclosure is declined rather than served.
 Opening it to the public changes what the rest of the plan has to guarantee.
 The items below are that list.
+
+**The LLM runs on CSCS, not HF (2026-10-14).** The Space only hosts Gradio
+and the CPU embedding; every LLM call goes from it to CSCS's public gateway
+(`api.inference.cscs.ch`, reachable from outside CSCS: `401` without a key).
+The Hack Apertus key may serve public traffic, but it is shared research
+capacity, so usage has to be **extremely** sparing, and the key may be
+revoked some time after the hackathon. Two consequences for the items below:
+the cap counts calls, not dollars (CSCS bills node hours, so the `$/query`
+column is blank and a dollar cap would never trip), and a revoked key is an
+expected state of the deployment, not an incident.
 
 - [ ] **Extract the rendering contract** from `cli.py` into `render.py`: the
       *decisions* (referral first, the framing line under a flag, the
@@ -1790,10 +1802,11 @@ The items below are that list.
       A leak here is silent and a product violation, so it meets the Phase 2
       bar for a test.
 - [ ] **Web front end**: Gradio on a HuggingFace Space. The Space holds
-      `HF_TOKEN` as a secret, the free CPU tier is enough for one query
-      embedding plus a 487-row matmul, Gradio's queue gives a concurrency
-      limit for free, and it keeps the Apertus/HF thread running through the
-      project. It calls `run_query` and nothing else: pipeline config ==
+      `CSCS_INFERENCE_API_KEY` as a secret (a Space secret is an environment
+      variable, and `_load_dotenv` never overrides one), the free CPU tier is
+      enough for one query embedding plus a 487-row matmul, and Gradio's
+      queue gives a concurrency limit for free: one LLM-backed query at a
+      time. It calls `run_query` and nothing else: pipeline config ==
       experiment config, so the public sees exactly the row the matrix
       scored. Ship `passages.jsonl` and the index built by the same code, so a
       cold start never hits Gutenberg, and install the CPU torch wheel, not
@@ -1801,18 +1814,28 @@ The items below are that list.
 - [ ] **"Compare with baseline"**: the Phase 5 worked examples, live. The
       `raw` row makes no LLM call, so a side-by-side with the tuned pipeline
       costs one extra embedding.
-- [ ] **Spend cap**: a daily LLM budget, read from the `$/query` accounting
-      Phase 3 already built. Past the cap, the Space runs in outage mode:
-      keyword router and `raw`, English only, non-English refused. That is the
-      same "degrade, and say so" path as Risk 1, so running out of budget
-      needs no new behaviour, only a new trigger. Plus a per-session rate
-      limit.
+- [ ] **Usage cap**: a global daily cap on CSCS calls, counted at the
+      gateway client (an in-scope query costs two: router and HyDE; chitchat,
+      `meta` and a declined language cost one or none), set low and raised
+      only if real use asks for it. Plus a per-session rate limit. Past the
+      cap, the Space runs in outage mode: keyword router and `raw`, English
+      only, non-English refused. That is the same "degrade, and say so" path
+      as Risk 1, so running out of budget needs no new behaviour, only a new
+      trigger. The counter lives in memory; a Space restart resets it, which
+      is acceptable at this scale and needs no storage.
+- [ ] **Revoked key latches outage mode.** A `401`/`403` from CSCS switches
+      the Space to outage mode for the life of the process, so a dead key
+      costs one failed call, not one per query, and the page says the
+      hackathon LLM access has ended and the demo now runs the keyword
+      router and `raw` (the matrix's baseline row). A transient error
+      (timeout, `5xx`) keeps the per-query fallback it has today.
 - [ ] **Privacy**: people will describe abuse and crisis in this box. By
       default the Space **stores no query text**. Tracing stays off in the
       deployment (Phoenix spans carry the input verbatim), and logs record
       config, latency and flags, not the input. An upfront notice says the
-      query is sent to the LLM provider (Apertus via HF) and that this is not
-      a substitute for professional help.
+      query is sent to Apertus on CSCS, the Swiss National Supercomputing
+      Centre, which does not record prompts or responses, and that this is
+      not a substitute for professional help.
 - [ ] **Referral text reviewed for strangers.** Until now only I have seen it.
       The public cannot be assumed to be in any one country, so every
       referral also carries an international helpline directory, not only
@@ -1830,8 +1853,8 @@ router. Say this in the README rather than leaving it for someone to probe.
 
 **Done when:** the README results section tells the X% → Y% story; the Space is public and serves the eval-winner config; a query
 through the web UI returns the same `QueryResult` as the CLI for the same
-config; and the spend cap and the outage path have both been triggered on
-purpose and seen to degrade as specified.
+config; and the usage cap, the outage path and a revoked key (a bogus key,
+on purpose) have each been triggered and seen to degrade as specified.
 
 ## Phase 6 — Multilingual queries, German first (~2–3 days, mostly curation)
 
@@ -1968,7 +1991,7 @@ none of it needs re-planning:
 | LLM — default path | Apertus v1.5 70B on CSCS (`config.DEFAULT_LLM = "apertus-v15-70b"`; free to this project through Hack Apertus, but shared capacity). Router calls are tiny; HyDE/multi-query are ~1 short completion per query. Requires `CSCS_INFERENCE_API_KEY`. The 2509 rows run via HF Inference (`HF_TOKEN`; the 70B on featherless-ai). |
 | LLM — comparator | `claude-sonnet-5` ($2/$10 per MTok), scoped to comparator eval runs, not every query. A full golden-set pass is cents. |
 | Telemetry | Phoenix runs locally. Free. |
-| Hosting (Phase 5) | HuggingFace Space, free CPU tier. LLM spend bounded by the daily cap; past it the Space runs keyword + `raw` for free. |
+| Hosting (Phase 5) | HuggingFace Space, free CPU tier; LLM calls go to CSCS. CSCS usage bounded by a daily call cap; past it, or once the hackathon key is revoked, the Space runs keyword + `raw` with no LLM calls. |
 
 Worst case for a full grid run is bounded by the HF side, not the Anthropic
 side — the comparator column is the smaller half of the bill.

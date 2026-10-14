@@ -1613,6 +1613,45 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       family pattern is the evidence. It makes `raw` + `llm:claude` the
       second candidate for the fresh-query check before Phase 5, beside
       `raw+hyde@claude`: the shipped default stays raw until that check.
+
+      **The complete top-2 layer (2026-10-14) makes dead@2 exact, and it
+      overturns the recall story.** Every passage any configuration ranked
+      first or second on a hard query was judged blind: 504 pairs, 420 of
+      them in a second sheet (`eval/blind/sheet-top2-hard.md`, 207 struck),
+      the rest by the sample or gold labels (gold counted not dead). The
+      dead set now holds 570 judged pairs, tagged by layer; dead@5 stays
+      sample-only, since the layer is not a uniform draw.
+
+      | config | R@5 (gold) | dead@2 (hard, exact) | dead first passage |
+      |---|---|---|---|
+      | `raw+llm:claude` | 70% | **15% (6/40)** | 2/20 |
+      | `raw+hyde@apertus-v15-70b` | **80%** | 22% (9/40) | 5/20 |
+      | `raw+hyde@claude` | 75% | 28% (11/40) | 4/20 |
+      | `raw+llm:apertus-v15-70b` | 65% | 35% (14/40) | 5/20 |
+      | `raw` | 75% | 48% (19/40) | 7/20 |
+      | `raw+ce-minilm` | 55% | 52% (21/40) | 12/20 |
+      | `bge-base+bm25/raw` | 40% | 65% (26/40) | 12/20 |
+
+      - **Raw, the recall winner, is among the worst on dead@2**: nearly
+        half its top-2 passages on hard queries are judged useless. Gold
+        labels count as not dead and lean toward raw, which should flatter
+        it here, and it is still near the bottom.
+      - **Against raw, the differences are beyond noise**: `raw+llm:claude`
+        6/40 against 19/40 (Fisher p ~ 0.003), `raw+hyde@apertus-v15-70b`
+        9/40 (p ~ 0.03). Approximate, since a query's two slots are not
+        independent; the 150-pair sample could never show this.
+      - **`raw+hyde@apertus-v15-70b` wins both measures**: the best R@5 of
+        the phase (80%) and the second-best dead@2, on the open model, on
+        CSCS, at ~1.4 s a query. `raw+llm:claude` is the cleanest top 2 but
+        gives up a hard query at R@5 and costs $0.0086 a query.
+      - **The sampled dead@5 misled at family level**: it put the
+        cross-encoder rows at 21% dead; exactly, `raw+ce-minilm` is 52% at
+        top 2. Single-row or family claims from the sample are withdrawn.
+      - **Gold recall and dead@2 disagree because they measure different
+        things on a set built around raw**: recall asks whether one of a
+        few confident picks made the top 5; dead@2 asks how much of what
+        the reader sees first is useless. The second is closer to what a
+        reader experiences, and it is the one free of the coverage bias.
 - [ ] **"No good match" handling**: score threshold or LLM relevance check.
       **Scoped down for the delivery:** the threshold only, set from
       evidence once rerank has landed.

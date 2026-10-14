@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| git | `8fbb9fa` |
+| git | `93863a3` |
 | judge | `Qwen/Qwen3-235B-A22B-Instruct-2507` via deepinfra |
 | pool | 1254 (query, passage) pairs from every Phase 4 configuration's top 5 |
 | human sample | 150 pairs, seed 20261013 |
@@ -43,9 +43,68 @@
 
 Kept but not gold: 75 pairs, 69 of them never shown by raw. "Not definitely unhelpful" is a looser bar than a confident gold pick, so these are candidates for the golden set, not missed labels.
 
-## Dead set, by configuration
+## Dead@2 on the hard queries (exact)
 
-*Dead passages shown / judged passages shown, in each configuration's top 5 over the 28 golden queries. Lower is better. About 17 judged slots per configuration, shared between configurations: read families, not single rows.*
+*Every passage any configuration ranked first or second on a hard query was judged blind (the sample, then the complete top-2 layer; gold labels count as not dead). Dead passages over the 40 top-2 slots of the 20 hard queries; lower is better. No sampling noise, so single rows compare.*
+
+| config | dead@2 | dead first passage |
+|---|---|---|
+| `bge-base/raw+llm:claude` | 6/40 (15%) | 2/20 |
+| `bge-base-subchunk/raw+hyde@apertus-v15+no-book-1` | 9/40 (22%) | 6/20 |
+| `bge-base-subchunk/raw+hyde@apertus-v15-70b` | 9/40 (22%) | 5/20 |
+| `bge-base-subchunk/raw+hyde@apertus-v15-70b+no-book-1` | 9/40 (22%) | 5/20 |
+| `bge-base/raw+hyde@apertus-v15-70b` | 9/40 (22%) | 5/20 |
+| `bge-base/raw+hyde@apertus-v15-70b+no-book-1` | 9/40 (22%) | 5/20 |
+| `bge-base-subchunk/raw+hyde@apertus-v15` | 10/40 (25%) | 6/20 |
+| `bge-base-subchunk/raw+hyde@claude` | 10/40 (25%) | 4/20 |
+| `bge-base/raw+hyde@apertus-v15+no-book-1` | 10/40 (25%) | 5/20 |
+| `bge-base/raw+rewrite@claude` | 10/40 (25%) | 6/20 |
+| `bge-base-subchunk/raw+hyde@claude+no-book-1` | 11/40 (28%) | 4/20 |
+| `bge-base/hyde@claude` | 11/40 (28%) | 6/20 |
+| `bge-base/introspect@claude` | 11/40 (28%) | 5/20 |
+| `bge-base/raw+hyde@apertus-v15` | 11/40 (28%) | 5/20 |
+| `bge-base/raw+hyde@claude` | 11/40 (28%) | 4/20 |
+| `bge-base/raw+hyde@claude+no-book-1` | 11/40 (28%) | 4/20 |
+| `bge-base/raw+llm:apertus-v15` | 11/40 (28%) | 4/20 |
+| `bge-base/raw+multi@apertus-v15` | 11/40 (28%) | 4/20 |
+| `bge-base/raw+hyde@apertus-v15+ce-bge` | 12/40 (30%) | 7/20 |
+| `bge-base/raw+introspect@claude` | 12/40 (30%) | 5/20 |
+| `bge-base/raw+multi@claude` | 12/40 (30%) | 6/20 |
+| `bge-base/hyde@apertus-v15-70b` | 13/40 (32%) | 3/20 |
+| `bge-base/introspect@apertus-v15` | 13/40 (32%) | 6/20 |
+| `bge-base/multi@apertus-v15` | 13/40 (32%) | 4/20 |
+| `bge-base/multi@apertus-v15-70b` | 13/40 (32%) | 8/20 |
+| `bge-base/raw+hyde@apertus-v15-70b+ce-bge` | 13/40 (32%) | 7/20 |
+| `bge-base/raw+hyde@claude+ce-bge` | 13/40 (32%) | 8/20 |
+| `bge-base+bm25/raw+hyde@apertus-v15` | 14/40 (35%) | 6/20 |
+| `bge-base+bm25/raw+hyde@apertus-v15-70b` | 14/40 (35%) | 7/20 |
+| `bge-base+bm25/raw+hyde@claude` | 14/40 (35%) | 9/20 |
+| `bge-base/introspect@apertus-v15-70b` | 14/40 (35%) | 6/20 |
+| `bge-base/raw+ce-bge` | 14/40 (35%) | 7/20 |
+| `bge-base/raw+llm:apertus-v15-70b` | 14/40 (35%) | 5/20 |
+| `bge-base/rewrite@apertus-v15` | 14/40 (35%) | 6/20 |
+| `bge-base/rewrite@apertus-v15-70b` | 14/40 (35%) | 6/20 |
+| `bge-base/raw+introspect@apertus-v15-70b` | 15/40 (38%) | 7/20 |
+| `bge-base/raw+multi@apertus-v15-70b` | 15/40 (38%) | 9/20 |
+| `bge-base/raw+rewrite@apertus-v15-70b` | 15/40 (38%) | 8/20 |
+| `bge-base/rewrite@claude` | 15/40 (38%) | 9/20 |
+| `bge-base/raw+introspect@apertus-v15` | 16/40 (40%) | 6/20 |
+| `bge-base/raw+hyde@apertus-v15+ce-minilm` | 17/40 (42%) | 9/20 |
+| `bge-base/raw+rewrite@apertus-v15` | 17/40 (42%) | 7/20 |
+| `bge-base-subchunk/raw+no-book-1` | 18/40 (45%) | 7/20 |
+| `bge-base/hyde@apertus-v15` | 18/40 (45%) | 9/20 |
+| `bge-base/multi@claude` | 18/40 (45%) | 8/20 |
+| `bge-base-subchunk/raw` | 19/40 (48%) | 8/20 |
+| `bge-base/raw` | 19/40 (48%) | 7/20 |
+| `bge-base/raw+hyde@claude+ce-minilm` | 19/40 (48%) | 8/20 |
+| `bge-base/raw+no-book-1` | 19/40 (48%) | 7/20 |
+| `bge-base/raw+ce-minilm` | 21/40 (52%) | 12/20 |
+| `bge-base/raw+hyde@apertus-v15-70b+ce-minilm` | 21/40 (52%) | 12/20 |
+| `bge-base+bm25/raw` | 26/40 (65%) | 12/20 |
+
+## Dead@5 from the random sample, by configuration
+
+*Dead passages shown / judged passages shown, in each configuration's top 5 over the 28 golden queries, sample rows only. About 17 judged slots per configuration: too noisy for single rows, and the exact dead@2 above disagrees with it for some families. Kept for the record.*
 
 | config | dead / judged | dead rate |
 |---|---|---|

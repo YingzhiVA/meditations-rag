@@ -35,7 +35,10 @@ adds the language guard, fusion, rerank, and the LLM-backed routers/strategies):
    score-scale reconciliation needed — which is also why RRF is the natural
    place to merge BM25 (Phase 4 hybrid): just add the lexical ranked list
    as one more list in the fusion.
-5. rerank (or identity), cut to k. (Phase 4; identity here.)
+5. rerank (Phase 4, retrieve/rerank.py): with cfg.reranker set, steps 3-4
+   collect config.OVERRETRIEVE_K candidates instead of k, and a
+   cross-encoder scores each against the problem AS TYPED and cuts to k.
+   Identity by default.
 6. retrieve/safety.py: with a safety flag set, withhold the flag's reviewed
    passages from the cut list. No backfill. Gated on the flag, so it is a
    no-op for the common case. cfg.suppressor names an LLM instead to run
@@ -65,6 +68,7 @@ Returns QueryResult — the render/eval contract. Eval scores retrieval on
 .passages, the router on .intent and .safety, and suppression on .withheld.
 """
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 
 from meditations_rag import config, telemetry
@@ -86,13 +90,19 @@ class RetrievalConfig:
     skip that axis for them rather than running identical configurations."""
 
     embedder: str = config.DEFAULT_EMBEDDER
-    strategy: str = config.DEFAULT_STRATEGY
+    strategy: str = config.BASELINE_STRATEGY   # the eval baseline, not the shipped default
     llm: str | None = None
     router: str = config.DEFAULT_ROUTER
     reranker: str = "none"
     # "passage" (one vector per §) or "subchunk" (the long passages split
     # into children, deduped back to the parent at query time).
     chunking: str = "passage"
+    # A metadata filter (FILTERS): "none", or "no-book-1" to exclude Book I,
+    # the list of debts to particular people, which is not counsel.
+    filter: str = "none"
+    # "dense", or "hybrid": BM25 over the user's own words (index/lexical.py)
+    # fused (RRF) with the dense list(s).
+    retriever: str = "dense"
     # "list": the reviewed lists in retrieve/safety.py, the shipped behaviour.
     # An LLM registry name runs retrieve/safety_llm.LLMSuppressor instead, as
     # a comparator row in the eval; the CLI never sets it.
@@ -107,6 +117,8 @@ class RetrievalConfig:
         """Row label for the matrix: 'bge-base/raw' or 'bge-base/hyde@apertus'
         ('bge-base-subchunk/raw' on the sub-chunked index)."""
         index = self.embedder if self.chunking == "passage" else f"{self.embedder}-{self.chunking}"
+        if self.retriever == "hybrid":
+            index += "+bm25"
         core = f"{index}/{self.strategy}"
         if self.llm:
             core += f"@{self.llm}"
@@ -114,7 +126,22 @@ class RetrievalConfig:
             core += f"+{self.reranker}"
         if self.suppressor != "list":
             core += f"+check@{self.suppressor}"
+        if self.filter != "none":
+            core += f"+{self.filter}"
         return core
+
+
+# Metadata filters (Phase 4): which passages a configuration may return.
+# Each maps a Passage to True when it is excluded. Applied to the search
+# itself, before fusion, suppression and the cut to k, and every list is
+# searched deeper by the number of excluded index rows, so a filtered query
+# still returns k passages. Book I is a list of debts to particular people
+# ("From Rusticus I learned…"), not counsel, and matches on names and
+# kinship for the wrong reason (eval/README.md, "Book I noise").
+FILTERS: dict[str, Callable[[Passage], bool] | None] = {
+    "none": None,
+    "no-book-1": lambda p: p.book == 1,
+}
 
 
 @dataclass(frozen=True)
@@ -125,6 +152,9 @@ class RetrievedPassage:
     # On a sub-chunked index, the child that matched ('11.18#11'); None when
     # the passage was embedded whole.
     chunk: str | None = None
+    # The cross-encoder's score when a reranker ordered the list (a logit,
+    # not a cosine; see retrieve/rerank.py); None without one.
+    rerank_score: float | None = None
 
 
 @dataclass(frozen=True)
@@ -155,6 +185,8 @@ class QueryResult:
     # Set when an LLM strategy (cfg.strategy) lost its provider and the raw
     # query was embedded instead.
     strategy_fallback: str | None = None
+    # Set when an LLM reranker failed and the retrieval order was kept.
+    rerank_fallback: str | None = None
 
     @property
     def retrieved(self) -> bool:
@@ -168,6 +200,7 @@ def run_query(
     *,
     router: Router | None = None,
     strategy: QueryStrategy | None = None,
+    reranker=None,
     embedder: Embedder | None = None,
     index: LoadedIndex | None = None,
     passages: list[Passage] | None = None,
@@ -184,7 +217,8 @@ def run_query(
     with telemetry.span("query", "CHAIN", input=problem) as root:
         telemetry.set_metadata(root, {**cfg.as_dict(), "config": cfg.label,
                                       "eval_run_id": eval_run_id}, tags=[cfg.label])
-        result = _run_query(problem, cfg, router, strategy, embedder, index, passages)
+        result = _run_query(problem, cfg, router, strategy, reranker, embedder, index,
+                            passages)
         telemetry.set_output(root, {
             "intent": result.intent.value if result.intent else None,
             "language": result.language,
@@ -195,6 +229,7 @@ def run_query(
             "no_strong_match": result.no_strong_match,
             "router_fallback": result.router_fallback,
             "strategy_fallback": result.strategy_fallback,
+            "rerank_fallback": result.rerank_fallback,
         })
         return result
 
@@ -218,7 +253,28 @@ def _dedupe_to_parent(hits: list[SearchHit],
     return out
 
 
-def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> QueryResult:
+def _lexical_list(problem: str, index: LoadedIndex, passages: list[Passage],
+                  excluded: set[str], vector, depth: int) -> list[SearchHit]:
+    """BM25 over the user's own words (index/lexical.py), as one more ranked
+    list for RRF. Always the message as typed, whatever the strategy wrote:
+    the lexical anchors are in the user's words. Each hit carries its cosine
+    to the first embedded query (the best child's, on a sub-chunked index),
+    so the fused list keeps carrying cosines, never BM25 scores."""
+    from meditations_rag.index.chunking import parent_id
+    from meditations_rag.index.lexical import lexical_index
+
+    ids = [i for i in lexical_index(passages).search(problem, depth + len(excluded))
+           if i not in excluded][:depth]
+    sims = index.vectors @ vector
+    best: dict[str, float] = {}
+    for row, cid in enumerate(index.ids):
+        pid = parent_id(cid)
+        best[pid] = max(best.get(pid, float("-inf")), float(sims[row]))
+    return [SearchHit(pid, best[pid]) for pid in ids]
+
+
+def _run_query(problem, cfg, router, strategy, reranker, embedder, index,
+               passages) -> QueryResult:
     from meditations_rag.route import get_router
     from meditations_rag.route.keyword import safety_flags
     from meditations_rag.route.language import check_language
@@ -261,8 +317,13 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
             strategy_fallback = f"{type(exc).__name__}: {exc}"[:300]
             queries = RawQuery().expand(problem)
         telemetry.set_output(sp, {"queries": queries, "fallback": strategy_fallback})
-    if cfg.reranker != "none":
-        raise NotImplementedError("rerankers land in Phase 4; Phase 2 knows only 'none'")
+    if reranker is None and cfg.reranker != "none":
+        from meditations_rag.retrieve.rerank import get_reranker
+
+        reranker = get_reranker(cfg.reranker)
+    # With a reranker, retrieval hands it OVERRETRIEVE_K candidates and the
+    # reranker cuts to k; without one, retrieval cuts to k itself.
+    n_out = max(cfg.k, config.OVERRETRIEVE_K) if reranker is not None else cfg.k
 
     # Only the CLI reaches this span: the harness passes all three in, so its
     # traces carry per-query cost and never a model load.
@@ -284,31 +345,76 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
 
     subchunked = cfg.chunking != "passage"
     extra = len(index) - len({parent_id(i) for i in index.ids}) if subchunked else 0
-    depth = (cfg.k if len(queries) == 1 else max(cfg.k, config.RRF_DEPTH)) + extra
+    try:
+        excludes = FILTERS[cfg.filter]
+    except KeyError:
+        raise ValueError(f"unknown filter {cfg.filter!r}; known: {', '.join(FILTERS)}") from None
+    excluded = {p.id for p in passages if excludes(p)} if excludes else set()
+    if excluded:
+        # Every excluded row could rank above the first allowed one.
+        extra += sum(1 for i in index.ids if parent_id(i) in excluded)
+    if cfg.retriever not in ("dense", "hybrid"):
+        raise ValueError(f"unknown retriever {cfg.retriever!r}; known: dense, hybrid")
+    hybrid = cfg.retriever == "hybrid"
+    fused = len(queries) > 1 or hybrid
+    depth = (max(n_out, config.RRF_DEPTH) if fused else n_out) + extra
     matched: dict[str, tuple[float, str]] = {}   # parent -> (best cosine, child)
     lists: list[list[SearchHit]] = []
+    first_vector = None
     for q in queries:
         with telemetry.span("embed.query", "EMBEDDING", input=q, **{
             "embedding.model_name": getattr(embedder, "model_id", embedder.name),
             "embedding.embeddings.0.embedding.text": q,
         }):
             vector = embedder.embed_query(q)
+        if first_vector is None:
+            first_vector = vector
         with telemetry.span("index.search", "RETRIEVER", input=q,
                             **{"meditations.k": depth}) as sp:
             found = search(vector, index, depth)
+            if excluded:
+                found = [h for h in found if parent_id(h.passage_id) not in excluded]
             if subchunked:
                 found = _dedupe_to_parent(found, matched)
             telemetry.set_documents(sp, [(h.passage_id, h.score, by_id[h.passage_id].text)
                                          for h in found[:cfg.k]])
         lists.append(found)
+    if hybrid:
+        with telemetry.span("lexical.search", "RETRIEVER", input=problem,
+                            **{"meditations.k": depth}) as sp:
+            lexical = _lexical_list(problem, index, passages, excluded, first_vector,
+                                    max(cfg.k, config.RRF_DEPTH))
+            telemetry.set_output(sp, [h.passage_id for h in lexical[:cfg.k]])
+        lists.append(lexical)
     if len(lists) == 1:
-        hits: list[SearchHit] = lists[0][:cfg.k]
+        hits: list[SearchHit] = lists[0][:n_out]
     else:
         from meditations_rag.retrieve.fusion import rrf
 
         with telemetry.span("fuse", "CHAIN", **{"meditations.lists": len(lists)}) as sp:
-            hits = rrf(lists, cfg.k)
+            hits = rrf(lists, n_out)
             telemetry.set_output(sp, [h.passage_id for h in hits])
+
+    # Step 5: rerank against the problem as typed, never the strategy's text.
+    # An LLM reranker can fail; the retrieval order is kept and the result
+    # says so, as with a strategy fallback.
+    rerank_scores: dict[str, float] = {}
+    rerank_fallback = None
+    if reranker is not None:
+        with telemetry.span("rerank", "RERANKER", input=problem,
+                            **{"meditations.reranker": reranker.name,
+                               "meditations.candidates": len(hits)}) as sp:
+            try:
+                ranked = reranker.rerank(problem, hits, {pid: by_id[pid].text for pid in
+                                                         (h.passage_id for h in hits)}, cfg.k)
+                hits = [h for h, _ in ranked]
+                rerank_scores = {h.passage_id: sc for h, sc in ranked}
+            except LLMError as exc:
+                rerank_fallback = f"{type(exc).__name__}: {exc}"[:300]
+                hits = hits[:cfg.k]
+            telemetry.set_output(sp, {"ranked": [(h.passage_id, rerank_scores.get(h.passage_id))
+                                                 for h in hits],
+                                      "fallback": rerank_fallback})
 
     # Gated on the flag like apply_suppression itself: no flag, no span.
     suppression_fallback = None
@@ -333,7 +439,8 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
     shown = [
         RetrievedPassage(passage=by_id[h.passage_id], score=h.score, rank=r,
                          chunk=matched[h.passage_id][1] if h.passage_id in matched
-                         and "#" in matched[h.passage_id][1] else None)
+                         and "#" in matched[h.passage_id][1] else None,
+                         rerank_score=rerank_scores.get(h.passage_id))
         for r, h in enumerate(kept, start=1)
     ]
     no_strong_match = bool(hits) and hits[0].score < config.MIN_SCORE_THRESHOLD
@@ -349,4 +456,5 @@ def _run_query(problem, cfg, router, strategy, embedder, index, passages) -> Que
         language=verdict.language,
         suppression_fallback=suppression_fallback,
         strategy_fallback=strategy_fallback,
+        rerank_fallback=rerank_fallback,
     )

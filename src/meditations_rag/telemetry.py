@@ -38,19 +38,30 @@ SPAN TREE
       ├─ route                  (CHAIN)
       │    └─ llm.generate      (LLM — LLM routers only; none on a chitchat
       │                          exact match or with the keyword router)
-      ├─ strategy.expand        (CHAIN)
-      │    └─ llm.generate      (LLM — HyDE / multi-query / rewrite; Phase 4)
+      ├─ strategy.expand        (CHAIN — output: the strings to embed, and
+      │    │                     the fallback reason if the LLM failed)
+      │    └─ llm.generate      (LLM — rewrite / introspect / hyde / multi,
+      │                          and their raw+ variants; none for raw)
       ├─ load                   (CHAIN — CLI cold start only)
-      ├─ embed.query            (EMBEDDING)
-      ├─ index.search           (RETRIEVER — documents with scores and text)
-      ├─ rerank                 (RERANKER; Phase 4)
+      ├─ embed.query            (EMBEDDING ┐ once per embedded string: one
+      ├─ index.search           (RETRIEVER ┘ pair for raw, two for raw+X,
+      │                          three for multi; documents with scores and
+      │                          text, after the metadata filter and, on a
+      │                          sub-chunked index, the dedupe to parents)
+      ├─ lexical.search         (RETRIEVER — hybrid only: BM25 over the
+      │                          user's own words)
+      ├─ fuse                   (CHAIN — RRF; only when there is more than
+      │                          one ranked list)
+      ├─ rerank                 (RERANKER — only with cfg.reranker: the
+      │                          candidates in, the reranked top k out)
       └─ safety.suppress        (GUARDRAIL — only when a flag fired)
            └─ llm.generate      (LLM — one per passage and test, LLM suppressor only)
 
 ATTRIBUTES THAT MAKE IT USEFUL
 ------------------------------
 Tag the root span with the full RetrievalConfig (embedder, strategy, llm,
-router, reranker, k) and, when running under the harness, an eval_run_id.
+router, reranker, suppressor, chunking, filter, retriever, k: every field of
+RetrievalConfig.as_dict) and, when running under the harness, an eval_run_id.
 That is the whole tie-in: it lets latency and token cost be sliced BY
 CONFIGURATION in Phoenix, and lets run_eval.py read p50/p95 latency and
 $/query back out of the same spans it already grids over. Without those tags

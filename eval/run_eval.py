@@ -25,6 +25,13 @@ comparisons that matter.
              "content") get their own column too: they are a different kind
              of input from a problem statement, and PLAN.md asks for them to
              be reported apart.
+             The dead set (eval/dead_set.jsonl, from the blind re-judging)
+             is the golden set's opposite: passages judged definitely not
+             helping. dead@2 (hard) is exact for every Phase 4 row: every
+             top-2 slot on the hard queries was judged (gold counted not
+             dead); a new row may show unjudged passages and says so.
+             dead@5 (sample) is a ~17-slot random sample per row: noisy,
+             kept for the record. Lower is better for both.
 
   Router     reported as a PAIR: out_of_scope recall AND in_scope retention.
              Recall alone is gameable by rejecting everything, and the real
@@ -90,6 +97,12 @@ withheld beyond the list; (b) every passage in eval/suppression_review.jsonl,
 kept and struck, judged for every reader of the matching situation. Keeps
 judged safe and strikes judged hazardous are reported apart, never averaged.
 
+EXPOSURE (Phase 4) needs no labels: every distinct English query in the
+three sets through each retrieval row, counting what readers are shown:
+Book I passages, listed passages shown to unflagged readers (what a missed
+flag would expose), and how many distinct passages the top-5 lists cover. LLM-strategy rows only with
+--exposure-llm, since their completions are cached for the golden set only.
+
 THE LANGUAGE GUARD (Phase 4) gets its own table: false declines over every
 English input the three sets hold, and decline recall over
 eval/language_set.jsonl by tier. Both run locally and free on every run.
@@ -118,7 +131,7 @@ from meditations_rag.embed import EMBEDDER_NAMES, get_embedder
 from meditations_rag.index.vector_index import load_index
 from meditations_rag.llm.base import CALLS, CallRecord
 from meditations_rag import telemetry
-from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
+from meditations_rag.retrieve.pipeline import FILTERS, RetrievalConfig, run_query
 from meditations_rag.retrieve.strategies import LLM_STRATEGIES, STRATEGY_NAMES, get_strategy
 from meditations_rag.llm import get_llm
 from meditations_rag.route import LLM_ROUTERS, ROUTER_NAMES, get_router
@@ -194,16 +207,34 @@ def describe_device(emb) -> str:
     return device
 
 
-def build_grid(embedders, strategies, llms, chunkings=("passage",)) -> list[RetrievalConfig]:
+def _reranker_name(name: str) -> str:
+    """argparse type for --reranker: a cross-encoder name or llm:<registry name>."""
+    from meditations_rag.llm import LLM_NAMES
+    from meditations_rag.retrieve.rerank import RERANKER_NAMES
+
+    if name in RERANKER_NAMES or (name.startswith("llm:") and name[4:] in LLM_NAMES):
+        return name
+    raise argparse.ArgumentTypeError(
+        f"unknown reranker {name!r}: use one of {', '.join(RERANKER_NAMES)} or llm:<name> "
+        f"with <name> in {', '.join(LLM_NAMES)}")
+
+
+def build_grid(embedders, strategies, llms, chunkings=("passage",),
+               filters=("none",), retrievers=("dense",),
+               rerankers=("none",)) -> list[RetrievalConfig]:
     """Derived from the registries, so Phase 4's cells appear with no edit.
 
     The llm axis only varies for LLM-USING strategies: 'raw' takes none, so
     running it once per provider would report identical configurations as
     distinct rows. With no llm named, the LLM strategies are left out."""
     return [
-        RetrievalConfig(embedder=e, strategy=s, llm=m, chunking=c, k=max(KS))
+        RetrievalConfig(embedder=e, strategy=s, llm=m, chunking=c, filter=f,
+                        retriever=r, reranker=rr, k=max(KS))
         for e in embedders
         for c in chunkings
+        for r in retrievers
+        for rr in rerankers
+        for f in filters
         for s in strategies
         for m in (llms if s in LLM_STRATEGIES else [None])
     ]
@@ -218,13 +249,21 @@ def gold_rank(result, gold_ids: list[str]) -> int | None:
     return None
 
 
+def cell_resources(cfg, resources):
+    """(embedder, index, passages) for one grid cell: the embedder's loaded
+    passage index, or its sub-chunked one (index/chunking.py), loaded here.
+    Shared by the retrieval and exposure tables so they search the same
+    index for the same row."""
+    emb, idx, passages = resources[cfg.embedder]
+    if cfg.chunking != "passage":
+        idx = load_index(emb.name, expected_dim=emb.dim, chunking=cfg.chunking)
+    return emb, idx, passages
+
+
 def run_config(cfg, hard, canary, content, oos, resources, run_id=None) -> dict:
     """One grid cell over every scored entry. Returns metrics plus the
     per-query records the error-analysis file is built from."""
-    emb, idx, passages = resources[cfg.embedder]
-    if cfg.chunking != "passage":
-        # The sub-chunked index (index/chunking.py), loaded once per cell.
-        idx = load_index(emb.name, expected_dim=emb.dim, chunking=cfg.chunking)
+    emb, idx, passages = cell_resources(cfg, resources)
     # Built once per cell, not per query: the client is the same for all of them.
     strategy = get_strategy(cfg.strategy, get_llm(cfg.llm) if cfg.llm else None)
     records, latencies = [], []
@@ -254,7 +293,9 @@ def run_config(cfg, hard, canary, content, oos, resources, run_id=None) -> dict:
                 "embedded": res.queries,
                 # Which child matched, per shown passage (None: embedded whole).
                 "chunks": [rp.chunk for rp in res.passages],
+                "rerank_scores": [rp.rerank_score for rp in res.passages],
                 "strategy_fallback": res.strategy_fallback,
+                "rerank_fallback": res.rerank_fallback,
                 **llm_usage(calls),
             })
     return {"config": cfg, "records": records,
@@ -265,6 +306,38 @@ def run_config(cfg, hard, canary, content, oos, resources, run_id=None) -> dict:
                 "oos": oos_metrics([r for r in records if r["tier"] == "out_of_scope"]),
             },
             "latency": latencies}
+
+
+# (query, passage) -> dead, from eval/dead_set.jsonl; empty when absent.
+# DEAD: sample rows only (a uniform draw, for dead@5). DEAD2: every judged row
+# plus gold counted not dead, which covers every top-2 slot on the hard
+# queries of every Phase 4 configuration (for dead@2).
+DEAD: dict[tuple[str, str], bool] = {}
+DEAD2: dict[tuple[str, str], bool] = {}
+
+
+def dead2_cell(records: list[dict]) -> str:
+    """dead@2 on the hard queries. Exact when every slot is judged; a new
+    configuration can show unjudged passages, and then the cell says how
+    many slots it could judge."""
+    if not DEAD2:
+        return "—"
+    slots = [(r["query"], p) for r in records if r["tier"] == "hard" for p in r["returned"][:2]]
+    judged = [DEAD2[s] for s in slots if s in DEAD2]
+    if not judged:
+        return "—"
+    cell = f"{sum(judged) / len(judged):.0%} ({sum(judged)}/{len(judged)})"
+    return cell if len(judged) == len(slots) else cell + f", {len(slots) - len(judged)} unjudged"
+
+
+def dead_cell(records: list[dict]) -> str:
+    if not DEAD:
+        return "—"
+    judged = [DEAD[(r["query"], p)] for r in records for p in r["returned"]
+              if (r["query"], p) in DEAD]
+    if not judged:
+        return "—"
+    return f"{sum(judged) / len(judged):.0%} ({sum(judged)}/{len(judged)})"
 
 
 def tier_metrics(records: list[dict]) -> dict | None:
@@ -597,6 +670,77 @@ def run_language(english: list[str], language_set: list[dict]) -> list[dict]:
     return records
 
 
+# --- exposure ----------------------------------------------------------------
+
+def run_exposure(cfgs, queries: list[str], resources, run_id=None) -> list[dict]:
+    """What each configuration shows readers, over every distinct English
+    query in the three sets, with no labels at all. One record per (config,
+    query) that retrieved. The measures are the ones Phase 4 kept needing
+    and could only compute by hand: Book I shown, listed passages shown to
+    unflagged readers, and how many distinct passages the top-5 lists cover
+    (a strategy collapsing onto a few attractors shows here first).
+
+    Listed passages reaching unflagged readers are not a hazard in
+    themselves: outside the vulnerable groups, readers see the book as
+    published (PLAN.md, "Unflagged readers see the book as published").
+    They count what a missed flag would expose."""
+    from meditations_rag.retrieve.safety import ABUSE_SUPPRESSED, DEATH_COUNSEL_SUPPRESSED
+
+    records = []
+    for cfg in cfgs:
+        emb, idx, passages = cell_resources(cfg, resources)
+        strategy = get_strategy(cfg.strategy, get_llm(cfg.llm) if cfg.llm else None)
+        for q in queries:
+            res = run_query(q, cfg, strategy=strategy, embedder=emb, index=idx,
+                            passages=passages, eval_run_id=run_id)
+            if not res.retrieved:
+                continue
+            shown = [rp.passage for rp in res.passages]
+            unflagged = not res.safety
+            records.append({
+                "table": "exposure", "config": cfg.label, "query": q,
+                "returned": [p.id for p in shown],
+                "safety": sorted(f.value for f in res.safety),
+                "book_1": [p.id for p in shown if p.book == 1],
+                "rule_4_unflagged": [p.id for p in shown
+                                     if unflagged and p.id in ABUSE_SUPPRESSED],
+                "death_counsel_unflagged": [p.id for p in shown
+                                            if unflagged and p.id in DEATH_COUNSEL_SUPPRESSED],
+                "strategy_fallback": res.strategy_fallback,
+            })
+    return records
+
+
+def render_exposure(records: list[dict], skipped_llm: list[str]) -> str:
+    L = ["## Exposure", "",
+         "*Every distinct English query in the golden, router and safety sets, through "
+         "each configuration, counted where it retrieved. No labels: this is what readers "
+         "are shown, not whether it is right. The suppression lists apply to flagged "
+         "readers only, by design; the two list columns count what a missed flag would "
+         "expose, not a hazard to every reader.*", ""]
+    if not records:
+        return "\n".join(L + ["*No exposure records.*", ""]) + "\n"
+    rows = []
+    for label in dict.fromkeys(r["config"] for r in records):
+        rs = [r for r in records if r["config"] == label]
+        shown = Counter(i for r in rs for i in r["returned"])
+        top, n_top = shown.most_common(1)[0] if shown else ("—", 0)
+        def count(key):
+            n = sum(len(r[key]) for r in rs)
+            q = sum(1 for r in rs if r[key])
+            return f"{n} ({q} q)" if n else "0"
+        rows.append([f"`{label}`", str(len(rs)), count("book_1"), count("rule_4_unflagged"),
+                     count("death_counsel_unflagged"),
+                     f"{len(shown)}/{sum(shown.values())}", f"{top} ×{n_top}"])
+    L += [table(["config", "queries retrieved", "Book I shown", "rule-4 list, unflagged",
+                 "death-counsel list, unflagged", "distinct / shown", "most shown"], rows), ""]
+    if skipped_llm:
+        L += [f"*Not run for the {len(skipped_llm)} LLM rows (strategy or reranker): their completions "
+              "are cached for the golden set only, so every other query would be a new "
+              "call. Pass --exposure-llm to include them.*", ""]
+    return "\n".join(L) + "\n"
+
+
 def render_language(records: list[dict]) -> str:
     eng = [r for r in records if r["set"] == "english"]
     non = [r for r in records if r["set"] == "non-english"]
@@ -757,14 +901,20 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
                 *[pct(m[f"recall@{k}"]) for k in KS], f"{m['mrr']:.3f}",
                 pct(c["recall@5"]) + f" ({c['n']})" if c else "—",
                 pct(ct["recall@5"]) + f" ({ct['n']})" if ct else "—",
+                dead2_cell(r["records"]),
+                dead_cell(r["records"]),
                 pct(o["accuracy"]) + f" ({o['n']})" if o else "—",
                 f"{statistics.median(lat):.0f}",
                 f"{sorted(lat)[max(0, int(0.95 * len(lat)) - 1)]:.0f}",
                 *strategy_cost_cells(r),
             ])
         L += [table(["config", "n", "R@1", "R@3", "R@5", "MRR", "canary R@5",
-                     "content R@5", "oos acc", "p50 ms", "p95 ms", "tok", "$/q"], rows), ""]
+                     "content R@5", "dead@2 (hard)", "dead@5 (sample)", "oos acc", "p50 ms", "p95 ms", "tok", "$/q"], rows), ""]
         for r in results:
+            n_rr = sum(1 for rec in r["records"] if rec["rerank_fallback"])
+            if n_rr:
+                L += [f"***`{r['config'].label}`: {n_rr} of {len(r['records'])} queries kept "
+                      "the retrieval order because the LLM reranker failed.***", ""]
             n_fb = sum(1 for rec in r["records"] if rec["strategy_fallback"])
             if n_fb:
                 L += [f"***`{r['config'].label}`: {n_fb} of {len(r['records'])} queries fell "
@@ -837,6 +987,16 @@ def main() -> int:
     ap.add_argument("--chunking", nargs="*", default=["passage"], choices=["passage", "subchunk"],
                     help="which indexes to score; 'subchunk' needs `meditations index "
                          "--chunking subchunk` first")
+    ap.add_argument("--reranker", nargs="*", default=["none"], type=_reranker_name,
+                    help="rerankers to score, one row each: none, ce-minilm, ce-bge, or "
+                         "llm:<llm name> for an LLM listwise rerank (costs a call per query)")
+    ap.add_argument("--retriever", nargs="*", default=["dense"], choices=["dense", "hybrid"],
+                    help="dense only, or hybrid (BM25 fused with dense); one row each")
+    ap.add_argument("--exposure-llm", action="store_true",
+                    help="include LLM-strategy rows in the exposure table; each query "
+                         "outside the golden set is a new LLM call")
+    ap.add_argument("--filter", nargs="*", default=["none"], choices=list(FILTERS),
+                    help="metadata filters to score, one row each (Phase 4)")
     # LLM strategies spend per query too, so they run only with an --llm.
     ap.add_argument("--llm", nargs="*", default=[],
                     help=f"LLMs to run the LLM strategies ({', '.join(sorted(LLM_STRATEGIES))}) "
@@ -874,6 +1034,14 @@ def main() -> int:
     safety_p = args.safety_set or EVAL_DIR / "safety_set.jsonl"
     language_p = args.language_set or EVAL_DIR / "language_set.jsonl"
     hard, canary, content, oos, skipped = split_golden(load_jsonl(golden_p))
+    dead_p = EVAL_DIR / "dead_set.jsonl"
+    dead_rows = load_jsonl(dead_p)
+    DEAD.update({(e["query"], e["passage_id"]): e["dead"] for e in dead_rows
+                 if e.get("layer", "sample") == "sample"})
+    if any(e.get("layer") == "top2-hard" for e in dead_rows):
+        DEAD2.update({(e["query"], g): False for e in load_jsonl(golden_p)
+                      for g in e.get("gold_ids", [])})
+        DEAD2.update({(e["query"], e["passage_id"]): e["dead"] for e in dead_rows})
     router_set, safety_set = load_jsonl(router_p), load_jsonl(safety_p)
 
     try:
@@ -886,6 +1054,7 @@ def main() -> int:
              "git": rev or "unknown", "corpus md5": md5(PASSAGES_FILE),
              "golden_set md5": md5(golden_p), "router_set md5": md5(router_p),
              "safety_set md5": md5(safety_p), "language_set md5": md5(language_p),
+             "dead_set md5": md5(dead_p),
              "lingua": _version("lingua-language-detector"),
              "language_min_ratio": config.LANGUAGE_MIN_RATIO,
              "min_score_threshold": config.MIN_SCORE_THRESHOLD}
@@ -912,7 +1081,18 @@ def main() -> int:
                 sub = load_index(name, chunking="subchunk").meta
                 stamp[f"subchunk index ({name})"] = (
                     f"{sub['count']} rows, max {config.SUBCHUNK_MAX_WORDS} words per chunk")
-        for cfg in build_grid(args.embedder, args.strategy, args.llm, args.chunking):
+        from meditations_rag.retrieve.rerank import RERANKER_MODELS
+
+        for name in args.reranker:
+            if name.startswith("llm:"):
+                from meditations_rag.retrieve.rerank import LLM_RERANK_PROMPT_VERSION
+
+                stamp[f"reranker ({name})"] = _llm_stamp(get_llm(name[4:]))
+                stamp["prompt (llm rerank)"] = LLM_RERANK_PROMPT_VERSION
+            elif name != "none":
+                stamp[f"reranker ({name})"] = RERANKER_MODELS[name]
+        for cfg in build_grid(args.embedder, args.strategy, args.llm, args.chunking,
+                              args.filter, args.retriever, args.reranker):
             print(f"  {cfg.label} …", flush=True)
             results.append(run_config(cfg, hard, canary, content, oos, resources, run_id))
 
@@ -973,10 +1153,22 @@ def main() -> int:
         [e["query"] for e in load_jsonl(golden_p) + router_set + safety_set],
         load_jsonl(language_p))
 
+    exposure_records, skipped_llm = [], []
+    if results:
+        english = list(dict.fromkeys(e["query"] for e in load_jsonl(golden_p) + router_set
+                                     + safety_set))
+        cells = [r["config"] for r in results]
+        free = [c for c in cells if args.exposure_llm or (
+            c.strategy not in LLM_STRATEGIES and not c.reranker.startswith("llm:"))]
+        skipped_llm = [c.label for c in cells if c not in free]
+        exposure_records = run_exposure(free, english, resources, run_id)
+
     report = render(results, router_rows, safety_rows, stamp, skipped)
     if supp_records or agree_records:
         report += render_suppression(supp_records, agree_records)
     report += render_language(language_records)
+    if results:
+        report += render_exposure(exposure_records, skipped_llm)
     if args.repeats > 1:
         report += render_stability(router_records, safety_records, args.repeats)
     print("\n" + report)
@@ -993,7 +1185,8 @@ def main() -> int:
         for r in results:
             for rec in r["records"]:
                 fh.write(json.dumps({"table": "retrieval", **rec}) + "\n")
-        for rec in router_records + safety_records + language_records + supp_records + agree_records:
+        for rec in (router_records + safety_records + language_records + supp_records
+                    + agree_records + exposure_records):
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
     print(f"wrote {out}")
     if results or router_records:

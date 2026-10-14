@@ -33,6 +33,7 @@ rather than zero.
 
 import json
 import logging
+import threading
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -66,9 +67,32 @@ class CallRecord:
     fingerprint: str | None = None
 
 
-# Append-only, process-wide. Single-threaded use (CLI, eval harness); a
-# consumer takes len(CALLS) before a query and slices after it.
+# Append-only, process-wide. A consumer that runs one query at a time (the
+# CLI, run_eval.py) takes len(CALLS) before a query and slices after it. That
+# slice is NOT safe under threads, where other threads' calls land inside it:
+# code that needs "the calls this completion made" uses capture_calls(),
+# which is per thread.
 CALLS: list[CallRecord] = []
+
+_local = threading.local()
+
+
+@contextmanager
+def capture_calls() -> Generator[list[CallRecord], None, None]:
+    """Collect the CallRecords made by THIS thread inside the block, in
+    order, alongside CALLS. Nests: an outer capture sees an inner one's
+    records too. Used by llm/cache.py, so that a completion's cache entry
+    holds its own calls even when several threads call at once (eval/blind.py
+    runs its judge on a thread pool)."""
+    stack = getattr(_local, "stack", None)
+    if stack is None:
+        stack = _local.stack = []
+    mine: list[CallRecord] = []
+    stack.append(mine)
+    try:
+        yield mine
+    finally:
+        stack.pop()
 
 # Which repeat of an eval run the following calls belong to (0: a normal
 # run). Two consumers: the completion cache keys on it (llm/cache.py), and
@@ -169,8 +193,11 @@ class ChatJSONClient:
     def complete(self, system: str, user: str) -> str:
         return self._chat(system, user, json_path=None)
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict:
-        if self._structured is not False:
+    def complete_json(self, system: str, user: str, schema: dict,
+                      structured: bool = True) -> dict:
+        # structured=False: the caller knows response_format misbehaves for
+        # its prompt and goes straight to prompt-instructed JSON.
+        if structured and self._structured is not False:
             fmt = {"type": "json_schema",
                    "json_schema": {"name": "output", "schema": schema, "strict": True}}
             try:
@@ -234,6 +261,8 @@ class _Call:
                          (time.perf_counter() - self._t0) * 1000, json_path,
                          served_model=served_model, fingerprint=fingerprint)
         CALLS.append(rec)
+        for sink in getattr(_local, "stack", ()):
+            sink.append(rec)
         telemetry.set_llm(self._span, model=self._model, provider=self._provider,
                           input_tokens=input_tokens, output_tokens=output_tokens)
         telemetry.set_output(self._span, output)
@@ -278,8 +307,15 @@ class LLMClient(Protocol):
         """Plain text completion. Used for HyDE."""
         ...
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict:
+    def complete_json(self, system: str, user: str, schema: dict,
+                      structured: bool = True) -> dict:
         """Schema-constrained JSON completion. Used for multi-query expansion,
         router classification, and LLM rerank. Implementations must return a
-        parsed dict or raise — never hand back prose for the caller to regex."""
+        parsed dict or raise — never hand back prose for the caller to regex.
+
+        structured=False asks a provider WITHOUT guaranteed structured output
+        to skip its response_format attempt and use prompt-instructed JSON
+        (schema-checked, one retry). Providers with guaranteed structured
+        output (Claude) ignore it. For prompts where constrained decoding is
+        known to loop: see retrieve/rerank.LLMReranker."""
         ...

@@ -141,7 +141,9 @@ human-verified against the actual text.
 Note when labeling: Book I is a list of debts to particular people ("From
 Rusticus I learned…") rather than counsel, so it rarely deserves a gold label
 even when it matches lexically. Whether excluding Book I from the index helps is
-itself a Phase 4 experiment.
+itself a Phase 4 experiment. (Measured: the full read labelled no Book I
+passage, and raw shows one in 73 retrieving queries, so the filter ties; see
+PLAN.md.)
 
 ## Two axes: theme and failure mode
 

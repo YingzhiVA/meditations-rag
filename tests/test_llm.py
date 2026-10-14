@@ -33,7 +33,8 @@ class _CountingClient:
             call.done(self.name, input_tokens=10, output_tokens=5)
         return self.name
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict:
+    def complete_json(self, system: str, user: str, schema: dict,
+                      structured: bool = True) -> dict:
         return {"by": self.complete(system, user)}
 
 
@@ -134,3 +135,65 @@ def test_publicai_refuses_an_answer_from_a_substituted_model(monkeypatch):
                             transport=served_by("aisingapore/Qwen-SEA-LION-v4-32B-IT"))
     with pytest.raises(LLMError, match="SEA-LION"):
         swapped.complete("sys", "q")
+
+
+def test_structured_false_skips_response_format(monkeypatch):
+    """The LLM reranker opts out of response_format because constrained
+    decoding looped on whitespace for its long prompt on CSCS. If the flag
+    were ignored, every rerank would burn 15 s and ~1000 tokens of shared
+    capacity before its retry, and nothing would fail."""
+    import json as _json
+
+    import httpx
+
+    from meditations_rag.llm.gateway import GatewayClient
+
+    bodies = []
+
+    def handler(request):
+        bodies.append(_json.loads(request.content))
+        return httpx.Response(200, json={
+            "model": "m", "usage": {"prompt_tokens": 5, "completion_tokens": 3},
+            "choices": [{"message": {"content": '{"a": "x"}'}, "finish_reason": "stop"}]})
+
+    monkeypatch.setenv("PUBLICAI_API_KEY", "test-key")
+    schema = {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}
+    client = GatewayClient("g", "m", "publicai.co", transport=httpx.MockTransport(handler))
+    assert client.complete_json("sys", "q", schema, structured=False) == {"a": "x"}
+    assert "response_format" not in bodies[-1]
+    assert client.complete_json("sys", "q", schema) == {"a": "x"}
+    assert "response_format" in bodies[-1]
+
+
+def test_concurrent_completions_cache_only_their_own_calls(tmp_path):
+    """eval/blind.py judges on a thread pool. The cache used to attribute
+    calls by slicing the process-wide CALLS log, so each entry swallowed
+    every call other threads made meanwhile (13 records on one judge
+    entry): token and latency accounting inflated, and nothing failed."""
+    import json as _json
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    from meditations_rag.llm.cache import CachedClient
+
+    barrier = threading.Barrier(8)
+
+    class _Slow:
+        name, model = "slow", "slow-model"
+        sampling = dict(config.DEFAULT_SAMPLING)
+
+        def complete(self, system, user):
+            with observed_call(self.name, self.model, "fake", system, user) as call:
+                barrier.wait()            # every thread is inside a call at once
+                time.sleep(0.01)
+                call.done(user, input_tokens=int(user), output_tokens=1)
+            return user
+
+    client = CachedClient(_Slow(), tmp_path)
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        assert list(ex.map(lambda i: client.complete("s", str(i)), range(8))) == \
+            [str(i) for i in range(8)]
+    for f in (tmp_path / "slow").glob("*.json"):
+        entry = _json.loads(f.read_text())
+        assert [c["input_tokens"] for c in entry["calls"]] == [int(entry["user"])]

@@ -309,6 +309,16 @@ Note 9.3 appears here having been struck from the `ABUSE` list — the clearest
 demonstration that hazard is a function of the *user's situation*, not a
 property of the passage, and therefore that suppression has to be per flag.
 
+**Unflagged readers see the book as published (decided 2026-10-13).** The
+lists exist for the vulnerable groups rule 3 names, and only for them. For a
+reader in none of them, a rule-4 or death-counsel passage is not a hazard:
+the *Meditations* is published unredacted and widely read, and this tool
+does not edit it for everyone. What the lists cannot cover is a vulnerable
+reader the router *misses*: "unflagged" means no flag was raised, not that
+none was owed. So counting listed passages shown to unflagged readers (the
+Exposure table in `run_eval.py`) measures what a missed flag would expose,
+which makes it a reason to improve flag recall, never to widen the lists.
+
 ### No cherry-picking
 
 Showing part of a passage is out for v1, even though some passages are part
@@ -1298,8 +1308,8 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       | passage | 35% | 50% | 75% | 0.477 | 6/6 | 2/2 |
       | subchunk | 35% | 50% | 70% | 0.456 | 6/6 | 2/2 |
 
-      **Sub-chunking does not help, and it makes the endurance passages
-      far more visible. The passage index stays the default.** Long passages
+      **Sub-chunking does not help. The passage index stays the
+      default.** Long passages
       go from 2 appearances in the 28 queries' top 5 to 23, and not one of
       those 23 is a labelled passage. The four labelled long passages (4.3,
       9.42, 3.4, 10.33) are not shown under either index, so "I said
@@ -1319,31 +1329,58 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       token, but most long passages deal with several themes, and an
       average of their chunks would blur exactly the distinctions
       sub-chunking exists to keep.
-      **The safety side effect is the larger finding.** 4.3 and 11.18 are
-      both on the rule-4 list, and the lists apply only to flagged readers.
-      Passages from that list reach unflagged readers 14 times on the
-      sub-chunked index against 3 on the passage index, including "I think
-      I'm in a toxic relationship, but I don't have the courage to break
-      free", which raises no flag and now gets both 11.18 and 4.3. That
-      reader is the case rule 4 was written for, and their safety then rests
-      entirely on the router flagging them. (Death-counsel passages reach
-      unflagged readers 9-10 times under either index; that is raw's
-      behaviour, recorded here because the count surfaced it.)
-- [ ] **Book I as a metadata filter**: Book I is a list of debts to particular
+      **What a missed flag would expose** (see "Unflagged readers see the
+      book as published"): 4.3 and 11.18 are on the rule-4 list, so the
+      sub-chunked index shows rule-4 passages to unflagged readers 14 times
+      against 3. Not a hazard for readers outside the vulnerable groups;
+      it matters only where the router misses one. "I think I'm in a toxic
+      relationship, but I don't have the courage to break free" raises no
+      flag and gets both 11.18 and 4.3, which makes it a case for flag
+      recall, not for the lists.
+- [x] **Book I as a metadata filter**: Book I is a list of debts to particular
       people ("From Rusticus I learned…"), not counsel, and will match queries
       like "how do I become more patient" for the wrong reason. Cheap
       experiment: eval with and without `book == 1`.
-- [ ] **More embedders** — two rows, one controlled variable each:
-      - `BAAI/bge-small-en-v1.5` (33M, 384-dim, same family, same query
-        prefix, one constructor argument). Isolates encoder *size*: does a 3x
-        smaller model lose anything at 487 passages?
-      - `andreasmartin/apertus-v1.1-swiss-embed-0.4b-bidir` (439M, 1024-dim,
-        1024-token, matryoshka to 256, Apache 2.0). Changes *family and
-        training domain*, and keeps the Apertus thread running through the
-        retrieval half. See the note below on how to read its result.
-      - `embed/voyage.py` stays optional — a hosted comparator if the local
-        rows turn out to be too close together to be interesting.
-- [ ] **Hybrid retrieval**: BM25 alongside dense, RRF fusion — helps queries
+
+      **Built** as a generic metadata filter (`RetrievalConfig.filter`,
+      `pipeline.FILTERS`; `--filter no-book-1` on the CLI and in
+      `run_eval.py`). It excludes passages from the search itself, before
+      fusion, suppression and the cut, and searches deeper by the number
+      of excluded rows, so a filtered query still returns k passages (a
+      test pins both, sub-chunked Book I children included).
+
+      **Result** (`eval/results/phase-4-bookone.md`, all LLM rows from
+      cache): **no measurable effect, because the noise is rare.**
+      - **The labels cannot lose by it.** The full read labelled no Book I
+        passage for any of the 28 queries, so the filter can only tie or
+        help on recall. Raw ties exactly (R@5 75%, MRR 0.477), on the
+        passage index and the sub-chunked one.
+      - **Fused rows move by rank-5 noise.** Removing 1.2 from raw's list
+        moves every passage below it up a rank, which changes RRF scores:
+        on the dementia query `raw+hyde@claude` loses 9.21 at rank 5
+        (75% to 70%) and `raw+hyde@apertus-v15-70b` gains it (80% to 85%).
+        Same query, opposite directions.
+      - **Exposure, measured without labels** (the new Exposure table in
+        `run_eval.py`, in the same results file): across the 73 queries
+        of all three sets that retrieve, raw shows a Book I passage once
+        (1.2 at rank 2, "My father has dementia…"). The README's "how do I
+        become more patient" example does not surface Book I at all on
+        this embedder. **On the sub-chunked index it is 7 times**, 5 of
+        them 1.17's chunks: there the filter does real work.
+      - **What a missed flag would expose.** On the shipped path (raw,
+        passage index), death-counsel passages appear for unflagged
+        readers 23 times across 18 of the 73 queries (8.47, "Quit life
+        then…", 11 times) and rule-4 passages 5 times; on the sub-chunked
+        index, rule-4 passages 24 times. For readers outside the
+        vulnerable groups that is the book as published, and intended
+        (see "Unflagged readers see the book as published"). The counts
+        matter only where the router misses a flag that was owed.
+      Book I noise was a Phase 2 observation on a handful of phrasings; at
+      this embedder and k it is a rare failure. Whether the shipped
+      default should exclude Book I anyway (no measured cost, one fewer
+      wrong-reason passage in 73 queries) is a Phase 5 call, made with the
+      rest of the winning configuration; the eval baseline stays unfiltered.
+- [x] **Hybrid retrieval**: BM25 alongside dense, RRF fusion — helps queries
       with lexical anchors ("death", "anger", "fame"). **This is where the
       vector store stops being a numpy array**: `sqlite-vec` (single file, no
       server, pre-v1 so pin it) holds the vectors, and SQLite's built-in FTS5
@@ -1352,9 +1389,285 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       the Book I metadata filter above a `WHERE` clause and the sub-chunk ->
       parent dedup a join. Numpy stays the default path; the DB is an eval row
       that has to earn the dependency, not a replacement.
-- [ ] **Rerank** (`retrieve/rerank.py`): over-retrieve ~20, rerank to top 5.
+      **Scoped down for the 2026-10-16 delivery:** BM25 from SQLite's FTS5
+      in the standard library (no new dependency), dense search stays numpy,
+      and the lexical list joins the existing RRF fusion. The single
+      `sqlite-vec` store moves to Phase 7: it changes the plumbing, not the
+      numbers.
+
+      **Built** (`index/lexical.py`, `--retriever hybrid`, row label
+      `bge-base+bm25`). BM25 over whole passages, in memory per process,
+      Porter stemming, no stopword list, standard parameters; nothing
+      tuned. It always runs on the user's own words, whatever the strategy
+      wrote, obeys the metadata filter, and its hits carry their cosine
+      into the fusion, never a BM25 score. The message is reduced to quoted
+      words before it reaches FTS5, so no input is ever query syntax (a
+      test throws quotes, NEAR, AND and `*` at it).
+
+      **Result** (`eval/results/phase-4-hybrid.md`, all LLM rows from
+      cache):
+
+      | config | R@1 | R@5 | MRR | canary R@5 | content R@5 | vs dense (hit@5) |
+      |---|---|---|---|---|---|---|
+      | `raw` | 35% | 75% | 0.477 | 6/6 | 2/2 | — |
+      | `raw` + BM25 | 25% | 40% | 0.300 | 6/6 | 2/2 | fixed 1, broke 8 |
+      | `raw+hyde@claude` + BM25 | 20% | 55% | 0.303 | 6/6 | 2/2 | fixed 1, broke 5 |
+      | `raw+hyde@apertus-v15-70b` + BM25 | 25% | 55% | 0.360 | 6/6 | 2/2 | fixed 1, broke 5 |
+      | `raw+hyde@apertus-v15` (8B) + BM25 | 25% | 55% | 0.352 | 6/6 | 2/2 | fixed 4, broke 5 |
+
+      **Hybrid loses badly, and dense stays the default.** Two causes,
+      both visible per query:
+      - **Unweighted RRF rewards consensus over conviction.** Dense's
+        first hit scores 1/61; a passage both lists put around rank 10
+        scores 2/70, nearly twice as much. So generic passages that each
+        ranker places mid-list (5.36, 7.2, 10.36) displace dense's best
+        hits unless BM25 also ranks them: "I'm jealous of my friend's
+        success" loses 7.27 from rank 1.
+      - **This set is built from BM25's failure modes.** The hard queries
+        were written as conceptual gaps and lexical hijacks (eval/README),
+        and a lexical hijack is what BM25 does: "friend" pulls Book I's
+        1.13 and 1.14, rare words like "deal" outweigh "anger". Alone,
+        BM25 finds 3 of 20 hard queries. The lexical-anchor cases it is
+        meant for, the canaries, were already 6/6 under dense.
+      It keeps every canary and both content questions, and with the 8B's
+      `raw+hyde` it fixes four queries, but every row breaks five or more.
+      A weighted fusion (dense counted more than BM25) is the obvious
+      variant; it is one knob fitted to 20 queries, so it is left for a
+      larger set rather than tuned here. Exposure (raw): Book I shown 1 to
+      4 times over the 73 retrieving queries, rule-4 passages to unflagged
+      readers 5 to 9, distinct passages 152 to 171.
+- [x] **Rerank** (`retrieve/rerank.py`): over-retrieve ~20, rerank to top 5.
       Cross-encoder (local, free) first; LLM listwise rerank as a comparison.
+      **Scoped down for the delivery:** cross-encoder only; the LLM
+      listwise comparison moves to Phase 7. (Brought back the same day,
+      once both cross-encoders lost: see below.)
+
+      **Built** (`--reranker ce-minilm|ce-bge`): two cross-encoders as
+      published, untuned, one row each: `cross-encoder/ms-marco-MiniLM-L-6-v2`
+      (22M) and `BAAI/bge-reranker-base` (278M). Retrieval hands the reranker
+      `OVERRETRIEVE_K` = 20 candidates after fusion, the filter and the
+      dedupe; it scores each against the problem as typed (never a HyDE
+      passage or a rewrite) and cuts to k; suppression runs after it. Tests
+      pin all three, including that a listed passage the reranker promotes
+      to first is still withheld.
+
+      **Result** (`eval/results/phase-4-rerank.md`, LLM rows from cache):
+
+      | config | R@1 | R@5 | MRR | canary R@5 | content R@5 | vs no rerank (hit@5) | p50 (GPU) |
+      |---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 75% | 0.477 | 6/6 | 2/2 | — | 15 ms |
+      | `raw` + MiniLM | 10% | 55% | 0.241 | 6/6 | 2/2 | fixed 1, broke 5 | 54 ms |
+      | `raw` + bge-reranker | 10% | 45% | 0.231 | 6/6 | 1/2 | fixed 0, broke 7 | 193 ms |
+      | `raw+hyde@claude` + MiniLM | 20% | 60% | 0.333 | 6/6 | 2/2 | — | — |
+      | `raw+hyde@apertus-v15-70b` + MiniLM | 10% | 70% | 0.301 | 6/6 | 2/2 | — | — |
+
+      **Both rerankers hurt every row; no rerank stays the default.** They
+      were trained on web search, where relevant means "answers the
+      query", and they rerank by that. This corpus's labels mean "helps
+      the person", which is often oblique (eval/README, "judge what a
+      passage does"). So the rerankers promote passages with a clear,
+      quotable answer shape: across the 73 retrieving queries MiniLM's most
+      shown passage is 4.49 ("Be like a promontory…", 10 times), bge's is
+      10.30 ("When you are offended at any one's fault…", 11 times). For
+      "I really wish I'm more patient with my child" both drop the labelled
+      6.11 and lift 9.3. bge-reranker also judges almost everything
+      irrelevant (sigmoid scores at or below 0.002), so its order is close
+      to noise. MiniLM does reach the one hard query no dense row finds
+      ("I said something cruel", 4.49 at rank 2), and it keeps every
+      canary and both content questions, but it breaks five queries for it.
+      Exposure (raw): MiniLM shows Book I 6 times against 1; bge cuts
+      death-counsel passages to unflagged readers from 23 to 9. Neither
+      changes the decision. A reranker fine-tuned on this kind of relevance
+      would need labelled pairs at a scale the golden set is not.
+
+      **LLM listwise rerank, brought back from Phase 7 (2026-10-13)** after
+      the cross-encoders failed on the kind of relevance, since an LLM can
+      be told which kind is meant (`--reranker llm:<name>`, prompt
+      `ede330a1ee`). One call per query: the message as typed and the 20
+      candidates numbered 1..20 (not by passage id), relevance stated as in
+      the labelling guidance ("what a passage would do for this reader",
+      oblique help included), zero-shot. The answer is checked, never
+      trusted: out-of-range numbers and repeats are dropped, a short answer
+      is filled from the retrieval order, and a failure keeps the retrieval
+      order with `rerank_fallback` set. No fallbacks in the run.
+
+      | config | R@1 | R@5 | MRR | canary R@5 | content R@5 | vs no rerank (hit@5) | $/q |
+      |---|---|---|---|---|---|---|---|
+      | `raw` | 35% | 75% | 0.477 | 6/6 | 2/2 | — | — |
+      | `raw` + `llm:apertus-v15-70b` | 30% | 65% | 0.401 | 6/6 | 0/2 | fixed 4, broke 8 | — |
+      | `raw` + `llm:apertus-v15` (8B) | 20% | 55% | 0.331 | 6/6 | 1/2 | fixed 1, broke 6 | — |
+      | `raw` + `llm:claude` (Sonnet 5) | 20% | 70% | 0.393 | 6/6 | 2/2 | fixed 2, broke 3 | $0.0086 |
+
+      **They lose too, but they are the first technique that reaches the
+      queries dense cannot.** All three find "I am in the last round of the
+      interview…", which no configuration had found; the 70B also finds "I
+      said something cruel", "toxic relationship" and "not a good mum".
+      What sinks them is replacing the order: each drops hits raw had (the
+      70B 8, including both content questions). Taking every hard query
+      that raw *or* the LLM rerank finds, the 70B reaches **19 of 20** (only
+      "burning out at work" stays unfound) against 17 for the best strategy
+      fusion: the highest ceiling of the phase. **But that union shows up to
+      ten passages, not five**, so at k = 5 something has to give, and RRF
+      cannot do the combining: every LLM pick is also in raw's candidate
+      list, so it scores in both lists and the fusion would reproduce the
+      LLM's five. What the result supports is a presentation choice for
+      Phase 5 rather than a ranking: raw's five, plus the LLM's picks that
+      raw missed as a separate, clearly labelled second group. The models
+      favour 8.47 ("Quit life then…"): it is among the three most shown for
+      every LLM.
+
+      **A structured-output failure on CSCS** (Risk 2): with this ~3,300
+      token prompt, `response_format` made Apertus-v1.5-70B emit whitespace
+      until max_tokens (15 s, ~1,000 tokens a call), with an integer array,
+      fixed integer fields and string enums alike, while the prompt-JSON
+      path answered in ~1 s. The router's and MultiQuery's shorter prompts
+      never hit it. `complete_json` gained `structured=False` to skip the
+      `response_format` attempt; the reranker uses it, and Claude ignores
+      it. A test pins that the flag reaches the request.
+- [x] **Blind re-judging of every configuration's top 5** (added
+      2026-10-13). The golden labels were picked while raw was the only
+      retriever, so they may lean toward what raw surfaces; every row so
+      far was scored against them. Protocol, fixed before any judging
+      (`eval/blind.py`):
+      - *pool*: every (query, passage) pair any of the 52 Phase 4
+        configurations put in a top 5, from the committed per-query files:
+        1,254 pairs, each judged once whoever showed it. Which
+        configurations showed a pair is re-derived from those files at
+        score time and never shown to a judge;
+      - *human sample*: 150 pairs drawn with seed 20261013, grouped by
+        message and shuffled within it, passage text and citation (no rank
+        or configuration; the citation added at the labeller's request, to
+        look passages up, at the cost that old gold picks are recognisable). A tick strikes a passage as definitely not
+        helping; anything that could reasonably help, even obliquely,
+        stays. The full pool would have been ~167,000 words to read, about
+        12 hours; the sample is about 1.5;
+      - *judge*: `Qwen/Qwen3-235B-A22B-Instruct-2507` (deepinfra), an open
+        model of a third lineage so it favours neither Apertus's picks nor
+        Claude's, on every pair, under the same instruction, cached;
+      - *gate*: configurations are scored on the judge's verdicts only if
+        its agreement with the human sample reaches **Cohen's kappa
+        >= 0.6**; below that, the report gives the agreement and stops;
+      - *score*: per configuration on the hard queries, helpful@5 (share of
+        the top 5 not struck) and how many queries keep at least one
+        helpful passage. A measure of what each row shows, alongside the
+        recall it was scored on, not a replacement for it.
+
+      **Result** (`eval/results/phase-4-blind.md`). **The judge failed the
+      gate: Cohen's kappa 0.34** (raw agreement 69%), so it scores no
+      configuration. The disagreement is one-sided: of the judge's 30
+      strikes the human made 25, but of the human's 66 strikes the judge
+      made only 25. It is far more lenient than the labeller, so its
+      "helps" means little. Recalibrating its prompt on these 150 would
+      fit the sample it is measured on; it would need a held-out split.
+      Judge cost: 1,254 calls, 463k input and 39k output tokens.
+
+      **The human sample alone** (exploratory, added after the gate;
+      small n) answers the question that prompted this item:
+      - **The gold labels hold up.** None of the 9 gold pairs met blind
+        was struck.
+      - **Beyond gold, raw shows nothing better than the rest.** Raw's
+        non-gold passages were struck 5 of 11 times (45%); passages raw
+        never showed, 61 of 130 (47%).
+      - **The bias is in the labels' coverage, not their quality.** 75
+        kept pairs are not gold, 69 of them never shown by raw, 48 on hard
+        queries. "Not definitely unhelpful" is a looser bar than a gold
+        pick, so these are candidates, but recall@5 against gold does
+        undercount every configuration that is not raw.
+      - **The rerankers showed the fewest duds**, the same ones that lost
+        on recall: cross-encoder rows 21% struck (10/48), LLM rerank 24%
+        (8/34); MultiQuery the most, 49% (18/37). Only that spread clearly
+        exceeds the noise.
+      - **Apertus and Claude cannot be told apart this way:** 35% (70B),
+        37% (8B) and 36% (Claude) of their rows' passages struck.
+      Raw stays the default: no configuration beat it on recall, and on
+      this sample none clearly beats it on duds either. Growing the golden
+      set from the kept candidates is the way to make recall stop favouring
+      raw; it is a labelling job, so it goes to Phase 7.
+
+      **The dead set** (`eval/dead_set.jsonl`, added the same day): the
+      human sample as an eval set, the golden set's opposite. Every judged
+      pair with its verdict; a configuration's **dead@5** is dead passages
+      shown over judged passages shown in its top 5, all 28 queries, lower
+      better. Unjudged slots count neither way, so no row gains from being
+      sampled less. `run_eval.py` prints it on every retrieval row from now
+      on; `eval/blind.py score` gives it for all 52 Phase 4 configurations
+      from their committed top 5s. About 17 judged slots per row, shared
+      between rows: read families, not single rows.
+
+      | config | R@5 | dead@5 |
+      |---|---|---|
+      | `raw` | 75% | 28% (5/18) |
+      | `raw` + `llm:claude` | 70% | **6% (1/18)** |
+      | `raw` + `llm:apertus-v15-70b` | 65% | 24% (4/17) |
+      | `raw` + `ce-minilm` | 55% | 15% (3/20) |
+      | `raw+hyde@claude` + `ce-minilm` | 60% | 6% (1/17) |
+      | `multi@claude` | 25% | 50% (9/18) |
+
+      **Recall and dead@5 disagree, and the disagreement is the finding.**
+      The rerank rows, which lost recall against the golden set, show the
+      fewest dead passages: every reranked row sits at or below raw, and the
+      MultiQuery rows sit highest (36-50%). `raw` + `llm:claude` gives up
+      one hard query at R@5 and shows one dead passage where raw shows five,
+      at $0.0086 and ~1.8 s a query. One row against another is not
+      significant at this n (5/18 against 1/18: Fisher exact p ~ 0.18); the
+      family pattern is the evidence. It makes `raw` + `llm:claude` the
+      second candidate for the fresh-query check before Phase 5, beside
+      `raw+hyde@claude`: the shipped default stays raw until that check.
+
+      **The complete top-2 layer (2026-10-14) makes dead@2 exact, and it
+      overturns the recall story.** Every passage any configuration ranked
+      first or second on a hard query was judged blind: 504 pairs, 420 of
+      them in a second sheet (`eval/blind/sheet-top2-hard.md`, 207 struck),
+      the rest by the sample or gold labels (gold counted not dead). The
+      dead set now holds 570 judged pairs, tagged by layer; dead@5 stays
+      sample-only, since the layer is not a uniform draw.
+
+      | config | R@5 (gold) | dead@2 (hard, exact) | dead first passage |
+      |---|---|---|---|
+      | `raw+llm:claude` | 70% | **15% (6/40)** | 2/20 |
+      | `raw+hyde@apertus-v15-70b` | **80%** | 22% (9/40) | 5/20 |
+      | `raw+hyde@claude` | 75% | 28% (11/40) | 4/20 |
+      | `raw+llm:apertus-v15-70b` | 65% | 35% (14/40) | 5/20 |
+      | `raw` | 75% | 48% (19/40) | 7/20 |
+      | `raw+ce-minilm` | 55% | 52% (21/40) | 12/20 |
+      | `bge-base+bm25/raw` | 40% | 65% (26/40) | 12/20 |
+
+      - **Raw, the recall winner, is among the worst on dead@2**: nearly
+        half its top-2 passages on hard queries are judged useless. Gold
+        labels count as not dead and lean toward raw, which should flatter
+        it here, and it is still near the bottom.
+      - **Against raw, the differences are beyond noise**: `raw+llm:claude`
+        6/40 against 19/40 (Fisher p ~ 0.003), `raw+hyde@apertus-v15-70b`
+        9/40 (p ~ 0.03). Approximate, since a query's two slots are not
+        independent; the 150-pair sample could never show this.
+      - **`raw+hyde@apertus-v15-70b` wins both measures**: the best R@5 of
+        the phase (80%) and the second-best dead@2, on the open model, on
+        CSCS, at ~1.4 s a query. `raw+llm:claude` is the cleanest top 2 but
+        gives up a hard query at R@5 and costs $0.0086 a query.
+      - **The sampled dead@5 misled at family level**: it put the
+        cross-encoder rows at 21% dead; exactly, `raw+ce-minilm` is 52% at
+        top 2. Single-row or family claims from the sample are withdrawn.
+      - **Gold recall and dead@2 disagree because they measure different
+        things on a set built around raw**: recall asks whether one of a
+        few confident picks made the top 5; dead@2 asks how much of what
+        the reader sees first is useless. The second is closer to what a
+        reader experiences, and it is the one free of the coverage bias.
+
+      **The shipped default is now `raw+hyde` on Apertus v1.5 70B**
+      (decided 2026-10-14, without waiting for the fresh-query check: it
+      wins both measures, runs on the open model at no cost, and fails
+      safe). `config.DEFAULT_STRATEGY = "raw+hyde"` is the product default
+      (CLI, web UI); `config.BASELINE_STRATEGY = "raw"` is what a bare
+      `RetrievalConfig()` means, so the eval's reference row and its safety
+      and exposure tables do not move with it. If the LLM call fails, the
+      pipeline embeds the raw query (strategy fallback); if the CSCS key is
+      missing altogether, the CLI's default searches with raw and says so,
+      while an explicit `--strategy raw+hyde` stays a setup error. The
+      fresh-query check before Phase 5 remains the independent test, now
+      of the default itself.
 - [ ] **"No good match" handling**: score threshold or LLM relevance check.
+      **Scoped down for the delivery:** the threshold only, set from
+      evidence once rerank has landed.
       Post-retrieval rejection — distinct from the router; see `route/base.py`.
       Set the threshold from evidence and keep it conservative: a low cosine
       score means the passage shares little vocabulary with the query, not
@@ -1390,39 +1703,14 @@ budgeted. Three API facts that shape the implementation:
   a few hundred tokens, below the minimum cacheable prefix, so it would
   silently never cache.
 
-**How to read the Apertus embedder row.** There is no official Swiss AI
-Initiative embedding model; the `andreasmartin/*-swiss-embed-*` family is one
-author's independent bidirectional + LoRA adaptation of Apertus, explicitly
-not an official release, with no MTEB/MMTEB submission and self-described
-"internal development diagnostics" on its card. Its training data is Swiss
-administrative and encyclopedic text (Wikipedia, `VotingBooklets-v1`,
-`ZurichNLP/SwissGov-RSD`), and this corpus is 1902 English literary prose — so
-**expect it to lose to bge-base, and treat that as the finding**: what the
-fully-open Swiss stack costs in recall on English literary retrieval, at what
-latency. Two things to state alongside the number, or the row misleads: it is
-~4x bge-base's parameter count (so a loss is worse than it looks, and a win is
-not like-for-like), and its 1024-token window versus bge's 512 means the
-parent-child sub-chunking row behaves differently per embedder.
-
-The 4.9B variant (`apertus-v1.5-swiss-embed-4.9b-bidir`) is deliberately *not*
-used: ~10 GB at fp16 does not fit an 8 GB 3070, so it would run on CPU and
-corrupt exactly the p50/p95 and $/query columns Phase 3 exists to produce.
-
 **Done when:** the matrix shows a clear best configuration and the README can
 tell the story: baseline X% recall@5 → best pipeline Y%, at Z ms and $W/query.
 
 ## Phase 5 — Benchmark, polish, web UI & writeup (~3–4 days)
 
-- [ ] `bench/ann_scaling.py`: **at what corpus size does ANN start to pay?**
-      At 487 vectors HNSW cannot win — exact cosine is one matmul, and
-      approximate search would be both slower and less accurate. So measure the
-      crossover instead: synthesize 10K/100K/1M vectors, plot exact-vs-HNSW
-      latency, HNSW recall *against exact search as ground truth*, build time,
-      memory, and the `ef_search` tradeoff curve. Exact search stays in
-      production; this explains why, with numbers, and says what would change
-      the answer.
 - [ ] README results section: the matrix, the router table, 2–3 worked examples
-      (query → baseline vs tuned pipeline), cost notes, the ANN crossover.
+      (query → baseline vs tuned pipeline), cost notes. (The ANN crossover
+      moved to Phase 7.)
 - [ ] `meditations` UX polish: pleasant passage rendering, `--all` paging,
       config defaults set to the eval winner.
 - [ ] Repo hygiene: license note (Gutenberg text is public domain; state the
@@ -1485,8 +1773,7 @@ user; the LLM only routes and rewrites queries. So an injected query can at
 worst misroute itself, and for English the floor still runs beneath the
 router. Say this in the README rather than leaving it for someone to probe.
 
-**Done when:** the README results section tells the X% → Y% story with the
-ANN crossover; the Space is public and serves the eval-winner config; a query
+**Done when:** the README results section tells the X% → Y% story; the Space is public and serves the eval-winner config; a query
 through the web UI returns the same `QueryResult` as the CLI for the same
 config; and the spend cap and the outage path have both been triggered on
 purpose and seen to degrade as specified.
@@ -1531,7 +1818,7 @@ from Phase 4.
       Telefonseelsorge, AT 142).
 - [ ] **Embedder row**: translate → `bge-base` against German embedded
       directly by a multilingual encoder (`bge-m3`, or the Apertus
-      swiss-embed from Phase 4). Phase 2's reason against a multilingual
+      swiss-embed from Phase 7's embedder rows). Phase 2's reason against a multilingual
       encoder ("a capability nothing here uses") gets tested against a
       number.
 - [ ] Add `"de"` to `config.SUPPORTED_LANGUAGES`, in the commit that meets the
@@ -1563,14 +1850,66 @@ That is the scaling argument against keyword lists, stated as work.
   manager?" into a standalone query is the task rewriting was invented for; in
   v1 it only gets to do half its job.
 
+**Moved here from Phases 4 and 5 (2026-10-13).** The project ships as a
+hackathon artifact on 2026-10-16, polished and with the web UI, so work that
+does not change what ships was cut from v1: none of it touches the shipped
+pipeline's quality, which the remaining Phase 4 items (hybrid retrieval,
+rerank, no-match handling, each scoped down) still can. Kept as written, so
+none of it needs re-planning:
+
+- [ ] **More embedders** — two rows, one controlled variable each:
+      - `BAAI/bge-small-en-v1.5` (33M, 384-dim, same family, same query
+        prefix, one constructor argument). Isolates encoder *size*: does a 3x
+        smaller model lose anything at 487 passages?
+      - `andreasmartin/apertus-v1.1-swiss-embed-0.4b-bidir` (439M, 1024-dim,
+        1024-token, matryoshka to 256, Apache 2.0). Changes *family and
+        training domain*, and keeps the Apertus thread running through the
+        retrieval half. See the note below on how to read its result.
+      - `embed/voyage.py` stays optional — a hosted comparator if the local
+        rows turn out to be too close together to be interesting.
+
+  **How to read the Apertus embedder row.** There is no official Swiss AI
+  Initiative embedding model; the `andreasmartin/*-swiss-embed-*` family is one
+  author's independent bidirectional + LoRA adaptation of Apertus, explicitly
+  not an official release, with no MTEB/MMTEB submission and self-described
+  "internal development diagnostics" on its card. Its training data is Swiss
+  administrative and encyclopedic text (Wikipedia, `VotingBooklets-v1`,
+  `ZurichNLP/SwissGov-RSD`), and this corpus is 1902 English literary prose — so
+  **expect it to lose to bge-base, and treat that as the finding**: what the
+  fully-open Swiss stack costs in recall on English literary retrieval, at what
+  latency. Two things to state alongside the number, or the row misleads: it is
+  ~4x bge-base's parameter count (so a loss is worse than it looks, and a win is
+  not like-for-like), and its 1024-token window versus bge's 512 means the
+  parent-child sub-chunking row behaves differently per embedder.
+
+  The 4.9B variant (`apertus-v1.5-swiss-embed-4.9b-bidir`) is deliberately *not*
+  used: ~10 GB at fp16 does not fit an 8 GB 3070, so it would run on CPU and
+  corrupt exactly the p50/p95 and $/query columns Phase 3 exists to produce.
+
+- [ ] **One SQLite store** (`sqlite-vec` for vectors beside FTS5), from the
+      Phase 4 hybrid item: one file for both halves, the Book I filter as a
+      `WHERE` clause, sub-chunk dedup as a join. Pre-v1, so pin it.
+- [ ] **Grow the golden set from the blind sample's kept passages** (Phase 4
+      blind re-judging): 75 kept pairs are not gold, 69 never shown by raw.
+      Judged as confident picks, the ones that qualify make recall stop
+      favouring raw. In their own commits, as every golden-set edit is.
+- [ ] `bench/ann_scaling.py`: **at what corpus size does ANN start to pay?**
+      At 487 vectors HNSW cannot win — exact cosine is one matmul, and
+      approximate search would be both slower and less accurate. So measure the
+      crossover instead: synthesize 10K/100K/1M vectors, plot exact-vs-HNSW
+      latency, HNSW recall *against exact search as ground truth*, build time,
+      memory, and the `ef_search` tradeoff curve. Exact search stays in
+      production; this explains why, with numbers, and says what would change
+      the answer.
+
 ---
 
 ## Cost & infra summary
 
 | Item | Estimate |
 |---|---|
-| Infra | None through Phase 3 — everything local (files + numpy). From Phase 4, `sqlite-vec`: still a single file, still no server. |
-| Embeddings | Local: free (`bge-base` Phase 2; `bge-small` + Apertus-0.4B Phase 4). Voyage, if used: pennies one-time for 487 passages. |
+| Infra | None — everything local (files + numpy; BM25 from the standard library's SQLite FTS5). `sqlite-vec` moved to Phase 7. |
+| Embeddings | Local: free (`bge-base` Phase 2; `bge-small` + Apertus-0.4B moved to Phase 7). Voyage, if used: pennies one-time for 487 passages. |
 | LLM — default path | Apertus v1.5 70B on CSCS (`config.DEFAULT_LLM = "apertus-v15-70b"`; free to this project through Hack Apertus, but shared capacity). Router calls are tiny; HyDE/multi-query are ~1 short completion per query. Requires `CSCS_INFERENCE_API_KEY`. The 2509 rows run via HF Inference (`HF_TOKEN`; the 70B on featherless-ai). |
 | LLM — comparator | `claude-sonnet-5` ($2/$10 per MTok), scoped to comparator eval runs, not every query. A full golden-set pass is cents. |
 | Telemetry | Phoenix runs locally. Free. |
@@ -1603,8 +1942,8 @@ side — the comparator column is the smaller half of the bill.
    the supported inference path is open.
    **Apertus v1.5 is served by publicAI's own gateway**
    (`llm/gateway.py`, then `llm/publicai.py`; `PUBLICAI_API_KEY`), not through HF: the
-   non-thinking `swiss-ai/apertus-v1.5-8b` and `-70b`, at $0.10 / $0.20 and
-   $0.82 / $2.92 per MTok. Smoke-tested 2026-10-07: `response_format`
+   non-thinking `swiss-ai/apertus-v1.5-8b` and `-70b`, at \$0.10 / \$0.20 and
+   \$0.82 / \$2.92 per MTok. Smoke-tested 2026-10-07: `response_format`
    honoured, `seed` accepted, 11-12 output tokens (no thinking), the 70B at
    0.5-1.2 s. Registered as new names, so `apertus` and `apertus-8b` keep
    meaning the 2509 models every recorded row used. From v1.5 on the bare

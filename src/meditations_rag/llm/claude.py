@@ -91,7 +91,9 @@ class ClaudeClient:
     def complete(self, system: str, user: str) -> str:
         return self._create(system, user, output_config={}, json_path=None)
 
-    def complete_json(self, system: str, user: str, schema: dict) -> dict:
+    def complete_json(self, system: str, user: str, schema: dict,
+                      structured: bool = True) -> dict:
+        # structured is ignored: Claude's structured output is guaranteed.
         fmt = {"format": {"type": "json_schema", "schema": schema}}
         text = self._create(system, user, output_config=fmt, json_path="structured")
         try:

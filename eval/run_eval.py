@@ -716,11 +716,13 @@ def render_no_match(records: list[dict], intents: dict[str, str]) -> str:
     """How often the no-match hedge fires, from the exposure records: on
     in-scope queries (golden, safety, router in_scope: false alarms) and on
     the router set's out_of_scope ones, which retrieve under the keyword
-    router. The hedge reads the message's own cosine, so any row that
-    embeds the message as typed (raw, raw+X) fires exactly as raw does."""
+    router. The hedge reads the best cosine between the message as typed
+    and any passage, so any row that embeds the message as typed (raw,
+    raw+X) fires exactly as raw does."""
     L = ["## No-match threshold", "",
          f"*config.MIN_SCORE_THRESHOLD = {config.MIN_SCORE_THRESHOLD}, on the cosine of the "
-         "message itself. Fired = \"No strong match — Marcus may be silent on this\" above the "
+         "best match of the message as typed (max cosine between the message and any "
+         "passage). Fired = \"No strong match — Marcus may be silent on this\" above the "
          "nearest passages (they are still shown).*", ""]
     rows = []
     for label in dict.fromkeys(r["config"] for r in records):

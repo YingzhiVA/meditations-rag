@@ -45,12 +45,12 @@ adds the language guard, fusion, rerank, and the LLM-backed routers/strategies):
    retrieve/safety_llm.py, the comparator; it falls back to the list on any
    provider error.
 7. Attach Passage objects (corpus.store.load_passages) + final scores.
-   Flag a query whose OWN MESSAGE comes no closer than
-   config.MIN_SCORE_THRESHOLD to any passage, so the CLI can render an
-   honest "no strong match — Marcus may be silent on this" above the
-   least-bad passages. The message's own best cosine, not the fused list's:
-   a HyDE passage is written in the corpus's register and lands near some
-   passage whatever was asked. This is POST-retrieval rejection: the query
+   Flag a query when the best cosine between THE MESSAGE AS TYPED and any
+   passage (QueryResult.match_score) is below config.MIN_SCORE_THRESHOLD,
+   so the CLI can render an honest "no strong match — Marcus may be silent
+   on this" above the least-bad passages. Not the fused list's scores, which
+   also hold cos(HyDE passage, passage): a HyDE passage is written in the
+   corpus's register and lands near some passage whatever was asked. This is POST-retrieval rejection: the query
    looked like a real problem, and the corpus simply had no good answer.
 
 Phase 4 — parent-child chunking (cfg.chunking == "subchunk",
@@ -449,7 +449,8 @@ def _run_query(problem, cfg, router, strategy, reranker, embedder, index,
                          rerank_score=rerank_scores.get(h.passage_id))
         for r, h in enumerate(kept, start=1)
     ]
-    # The message's own list when it was embedded (raw, raw+X, hybrid); a
+    # The ranked list of the message as typed, when it was embedded (raw,
+    # raw+X, hybrid): its top score is max cos(message, passage). A
     # strategy that never embeds the message as typed falls back to the
     # fused top, with the bias toward a match that implies.
     own = lists[queries.index(problem)] if problem in queries else hits

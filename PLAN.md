@@ -1993,8 +1993,9 @@ none of it needs re-planning:
 | Telemetry | Phoenix runs locally. Free. |
 | Hosting (Phase 5) | HuggingFace Space, free CPU tier; LLM calls go to CSCS. CSCS usage bounded by a daily call cap; past it, or once the hackathon key is revoked, the Space runs keyword + `raw` with no LLM calls. |
 
-Worst case for a full grid run is bounded by the HF side, not the Anthropic
-side — the comparator column is the smaller half of the bill.
+Only the comparator column costs money: the default path runs on CSCS, which
+costs shared capacity, not dollars, and the 2509 rows on HF are cached. A full
+grid rerun is cents, and nearly free from the completion cache.
 
 ## Key risks
 

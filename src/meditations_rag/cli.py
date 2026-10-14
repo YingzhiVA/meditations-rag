@@ -372,8 +372,12 @@ def _debug_block(result) -> str:
     if result.withheld:
         reasons = "; ".join(withheld_reasons(result.safety, result.withheld))
         lines.append(f"[debug] withheld: {', '.join(result.withheld)} — {reasons}")
-    if result.no_strong_match:
-        lines.append("[debug] no_strong_match: True")
+    if result.match_score is not None:
+        from meditations_rag import config
+
+        lines.append(f"[debug] message match: {result.match_score:.3f} "
+                     f"(no-match below {config.MIN_SCORE_THRESHOLD}"
+                     f"{', fired' if result.no_strong_match else ''})")
     return "\n".join(lines)
 
 

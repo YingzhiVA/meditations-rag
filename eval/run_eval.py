@@ -3,6 +3,7 @@
     .venv/bin/python eval/run_eval.py                       # everything
     .venv/bin/python eval/run_eval.py --embedder bge-base --strategy raw
     .venv/bin/python eval/run_eval.py --routers-only
+    .venv/bin/python eval/run_eval.py --strategy raw rewrite --llm apertus-v15-70b claude
 
 THIS FILE IS AUTHORITATIVE for quality numbers. Phoenix (see
 meditations_rag/telemetry.py) is observability only — do not use its
@@ -20,6 +21,17 @@ comparisons that matter.
              they are the easy lexical-anchor queries every configuration
              gets, so folding them in lifts every row equally and blunts the
              comparison. A canary that drops means something broke.
+             Content questions ("What does Marcus say about…", tier
+             "content") get their own column too: they are a different kind
+             of input from a problem statement, and PLAN.md asks for them to
+             be reported apart.
+             The dead set (eval/dead_set.jsonl, from the blind re-judging)
+             is the golden set's opposite: passages judged definitely not
+             helping. dead@2 (hard) is exact for every Phase 4 row: every
+             top-2 slot on the hard queries was judged (gold counted not
+             dead); a new row may show unjudged passages and says so.
+             dead@5 (sample) is a ~17-slot random sample per row: noisy,
+             kept for the record. Lower is better for both.
 
   Router     reported as a PAIR: out_of_scope recall AND in_scope retention.
              Recall alone is gameable by rejecting everything, and the real
@@ -38,14 +50,62 @@ WHAT IS MEASURED HERE AND WHAT IS NOT
 Latency is wall-clock around run_query, which IS the end-to-end number;
 telemetry.py's spans add the BREAKDOWN (where the time went), not the total,
 so the p50/p95 columns do not wait on it. Token and $/query columns stay
-blank until Phase 4 gives a strategy that makes an LLM call — printing 0.00
-for a pipeline that spends nothing would read as a measurement rather than an
-absence.
+blank wherever no LLM call is made — printing 0.00 for a pipeline that spends
+nothing would read as a measurement rather than an absence. The first LLM
+calls are the Phase 4 routers, so the router and safety tables carry their
+cost: fallbacks, LLM round-trip p50/p95, tokens and $ per query, all read
+from llm.base.CALLS rather than from the spans. $ is blank for providers
+with no published per-token rate.
 
-EVERY NUMBER IS A FLOOR. Labels are sparse (eval/README.md's pooling
-protocol): an apt passage nobody labelled scores as a miss. Fine for
-comparing configurations, which is what the matrix is for; not fine to
-present as an absolute.
+LLM COMPLETIONS ARE CACHED ON DISK (llm/cache.py), keyed by llm, model and
+full prompt, so a rerun is free and reproduces the first run. A cached call
+reports the original call's tokens and latency. LLM routers run only when
+named (--router apertus claude), so a bare run never spends. A fallback
+means part of a row is the keyword router under another name; the report
+says so in bold under the table.
+
+LLM STRATEGIES (Phase 4: rewrite) run once per --llm named, and only then,
+for the same reason: a bare run never spends. Their retrieval rows carry the
+strategy's cost in the tok and $/q columns, their latency includes the
+original LLM round trip even when served from the cache, and a provider
+error that made a query fall back to the raw problem is counted in bold
+under the table: those queries measured `raw` under the strategy's name.
+The per-query file records what was actually embedded, which is the
+evidence for any rewrite row.
+
+REPEATS. One run of an LLM router is one sample: at temperature 0.8 by
+construction, and at temperature 0 too if the provider is nondeterministic.
+--repeats N reruns the LLM routers N times, each repeat under its own cache
+key (llm/cache.py), labels the rows '#0'..'#N-1', and adds a stability table:
+how many queries changed answer between repeats, with the backend
+fingerprint per repeat. A difference between two routers smaller than
+either one's instability is not a finding.
+
+EVERY NUMBER IS A LOWER BOUND. The labels come from one full read of the
+book (eval/README.md), so an unlabelled passage was read and not picked,
+and every configuration is scored against the same labels. But each entry
+holds the curator's confident picks, not every passage that could help, so
+an apt passage left out still scores as a miss. Fine for comparing
+configurations, which is what the matrix is for; not fine to present as an
+absolute.
+
+THE POST-RETRIEVAL LLM CHECK (Phase 4, --suppressor NAME ...) is a
+comparator to the reviewed lists, scored two ways: (a) the safety set through
+the pipeline with the keyword router, so only the suppressor varies —
+prohibited passages shown, hazards the list would have caught, passages
+withheld beyond the list; (b) every passage in eval/suppression_review.jsonl,
+kept and struck, judged for every reader of the matching situation. Keeps
+judged safe and strikes judged hazardous are reported apart, never averaged.
+
+EXPOSURE (Phase 4) needs no labels: every distinct English query in the
+three sets through each retrieval row, counting what readers are shown:
+Book I passages, listed passages shown to unflagged readers (what a missed
+flag would expose), and how many distinct passages the top-5 lists cover. LLM-strategy rows only with
+--exposure-llm, since their completions are cached for the golden set only.
+
+THE LANGUAGE GUARD (Phase 4) gets its own table: false declines over every
+English input the three sets hold, and decline recall over
+eval/language_set.jsonl by tier. Both run locally and free on every run.
 
 THE STAMP. Results carry the model id, library versions, the corpus
 fingerprint and the md5 of each labelled set. Embedding numbers move when a
@@ -62,17 +122,19 @@ import json
 import statistics
 import subprocess
 import time
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
-from meditations_rag import config
+from meditations_rag import config, llm
 from meditations_rag.corpus.store import load_passages
 from meditations_rag.embed import EMBEDDER_NAMES, get_embedder
 from meditations_rag.index.vector_index import load_index
+from meditations_rag.llm.base import CALLS, CallRecord
 from meditations_rag import telemetry
-from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
-from meditations_rag.retrieve.strategies import STRATEGY_NAMES
-from meditations_rag.route import ROUTER_NAMES, get_router
+from meditations_rag.retrieve.pipeline import FILTERS, RetrievalConfig, run_query
+from meditations_rag.retrieve.strategies import LLM_STRATEGIES, STRATEGY_NAMES, get_strategy
+from meditations_rag.llm import get_llm
+from meditations_rag.route import LLM_ROUTERS, ROUTER_NAMES, get_router
 from meditations_rag.route.base import SafetyFlag
 
 EVAL_DIR = Path(__file__).resolve().parent
@@ -90,16 +152,31 @@ def load_jsonl(path: Path) -> list[dict]:
     return [json.loads(l) for l in path.open(encoding="utf-8") if l.strip()]
 
 
+def _llm_stamp(client) -> str:
+    """'apertus = swiss-ai/Apertus-70B-Instruct-2509 via featherless-ai'."""
+    provider = getattr(client, "provider", None) or "anthropic"
+    return f"{client.name} = {client.model} via {provider}"
+
+
+def _version(dist: str) -> str:
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version(dist)
+    except PackageNotFoundError:
+        return "not installed"
+
+
 def md5(path: Path) -> str:
     return hashlib.md5(path.read_bytes()).hexdigest() if path.exists() else "absent"
 
 
-def split_golden(entries: list[dict]) -> tuple[list, list, list, int]:
-    """(hard, canary, out_of_scope, n_unlabelled). An entry with no usable
-    gold ids is EXCLUDED, not scored as a miss — it has not been judged yet,
-    and counting it as a failure would make an unfinished set look like a bad
-    pipeline."""
-    hard, canary, oos, skipped = [], [], [], 0
+def split_golden(entries: list[dict]) -> tuple[list, list, list, list, int]:
+    """(hard, canary, content, out_of_scope, n_unlabelled). An entry with no
+    usable gold ids is EXCLUDED, not scored as a miss — it has not been
+    judged yet, and counting it as a failure would make an unfinished set
+    look like a bad pipeline."""
+    hard, canary, content, oos, skipped = [], [], [], [], 0
     for e in entries:
         tier = e.get("tier", "hard")
         if tier == "out_of_scope":
@@ -110,8 +187,8 @@ def split_golden(entries: list[dict]) -> tuple[list, list, list, int]:
             skipped += 1
             continue
         e = {**e, "gold_ids": ids}
-        (canary if tier == "canary" else hard).append(e)
-    return hard, canary, oos, skipped
+        {"canary": canary, "content": content}.get(tier, hard).append(e)
+    return hard, canary, content, oos, skipped
 
 
 # --- retrieval --------------------------------------------------------------
@@ -130,16 +207,36 @@ def describe_device(emb) -> str:
     return device
 
 
-def build_grid(embedders, strategies) -> list[RetrievalConfig]:
+def _reranker_name(name: str) -> str:
+    """argparse type for --reranker: a cross-encoder name or llm:<registry name>."""
+    from meditations_rag.llm import LLM_NAMES
+    from meditations_rag.retrieve.rerank import RERANKER_NAMES
+
+    if name in RERANKER_NAMES or (name.startswith("llm:") and name[4:] in LLM_NAMES):
+        return name
+    raise argparse.ArgumentTypeError(
+        f"unknown reranker {name!r}: use one of {', '.join(RERANKER_NAMES)} or llm:<name> "
+        f"with <name> in {', '.join(LLM_NAMES)}")
+
+
+def build_grid(embedders, strategies, llms, chunkings=("passage",),
+               filters=("none",), retrievers=("dense",),
+               rerankers=("none",)) -> list[RetrievalConfig]:
     """Derived from the registries, so Phase 4's cells appear with no edit.
 
     The llm axis only varies for LLM-USING strategies: 'raw' takes none, so
     running it once per provider would report identical configurations as
-    distinct rows."""
+    distinct rows. With no llm named, the LLM strategies are left out."""
     return [
-        RetrievalConfig(embedder=e, strategy=s, k=max(KS))
+        RetrievalConfig(embedder=e, strategy=s, llm=m, chunking=c, filter=f,
+                        retriever=r, reranker=rr, k=max(KS))
         for e in embedders
+        for c in chunkings
+        for r in retrievers
+        for rr in rerankers
+        for f in filters
         for s in strategies
+        for m in (llms if s in LLM_STRATEGIES else [None])
     ]
 
 
@@ -152,17 +249,36 @@ def gold_rank(result, gold_ids: list[str]) -> int | None:
     return None
 
 
-def run_config(cfg, hard, canary, oos, resources, run_id=None) -> dict:
+def cell_resources(cfg, resources):
+    """(embedder, index, passages) for one grid cell: the embedder's loaded
+    passage index, or its sub-chunked one (index/chunking.py), loaded here.
+    Shared by the retrieval and exposure tables so they search the same
+    index for the same row."""
+    emb, idx, passages = resources[cfg.embedder]
+    if cfg.chunking != "passage":
+        idx = load_index(emb.name, expected_dim=emb.dim, chunking=cfg.chunking)
+    return emb, idx, passages
+
+
+def run_config(cfg, hard, canary, content, oos, resources, run_id=None) -> dict:
     """One grid cell over every scored entry. Returns metrics plus the
     per-query records the error-analysis file is built from."""
-    emb, idx, passages = resources[cfg.embedder]
+    emb, idx, passages = cell_resources(cfg, resources)
+    # Built once per cell, not per query: the client is the same for all of them.
+    strategy = get_strategy(cfg.strategy, get_llm(cfg.llm) if cfg.llm else None)
     records, latencies = [], []
-    for tier, entries in (("hard", hard), ("canary", canary), ("out_of_scope", oos)):
+    for tier, entries in (("hard", hard), ("canary", canary), ("content", content),
+                          ("out_of_scope", oos)):
         for e in entries:
+            start = len(CALLS)
             t0 = time.perf_counter()
-            res = run_query(e["query"], cfg, embedder=emb, index=idx, passages=passages,
-                            eval_run_id=run_id)
-            latencies.append((time.perf_counter() - t0) * 1000)
+            res = run_query(e["query"], cfg, strategy=strategy, embedder=emb, index=idx,
+                            passages=passages, eval_run_id=run_id)
+            calls = CALLS[start:]
+            # A cache hit takes microseconds; add back the original round trip
+            # so a rerun reports the latency the configuration really has.
+            latencies.append((time.perf_counter() - t0) * 1000
+                             + sum(c.latency_ms for c in calls if c.cached))
             gold = e.get("gold_ids", [])
             records.append({
                 "config": cfg.label, "tier": tier, "query": e["query"],
@@ -170,17 +286,58 @@ def run_config(cfg, hard, canary, oos, resources, run_id=None) -> dict:
                 "gold_ids": gold, "rank": gold_rank(res, gold) if gold else None,
                 "returned": [rp.passage.id for rp in res.passages],
                 "scores": [round(rp.score, 4) for rp in res.passages],
-                "intent": res.intent.value,
+                "intent": res.intent.value if res.intent else None,
+                "declined": res.declined, "language": res.language,
                 "safety": sorted(f.value for f in res.safety),
                 "no_strong_match": res.no_strong_match,
+                "embedded": res.queries,
+                # Which child matched, per shown passage (None: embedded whole).
+                "chunks": [rp.chunk for rp in res.passages],
+                "rerank_scores": [rp.rerank_score for rp in res.passages],
+                "strategy_fallback": res.strategy_fallback,
+                "rerank_fallback": res.rerank_fallback,
+                **llm_usage(calls),
             })
     return {"config": cfg, "records": records,
             "metrics": {
                 "hard": tier_metrics([r for r in records if r["tier"] == "hard"]),
                 "canary": tier_metrics([r for r in records if r["tier"] == "canary"]),
+                "content": tier_metrics([r for r in records if r["tier"] == "content"]),
                 "oos": oos_metrics([r for r in records if r["tier"] == "out_of_scope"]),
             },
             "latency": latencies}
+
+
+# (query, passage) -> dead, from eval/dead_set.jsonl; empty when absent.
+# DEAD: sample rows only (a uniform draw, for dead@5). DEAD2: every judged row
+# plus gold counted not dead, which covers every top-2 slot on the hard
+# queries of every Phase 4 configuration (for dead@2).
+DEAD: dict[tuple[str, str], bool] = {}
+DEAD2: dict[tuple[str, str], bool] = {}
+
+
+def dead2_cell(records: list[dict]) -> str:
+    """dead@2 on the hard queries. Exact when every slot is judged; a new
+    configuration can show unjudged passages, and then the cell says how
+    many slots it could judge."""
+    if not DEAD2:
+        return "—"
+    slots = [(r["query"], p) for r in records if r["tier"] == "hard" for p in r["returned"][:2]]
+    judged = [DEAD2[s] for s in slots if s in DEAD2]
+    if not judged:
+        return "—"
+    cell = f"{sum(judged) / len(judged):.0%} ({sum(judged)}/{len(judged)})"
+    return cell if len(judged) == len(slots) else cell + f", {len(slots) - len(judged)} unjudged"
+
+
+def dead_cell(records: list[dict]) -> str:
+    if not DEAD:
+        return "—"
+    judged = [DEAD[(r["query"], p)] for r in records for p in r["returned"]
+              if (r["query"], p) in DEAD]
+    if not judged:
+        return "—"
+    return f"{sum(judged) / len(judged):.0%} ({sum(judged)}/{len(judged)})"
 
 
 def tier_metrics(records: list[dict]) -> dict | None:
@@ -206,63 +363,442 @@ def oos_metrics(records: list[dict]) -> dict | None:
 
 # --- routers ----------------------------------------------------------------
 
-def run_routers(names, entries) -> list[dict]:
-    rows = []
+def llm_usage(calls: list[CallRecord]) -> dict:
+    """What one query's LLM calls cost. Cached calls carry the ORIGINAL
+    call's tokens and latency (llm/cache.py), so a rerun reports what the run
+    cost when it was made. usd is None when any call's model has no
+    published rate (config.LLM_PRICES_PER_MTOK) — blank, never a guess."""
+    usd = 0.0
+    for c in calls:
+        rate = config.LLM_PRICES_PER_MTOK.get(c.model)
+        if rate is None:
+            usd = None
+            break
+        usd += (c.input_tokens * rate[0] + c.output_tokens * rate[1]) / 1e6
+    return {"llm_ms": round(sum(c.latency_ms for c in calls), 1),
+            "in_tok": sum(c.input_tokens for c in calls),
+            "out_tok": sum(c.output_tokens for c in calls),
+            "usd": usd if calls else None,
+            "json_paths": [c.json_path for c in calls if c.json_path],
+            "served_models": sorted({c.served_model for c in calls if c.served_model}),
+            "fingerprints": sorted({c.fingerprint for c in calls if c.fingerprint}),
+            "llm_calls": len(calls)}
+
+
+def usage_summary(records: list[dict]) -> dict:
+    """Per-router cost columns. Latency percentiles are over the queries
+    that made a call (an exact chitchat match never does); tokens and $ are
+    averaged over every query, since that is what a query costs on average."""
+    called = [r for r in records if r["llm_calls"]]
+    ms = sorted(r["llm_ms"] for r in called)
+    usd = [r["usd"] for r in called]
+    return {
+        "fallbacks": sum(1 for r in records if r["fallback"]),
+        "n": len(records),
+        "p50": statistics.median(ms) if ms else None,
+        "p95": percentile(ms, 0.95) if ms else None,
+        "tok_q": sum(r["in_tok"] + r["out_tok"] for r in records) / len(records),
+        "usd_q": (sum(usd) / len(records)) if usd and None not in usd else None,
+        "paths": dict(Counter(p for r in records for p in r["json_paths"])),
+    }
+
+
+def percentile(sorted_values: list[float], q: float) -> float:
+    """Nearest-rank, the same rule the retrieval table's p95 column uses."""
+    return sorted_values[max(0, int(q * len(sorted_values)) - 1)]
+
+
+def llm_flags(decision) -> list[str] | None:
+    """The LLM's own flags, before the floor; None when no LLM answered."""
+    if decision.llm_safety is None:
+        return None
+    return sorted(f.value for f in decision.llm_safety)
+
+
+def run_routers(names, entries) -> tuple[list[dict], list[dict]]:
+    """(rows, per-query records). Every LLM call a route() makes is sliced
+    out of llm.base.CALLS, so the router row carries its own cost."""
+    rows, records = [], []
     for name in names:
         router = get_router(name)
         per_intent = defaultdict(lambda: [0, 0])   # intent -> [correct, total]
         oos_tier = defaultdict(lambda: [0, 0])     # hard/canary -> [correct, total]
+        mine = []
         for e in entries:
             expected = e["intent"]
-            got = router.route(e["query"]).intent.value
+            start = len(CALLS)
+            d = router.route(e["query"])
+            got = d.intent.value
             per_intent[expected][1] += 1
             per_intent[expected][0] += got == expected
             if expected == "out_of_scope":
                 t = e.get("tier", "canary")
                 oos_tier[t][1] += 1
                 oos_tier[t][0] += got == expected
+            mine.append({"table": "router", "router": name, "query": e["query"],
+                         "tier": e.get("tier", ""), "expected": expected, "got": got,
+                         "correct": got == expected,
+                         "safety": sorted(f.value for f in d.safety),
+                         "llm_safety": llm_flags(d),
+                         "fallback": d.fallback, **llm_usage(CALLS[start:])})
         rows.append({"router": name, "per_intent": dict(per_intent),
-                     "oos_tier": dict(oos_tier)})
-    return rows
+                     "oos_tier": dict(oos_tier), "usage": usage_summary(mine)})
+        records += mine
+    return rows, records
 
 
 # --- safety -----------------------------------------------------------------
 
-def run_safety(names, entries, cfg, resources, run_id=None) -> list[dict]:
+def run_safety(names, entries, cfg, resources, run_id=None) -> tuple[list[dict], list[dict]]:
     """Two independent axes, reported side by side and never merged.
 
     PRE-retrieval: did the owed flag fire (recall), and did one fire when
     none was owed (false positives)? POST-retrieval: did a passage the
     entry names as prohibited survive into the shown results? The second is
     run through the real pipeline, so a flag the router MISSES shows up as a
-    surviving passage — which is the failure worth catching."""
+    surviving passage — which is the failure worth catching.
+
+    The union is what ships, so it is the headline. Beside it, for LLM
+    routers, the LLM's OWN flags (RouteDecision.llm_safety) are scored the
+    same way: what the LLM catches without the floor, and whether it
+    over-flags by itself — which the union hides, since it can never fall
+    below the floor's false positives. A query the LLM did not answer (a
+    fallback) counts as the LLM catching nothing.
+
+    Cost is sliced around the first route() only: the pipeline's own
+    route() for the same query is a cache hit, and counting it would bill
+    the query twice."""
     emb, idx, passages = resources[cfg.embedder]
-    rows = []
+    rows, records = [], []
     for name in names:
         router = get_router(name)
         per_flag = defaultdict(lambda: [0, 0])     # flag -> [caught, owed]
         fp = [0, 0]                                # [fired, n_negatives]
         survived, checked = 0, 0
+        llm_caught, llm_fp = [0, 0], [0, 0]        # LLM alone: [caught, owed], [fired, n_neg]
+        mine = []
         for e in entries:
             owed = set(e.get("flags", []))
-            got = {f.value for f in router.route(e["query"]).safety}
+            start = len(CALLS)
+            d = router.route(e["query"])
+            usage = llm_usage(CALLS[start:])
+            got = {f.value for f in d.safety}
+            own = set(llm_flags(d) or [])
             if owed:
                 for f in owed:
                     per_flag[f][1] += 1
                     per_flag[f][0] += f in got
+                    llm_caught[1] += 1
+                    llm_caught[0] += f in own
             else:
                 fp[1] += 1
                 fp[0] += bool(got)
+                llm_fp[1] += 1
+                llm_fp[0] += bool(own)
             banned = set(e.get("must_not_return", []))
+            shown_banned: list[str] = []
             if banned:
                 checked += 1
                 res = run_query(e["query"], cfg, router=router, embedder=emb,
                                 index=idx, passages=passages, eval_run_id=run_id)
-                if banned & {rp.passage.id for rp in res.passages}:
-                    survived += 1
+                shown_banned = sorted(banned & {rp.passage.id for rp in res.passages})
+                survived += bool(shown_banned)
+            mine.append({"table": "safety", "router": name, "query": e["query"],
+                         "tier": e.get("tier", ""), "owed": sorted(owed), "got": sorted(got),
+                         "missed": sorted(owed - got),
+                         "llm_safety": llm_flags(d),
+                         "false_positive": sorted(got) if not owed else [],
+                         "prohibited_shown": shown_banned,
+                         "fallback": d.fallback, **usage})
         rows.append({"router": name, "per_flag": dict(per_flag), "fp": fp,
-                     "survived": survived, "checked": checked})
-    return rows
+                     "survived": survived, "checked": checked,
+                     "llm_caught": llm_caught, "llm_fp": llm_fp,
+                     "usage": usage_summary(mine)})
+        records += mine
+    return rows, records
+
+
+# --- post-retrieval check: the LLM comparator --------------------------------
+
+def run_suppression(names, safety_set, embedder, resources, run_id=None) -> list[dict]:
+    """(a) In the pipeline. Every safety-set entry through run_query with the
+    keyword router — its flags are the deterministic floor, so only the
+    suppressor varies — once with the reviewed list and once per LLM. Counts,
+    per entry: prohibited passages SHOWN (must_not_return: the product
+    violation), passages withheld that the list would have shown
+    (over-suppression), and listed hazards shown (what the list would have
+    caught). Only what ranks in the top k is ever judged, so this is the
+    realistic test and a small sample; (b) is the controlled one."""
+    from meditations_rag.retrieve.safety import suppressed_ids
+
+    emb, idx, passages = resources[embedder]
+    router = get_router("keyword")
+    records = []
+    for name in ["list", *names]:
+        cfg = RetrievalConfig(embedder=embedder, k=max(KS), suppressor=name)
+        for e in safety_set:
+            start = len(CALLS)
+            res = run_query(e["query"], cfg, router=router, embedder=emb, index=idx,
+                            passages=passages, eval_run_id=run_id)
+            if not res.retrieved or not res.safety:
+                continue
+            shown = {rp.passage.id for rp in res.passages}
+            listed = set(suppressed_ids(res.safety))
+            records.append({
+                "table": "suppression", "suppressor": name, "query": e["query"],
+                "flags": sorted(f.value for f in res.safety),
+                "shown": sorted(shown), "withheld": sorted(res.withheld),
+                "prohibited_shown": sorted(shown & set(e.get("must_not_return", []))),
+                "over_withheld": sorted(set(res.withheld) - listed),
+                "listed_shown": sorted(shown & listed),
+                "fallback": res.suppression_fallback, **llm_usage(CALLS[start:])})
+    return records
+
+
+def run_agreement(names, review, safety_set, passages) -> list[dict]:
+    """(b) Against the review itself. Every passage the review read — kept
+    and struck — paired with every safety-set reader of the matching
+    situation (abuse readers for the abuse list; mental_health and addiction
+    readers for the death-counsel list), and judged once per pair. The
+    strikes are the deliberate near-misses: they are what show whether the
+    LLM applies the test or just reacts to vocabulary. 9.3 is reviewed for
+    both lists with opposite verdicts, so it also tests the split by
+    situation."""
+    from meditations_rag.llm import get_llm
+    from meditations_rag.llm.base import LLMError
+    from meditations_rag.retrieve.safety_llm import LLMSuppressor
+
+    texts = {p.id: p.text for p in passages}
+    readers = {"abuse": [e["query"] for e in safety_set if "abuse" in e.get("flags", [])],
+               "death": [e["query"] for e in safety_set
+                         if {"mental_health", "addiction"} & set(e.get("flags", []))]}
+    records = []
+    for name in names:
+        judge = LLMSuppressor(get_llm(name))
+        for r in review:
+            for q in readers[r["list"]]:
+                start = len(CALLS)
+                try:
+                    v = judge.judge(q, texts[r["id"]], r["list"])
+                    hazard, reason, error = bool(v["hazard"]), v["reason"], None
+                except LLMError as exc:
+                    hazard, reason, error = None, "", str(exc)[:200]
+                records.append({
+                    "table": "agreement", "suppressor": name, "list": r["list"],
+                    "id": r["id"], "verdict": r["verdict"], "query": q,
+                    "hazard": hazard, "reason": reason, "error": error,
+                    **llm_usage(CALLS[start:])})
+    return records
+
+
+def render_suppression(supp: list[dict], agree: list[dict]) -> str:
+    L = ["## Post-retrieval check: LLM comparator", "",
+         "*The reviewed lists are the shipped behaviour; an LLM suppressor is a comparator "
+         "and falls back to the list on any provider error. (a) runs the safety set "
+         "through the pipeline with the keyword router; (b) judges every reviewed "
+         "keep and strike against each reader of the matching situation.*", ""]
+    rows = []
+    for name in dict.fromkeys(r["suppressor"] for r in supp):
+        rs = [r for r in supp if r["suppressor"] == name]
+        u = usage_summary([{**r, "fallback": r["fallback"]} for r in rs]) if name != "list" else None
+        rows.append([f"`{name}`", str(len(rs)),
+                     str(sum(bool(r["prohibited_shown"]) for r in rs)),
+                     str(sum(len(r["listed_shown"]) for r in rs)),
+                     str(sum(len(r["over_withheld"]) for r in rs)),
+                     f"{u['fallbacks']}/{u['n']}" if u else "—",
+                     f"{u['tok_q']:.0f}" if u else "—",
+                     f"{u['usd_q']:.5f}" if u and u["usd_q"] is not None else "—"])
+    if rows:
+        L += ["**(a) In the pipeline**", "",
+              table(["suppressor", "flagged entries", "entries showing a prohibited passage",
+                     "listed hazards shown", "withheld beyond the list", "fallbacks",
+                     "tok/entry", "$/entry"], rows), ""]
+    rows = []
+    for name in dict.fromkeys(r["suppressor"] for r in agree):
+        for lst in ("abuse", "death"):
+            rs = [r for r in agree if r["suppressor"] == name and r["list"] == lst]
+            keeps = [r for r in rs if r["verdict"] == "keep"]
+            strikes = [r for r in rs if r["verdict"] == "strike"]
+            errs = sum(r["error"] is not None for r in rs)
+            rows.append([f"`{name}`", lst,
+                         f"{sum(r['hazard'] is True for r in keeps)}/{len(keeps)}",
+                         f"{sum(r['hazard'] is True for r in strikes)}/{len(strikes)}",
+                         str(errs)])
+    if rows:
+        L += ["**(b) Agreement with the review** (pairs of reviewed passage x reader)", "",
+              table(["suppressor", "list", "keeps judged hazard", "strikes judged hazard",
+                     "errors"], rows), ""]
+        for name in dict.fromkeys(r["suppressor"] for r in agree):
+            split = {lst: [r["hazard"] for r in agree if r["suppressor"] == name
+                           and r["id"] == "9.3" and r["list"] == lst] for lst in ("abuse", "death")}
+            L += [f"*`{name}` on 9.3, struck for abuse and kept for death counsel: "
+                  f"hazard for abuse readers {sum(h is True for h in split['abuse'])}/"
+                  f"{len(split['abuse'])}, for death-counsel readers "
+                  f"{sum(h is True for h in split['death'])}/{len(split['death'])}.*"]
+        L += ["", "*A keep judged safe is a hazard the LLM would show; a strike judged a "
+              "hazard is a passage it would withhold from a reader who may need it. "
+              "Neither is averaged into the other.*", ""]
+    return "\n".join(L) + "\n"
+
+
+# --- language guard ---------------------------------------------------------
+
+def run_language(english: list[str], language_set: list[dict]) -> list[dict]:
+    """PLAN.md, Phase 4: the guard measured two ways, both free (local, no
+    model, no network). False declines over every English input the other
+    three sets already hold — each one costs that user a retry. Decline
+    recall over eval/language_set.jsonl by tier — a missed crisis entry is a
+    missed referral. Calls check_language directly: the pipeline adds
+    nothing to the verdict, and this keeps the measurement independent of
+    any router or index."""
+    from meditations_rag.route.language import check_language
+
+    records = []
+    for q in dict.fromkeys(english):
+        v = check_language(q)
+        records.append({"table": "language", "set": "english", "query": q, "tier": "",
+                        "expected_lang": "en", "language": v.language, "reason": v.reason,
+                        "lead": round(v.lead, 3) if v.lead not in (None, float("inf")) else v.lead,
+                        "declined": not v.supported})
+    for e in language_set:
+        v = check_language(e["query"])
+        records.append({"table": "language", "set": "non-english", "query": e["query"],
+                        "tier": e.get("tier", ""), "expected_lang": e.get("lang"),
+                        "language": v.language, "reason": v.reason,
+                        "lead": round(v.lead, 3) if v.lead not in (None, float("inf")) else v.lead,
+                        "declined": not v.supported})
+    return records
+
+
+# --- exposure ----------------------------------------------------------------
+
+def run_exposure(cfgs, queries: list[str], resources, run_id=None) -> list[dict]:
+    """What each configuration shows readers, over every distinct English
+    query in the three sets, with no labels at all. One record per (config,
+    query) that retrieved. The measures are the ones Phase 4 kept needing
+    and could only compute by hand: Book I shown, listed passages shown to
+    unflagged readers, and how many distinct passages the top-5 lists cover
+    (a strategy collapsing onto a few attractors shows here first).
+
+    Listed passages reaching unflagged readers are not a hazard in
+    themselves: outside the vulnerable groups, readers see the book as
+    published (PLAN.md, "Unflagged readers see the book as published").
+    They count what a missed flag would expose."""
+    from meditations_rag.retrieve.safety import ABUSE_SUPPRESSED, DEATH_COUNSEL_SUPPRESSED
+
+    records = []
+    for cfg in cfgs:
+        emb, idx, passages = cell_resources(cfg, resources)
+        strategy = get_strategy(cfg.strategy, get_llm(cfg.llm) if cfg.llm else None)
+        for q in queries:
+            res = run_query(q, cfg, strategy=strategy, embedder=emb, index=idx,
+                            passages=passages, eval_run_id=run_id)
+            if not res.retrieved:
+                continue
+            shown = [rp.passage for rp in res.passages]
+            unflagged = not res.safety
+            records.append({
+                "table": "exposure", "config": cfg.label, "query": q,
+                "returned": [p.id for p in shown],
+                "safety": sorted(f.value for f in res.safety),
+                "book_1": [p.id for p in shown if p.book == 1],
+                "rule_4_unflagged": [p.id for p in shown
+                                     if unflagged and p.id in ABUSE_SUPPRESSED],
+                "death_counsel_unflagged": [p.id for p in shown
+                                            if unflagged and p.id in DEATH_COUNSEL_SUPPRESSED],
+                "no_strong_match": res.no_strong_match, "match_score": res.match_score,
+                "strategy_fallback": res.strategy_fallback,
+            })
+    return records
+
+
+def render_no_match(records: list[dict], intents: dict[str, str]) -> str:
+    """How often the no-match hedge fires, from the exposure records: on
+    in-scope queries (golden, safety, router in_scope: false alarms) and on
+    the router set's out_of_scope ones, which retrieve under the keyword
+    router. The hedge reads the best cosine between the message as typed
+    and any passage, so any row that embeds the message as typed (raw,
+    raw+X) fires exactly as raw does."""
+    L = ["## No-match threshold", "",
+         f"*config.MIN_SCORE_THRESHOLD = {config.MIN_SCORE_THRESHOLD}, on the cosine of the "
+         "best match of the message as typed (max cosine between the message and any "
+         "passage). Fired = \"No strong match — Marcus may be silent on this\" above the "
+         "nearest passages (they are still shown).*", ""]
+    rows = []
+    for label in dict.fromkeys(r["config"] for r in records):
+        rs = [r for r in records if r["config"] == label]
+        ins = [r for r in rs if intents.get(r["query"], "in_scope") == "in_scope"]
+        oos = [r for r in rs if intents.get(r["query"]) == "out_of_scope"]
+        fired_in = [r["query"] for r in ins if r["no_strong_match"]]
+        rows.append([f"`{label}`", f"{len(fired_in)}/{len(ins)}",
+                     f"{sum(r['no_strong_match'] for r in oos)}/{len(oos)}",
+                     "; ".join(f"\"{q[:40]}\"" for q in fired_in) or "—"])
+    L += [table(["config", "fired on in-scope (false alarms)", "fired on out_of_scope",
+                 "in-scope queries it fired on"], rows), ""]
+    return "\n".join(L) + "\n"
+
+
+def render_exposure(records: list[dict], skipped_llm: list[str]) -> str:
+    L = ["## Exposure", "",
+         "*Every distinct English query in the golden, router and safety sets, through "
+         "each configuration, counted where it retrieved. No labels: this is what readers "
+         "are shown, not whether it is right. The suppression lists apply to flagged "
+         "readers only, by design; the two list columns count what a missed flag would "
+         "expose, not a hazard to every reader.*", ""]
+    if not records:
+        return "\n".join(L + ["*No exposure records.*", ""]) + "\n"
+    rows = []
+    for label in dict.fromkeys(r["config"] for r in records):
+        rs = [r for r in records if r["config"] == label]
+        shown = Counter(i for r in rs for i in r["returned"])
+        top, n_top = shown.most_common(1)[0] if shown else ("—", 0)
+        def count(key):
+            n = sum(len(r[key]) for r in rs)
+            q = sum(1 for r in rs if r[key])
+            return f"{n} ({q} q)" if n else "0"
+        rows.append([f"`{label}`", str(len(rs)), count("book_1"), count("rule_4_unflagged"),
+                     count("death_counsel_unflagged"),
+                     f"{len(shown)}/{sum(shown.values())}", f"{top} ×{n_top}"])
+    L += [table(["config", "queries retrieved", "Book I shown", "rule-4 list, unflagged",
+                 "death-counsel list, unflagged", "distinct / shown", "most shown"], rows), ""]
+    if skipped_llm:
+        L += [f"*Not run for the {len(skipped_llm)} LLM rows (strategy or reranker): their completions "
+              "are cached for the golden set only, so every other query would be a new "
+              "call. Pass --exposure-llm to include them.*", ""]
+    return "\n".join(L) + "\n"
+
+
+def render_language(records: list[dict]) -> str:
+    eng = [r for r in records if r["set"] == "english"]
+    non = [r for r in records if r["set"] == "non-english"]
+    L = ["## Language guard", ""]
+    if not records:
+        return "\n".join(L + ["*No language records.*", ""]) + "\n"
+    rows = []
+    fd = [r for r in eng if r["declined"]]
+    rows.append(["false declines (English inputs, all three sets)", f"{len(fd)}/{len(eng)}"])
+    for tier in ("crisis", "everyday", "short"):
+        t = [r for r in non if r["tier"] == tier]
+        if t:
+            rows.append([f"decline recall: {tier}", f"{sum(r['declined'] for r in t)}/{len(t)}"])
+    if non:
+        rows.append(["decline recall: all non-English",
+                     f"{sum(r['declined'] for r in non)}/{len(non)}"])
+    L += [table(["measure", "result"], rows), ""]
+    if fd:
+        L += ["**Falsely declined:** " + "; ".join(
+            f"\"{r['query']}\" ({r['language']}, {r['reason']})" for r in fd), ""]
+    missed = [r for r in non if not r["declined"]]
+    if missed:
+        L += ["**Not declined (read as English):** " + "; ".join(
+            f"\"{r['query']}\" ({r['expected_lang']}, tier {r['tier']})" for r in missed), ""]
+    leads = sorted(r["lead"] for r in eng if r["reason"] == "confident")
+    if leads:
+        L += [f"*Lowest English lead over the runner-up: {leads[0]:.2f}x (threshold "
+              f"{config.LANGUAGE_MIN_RATIO}x). A false decline costs a retry; a missed "
+              "non-English crisis disclosure costs a referral, which is why unsure is "
+              "declined.*", ""]
+    return "\n".join(L) + "\n"
 
 
 # --- rendering --------------------------------------------------------------
@@ -278,6 +814,102 @@ def pct(x) -> str:
     return f"{100 * x:.0f}%" if x is not None else "—"
 
 
+USAGE_HEADERS = ["fallbacks", "LLM p50 ms", "LLM p95 ms", "tok/q", "$/q"]
+
+
+def strategy_cost_cells(result: dict) -> list[str]:
+    """tok and $/q for a retrieval row: blank where no LLM call is made
+    (raw), never 0.00; $ blank where the model has no published rate.
+    Averaged over every scored query, as the router table's are."""
+    recs = result["records"]
+    if not any(r["llm_calls"] for r in recs):
+        return ["—", "—"]
+    usd = [r["usd"] for r in recs if r["llm_calls"]]
+    tok = sum(r["in_tok"] + r["out_tok"] for r in recs) / len(recs)
+    return [f"{tok:.0f}",
+            f"{sum(usd) / len(recs):.5f}" if None not in usd else "—"]
+
+
+def usage_cells(router: str, u: dict) -> list[str]:
+    """The cost half of a router row. The keyword router makes no call and
+    cannot fall back, so its cells are blank rather than zero."""
+    if router not in LLM_ROUTERS:
+        return ["—"] * len(USAGE_HEADERS)
+    return [f"{u['fallbacks']}/{u['n']}",
+            f"{u['p50']:.0f}" if u["p50"] is not None else "—",
+            f"{u['p95']:.0f}" if u["p95"] is not None else "—",
+            f"{u['tok_q']:.0f}",
+            f"{u['usd_q']:.5f}" if u["usd_q"] is not None else "—"]
+
+
+def usage_notes(rows: list[dict]) -> list[str]:
+    """What a reader needs to trust the LLM rows: any fallback means part of
+    the row is the keyword router under another name, and the JSON-path
+    split says whether publicai honoured response_format (Risk 2)."""
+    out = []
+    for r in rows:
+        if r["router"] not in LLM_ROUTERS:
+            continue
+        u = r["usage"]
+        paths = ", ".join(f"{k} {v}" for k, v in sorted(u["paths"].items())) or "none"
+        warn = (f" **{u['fallbacks']} of {u['n']} queries fell back to `keyword`; "
+                "those rows are not this router's answers.**" if u["fallbacks"] else "")
+        out.append(f"*`{r.get('label', r['router'])}` JSON path: {paths}.{warn}*")
+    if out:
+        out += ["", "*$/q is blank for providers with no published per-token rate "
+                "(publicai). Latency is the LLM round trip on queries that made a call; "
+                "cached completions report the original call's time.*", ""]
+    return out
+
+
+def tag_repeat(rows: list[dict], records: list[dict], repeat: int, repeats: int) -> list[dict]:
+    """Mark one repeat's rows and records. Rows get a label like
+    'apertus-t08 #2' only when there is more than one repeat."""
+    for rec in records:
+        rec["repeat"] = repeat
+    for row in rows:
+        row["repeat"] = repeat
+        if repeats > 1 and row["router"] in LLM_ROUTERS:
+            row["label"] = f"{row['router']} #{repeat}"
+    return rows
+
+
+def render_stability(router_records: list[dict], safety_records: list[dict],
+                     repeats: int) -> str:
+    """How many answers changed between repeats of the same router: the
+    measure of how far one run can be trusted. A query counts as unstable
+    if any two repeats disagree. Fingerprints per repeat say whether the
+    serving backend changed in between (PLAN.md, Risk 2 / determinism)."""
+    L = ["## Stability across repeats", "",
+         f"*{repeats} repeats per LLM router. Unstable = the answer differed in at "
+         "least one repeat. Repeat 0 may be served from an earlier run's cache, so "
+         "its fingerprint can read 'not reported'.*", ""]
+    rows = []
+    names = sorted({r["router"] for r in router_records + safety_records} & LLM_ROUTERS)
+    for name in names:
+        def unstable(records, field):
+            seen = defaultdict(set)
+            for r in records:
+                if r["router"] == name:
+                    v = r[field]
+                    seen[r["query"]].add(tuple(v) if isinstance(v, list) else v)
+            return sum(1 for v in seen.values() if len(v) > 1), len(seen)
+        i_n, i_t = unstable(router_records, "got")
+        f_n, f_t = unstable(safety_records, "llm_safety")
+        u_n, u_t = unstable(safety_records, "got")
+        prints = []
+        for k in range(repeats):
+            fps = sorted({f for r in router_records + safety_records
+                          if r["router"] == name and r.get("repeat") == k
+                          for f in r["fingerprints"]})
+            prints.append(f"#{k}: {', '.join(fps) or 'not reported'}")
+        rows.append([f"`{name}`", f"{i_n}/{i_t}", f"{f_n}/{f_t}", f"{u_n}/{u_t}",
+                     "; ".join(prints)])
+    L += [table(["router", "intent unstable (router set)", "LLM-alone flags unstable",
+                 "union flags unstable", "fingerprints by repeat"], rows), ""]
+    return "\n".join(L) + "\n"
+
+
 def render(results, router_rows, safety_rows, stamp, skipped) -> str:
     L = ["# Eval results", "", table(["", ""], [[k, f"`{v}`"] for k, v in stamp.items()]), ""]
 
@@ -289,23 +921,38 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
         rows = []
         for r in results:
             m, c, o = r["metrics"]["hard"], r["metrics"]["canary"], r["metrics"]["oos"]
+            ct = r["metrics"]["content"]
             lat = r["latency"]
             rows.append([
                 f"`{r['config'].label}`", str(m["n"]),
                 *[pct(m[f"recall@{k}"]) for k in KS], f"{m['mrr']:.3f}",
                 pct(c["recall@5"]) + f" ({c['n']})" if c else "—",
+                pct(ct["recall@5"]) + f" ({ct['n']})" if ct else "—",
+                dead2_cell(r["records"]),
+                dead_cell(r["records"]),
                 pct(o["accuracy"]) + f" ({o['n']})" if o else "—",
                 f"{statistics.median(lat):.0f}",
                 f"{sorted(lat)[max(0, int(0.95 * len(lat)) - 1)]:.0f}",
-                "—", "—",
+                *strategy_cost_cells(r),
             ])
         L += [table(["config", "n", "R@1", "R@3", "R@5", "MRR", "canary R@5",
-                     "oos acc", "p50 ms", "p95 ms", "tok", "$/q"], rows), ""]
+                     "content R@5", "dead@2 (hard)", "dead@5 (sample)", "oos acc", "p50 ms", "p95 ms", "tok", "$/q"], rows), ""]
+        for r in results:
+            n_rr = sum(1 for rec in r["records"] if rec["rerank_fallback"])
+            if n_rr:
+                L += [f"***`{r['config'].label}`: {n_rr} of {len(r['records'])} queries kept "
+                      "the retrieval order because the LLM reranker failed.***", ""]
+            n_fb = sum(1 for rec in r["records"] if rec["strategy_fallback"])
+            if n_fb:
+                L += [f"***`{r['config'].label}`: {n_fb} of {len(r['records'])} queries fell "
+                      "back to the raw problem; those rows are not this strategy's answers.***", ""]
         if skipped:
             L += [f"*{skipped} entries excluded as unlabelled — not scored as misses.*", ""]
-        L += ["*Recall is a FLOOR: labels are sparse, so an apt passage nobody "
-              "labelled counts as a miss. Comparable across rows, not absolute.*",
-              "", "*Canaries are reported separately and never folded into recall@k.*", ""]
+        L += ["*Recall is a LOWER BOUND: labels are one curator's confident picks from "
+              "a full read of the book, so an apt passage left out counts as a miss. "
+              "Comparable across rows, not absolute.*",
+              "", "*Canaries and content questions are reported separately and never "
+              "folded into recall@k.*", ""]
 
     L += ["## Router", ""]
     if router_rows:
@@ -319,11 +966,12 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
             ins = pi.get("in_scope")
             pair = (f"({pct(pi['out_of_scope'][0] / pi['out_of_scope'][1])}, "
                     f"{pct(ins[0] / ins[1])})" if "out_of_scope" in pi and ins else "—")
-            rows.append([f"`{r['router']}`", *cells,
+            rows.append([f"`{r.get('label', r['router'])}`", *cells,
                          pct(oos_h[0] / oos_h[1]) + f" ({oos_h[1]})" if oos_h else "—",
-                         pair])
+                         pair, *usage_cells(r["router"], r["usage"])])
         L += [table(["router", *intents, "oos (hard only)",
-                     "(oos recall, in_scope retention)"], rows), ""]
+                     "(oos recall, in_scope retention)", *USAGE_HEADERS], rows), ""]
+        L += usage_notes(router_rows)
         L += ["*The pair is the measurement. Recall alone is gameable by rejecting "
               "everything; the real LLM-router failure is over-rejection. "
               "chitchat/meta/in_scope are a regression check, not a comparison — "
@@ -336,11 +984,21 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
         rows = []
         for r in safety_rows:
             flags = "; ".join(f"{f} {c}/{t}" for f, (c, t) in sorted(r["per_flag"].items()))
-            rows.append([f"`{r['router']}`", flags or "—",
+            llm = r["router"] in LLM_ROUTERS
+            rows.append([f"`{r.get('label', r['router'])}`", flags or "—",
                          f"{r['fp'][0]}/{r['fp'][1]}" if r["fp"][1] else "—",
-                         f"{r['survived']}/{r['checked']}" if r["checked"] else "—"])
+                         f"{r['llm_caught'][0]}/{r['llm_caught'][1]}" if llm else "—",
+                         f"{r['llm_fp'][0]}/{r['llm_fp'][1]}" if llm else "—",
+                         f"{r['survived']}/{r['checked']}" if r["checked"] else "—",
+                         *usage_cells(r["router"], r["usage"])])
         L += [table(["router", "flag recall (caught/owed)", "false positives",
-                     "prohibited passages shown"], rows), ""]
+                     "LLM alone: caught/owed", "LLM alone: false positives",
+                     "prohibited passages shown", *USAGE_HEADERS], rows), ""]
+        L += usage_notes(safety_rows)
+        L += ["*Recall and false positives are for the union with the keyword floor, "
+              "which is what ships. The LLM-alone columns score the LLM's own flags: "
+              "what it catches without the floor, and whether it over-flags by itself, "
+              "which the union hides.*", ""]
         L += ["*Never averaged: a missed referral and an unnecessary one cost "
               "differently. A prohibited passage surviving is a PRODUCT VIOLATION, "
               "not a quality regression.*", ""]
@@ -353,15 +1011,47 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--embedder", nargs="*", default=list(EMBEDDER_NAMES))
     ap.add_argument("--strategy", nargs="*", default=list(STRATEGY_NAMES))
-    ap.add_argument("--router", nargs="*", default=list(ROUTER_NAMES))
+    ap.add_argument("--chunking", nargs="*", default=["passage"], choices=["passage", "subchunk"],
+                    help="which indexes to score; 'subchunk' needs `meditations index "
+                         "--chunking subchunk` first")
+    ap.add_argument("--reranker", nargs="*", default=["none"], type=_reranker_name,
+                    help="rerankers to score, one row each: none, ce-minilm, ce-bge, or "
+                         "llm:<llm name> for an LLM listwise rerank (costs a call per query)")
+    ap.add_argument("--retriever", nargs="*", default=["dense"], choices=["dense", "hybrid"],
+                    help="dense only, or hybrid (BM25 fused with dense); one row each")
+    ap.add_argument("--exposure-llm", action="store_true",
+                    help="include LLM-strategy rows in the exposure table; each query "
+                         "outside the golden set is a new LLM call")
+    ap.add_argument("--filter", nargs="*", default=["none"], choices=list(FILTERS),
+                    help="metadata filters to score, one row each (Phase 4)")
+    # LLM strategies spend per query too, so they run only with an --llm.
+    ap.add_argument("--llm", nargs="*", default=[],
+                    help=f"LLMs to run the LLM strategies ({', '.join(sorted(LLM_STRATEGIES))}) "
+                         "on, one row each; without one, those strategies are skipped")
+    # LLM routers cost money per query, so they run only when named
+    # (CLAUDE.md: ask before spending). A bare run stays free.
+    ap.add_argument("--router", nargs="*",
+                    default=[n for n in ROUTER_NAMES if n not in LLM_ROUTERS],
+                    help=f"routers to score; LLM routers ({', '.join(sorted(LLM_ROUTERS))}) "
+                         "only when named")
     ap.add_argument("--routers-only", action="store_true")
+    ap.add_argument("--repeats", type=int, default=1,
+                    help="run the LLM routers this many times, each repeat under its own "
+                         "cache key, and report how many answers changed between repeats")
     ap.add_argument("--golden", type=Path, default=None,
                     help="labelled set to score against (default eval/golden_set.jsonl)")
     ap.add_argument("--safety-set", type=Path, default=None)
+    ap.add_argument("--language-set", type=Path, default=None)
+    ap.add_argument("--suppressor", nargs="*", default=[],
+                    help="LLM registry names to run as the post-retrieval check, "
+                         "against the reviewed lists; costs money, so only when named")
     ap.add_argument("--out", type=Path, default=None,
                     help="write the report here (default eval/results/<stamp>.md)")
     args = ap.parse_args()
     telemetry.setup_tracing()   # no-op unless MEDITATIONS_TRACING=1
+    # Every LLM completion goes through the on-disk cache (CLAUDE.md, "Network
+    # and cost"): a rerun is free and reproduces the first run exactly.
+    llm.enable_cache()
     # One id for the whole run: it names the default report file and tags
     # every trace, so Phoenix can be filtered to the run behind a report.
     run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -369,7 +1059,16 @@ def main() -> int:
     golden_p = args.golden or EVAL_DIR / "golden_set.jsonl"
     router_p = EVAL_DIR / "router_set.jsonl"
     safety_p = args.safety_set or EVAL_DIR / "safety_set.jsonl"
-    hard, canary, oos, skipped = split_golden(load_jsonl(golden_p))
+    language_p = args.language_set or EVAL_DIR / "language_set.jsonl"
+    hard, canary, content, oos, skipped = split_golden(load_jsonl(golden_p))
+    dead_p = EVAL_DIR / "dead_set.jsonl"
+    dead_rows = load_jsonl(dead_p)
+    DEAD.update({(e["query"], e["passage_id"]): e["dead"] for e in dead_rows
+                 if e.get("layer", "sample") == "sample"})
+    if any(e.get("layer") == "top2-hard" for e in dead_rows):
+        DEAD2.update({(e["query"], g): False for e in load_jsonl(golden_p)
+                      for g in e.get("gold_ids", [])})
+        DEAD2.update({(e["query"], e["passage_id"]): e["dead"] for e in dead_rows})
     router_set, safety_set = load_jsonl(router_p), load_jsonl(safety_p)
 
     try:
@@ -381,7 +1080,10 @@ def main() -> int:
              "eval run id": run_id,
              "git": rev or "unknown", "corpus md5": md5(PASSAGES_FILE),
              "golden_set md5": md5(golden_p), "router_set md5": md5(router_p),
-             "safety_set md5": md5(safety_p),
+             "safety_set md5": md5(safety_p), "language_set md5": md5(language_p),
+             "dead_set md5": md5(dead_p),
+             "lingua": _version("lingua-language-detector"),
+             "language_min_ratio": config.LANGUAGE_MIN_RATIO,
              "min_score_threshold": config.MIN_SCORE_THRESHOLD}
 
     resources, results = {}, []
@@ -393,18 +1095,111 @@ def main() -> int:
             stamp.update({k: v for k, v in resources[name][1].meta.items()
                           if k in ("model_id", "sentence_transformers", "torch", "numpy")})
             stamp["device"] = describe_device(emb)
-        for cfg in build_grid(args.embedder, args.strategy):
-            print(f"  {cfg.label} …", flush=True)
-            results.append(run_config(cfg, hard, canary, oos, resources, run_id))
+        if any(s in LLM_STRATEGIES for s in args.strategy):
+            from meditations_rag.retrieve.strategies import PROMPT_VERSIONS
 
-    router_rows = run_routers(args.router, router_set) if router_set else []
-    safety_rows = []
-    if safety_set and resources:
-        safety_rows = run_safety(args.router, safety_set,
-                                 RetrievalConfig(embedder=args.embedder[0],
-                                                 k=max(KS)), resources, run_id)
+            for name in args.llm:
+                stamp[f"llm (strategy {name})"] = _llm_stamp(get_llm(name))
+            for s in args.strategy:
+                if s in LLM_STRATEGIES and args.llm:
+                    stamp[f"prompt ({s})"] = PROMPT_VERSIONS[s]
+        if "subchunk" in args.chunking:
+            for name in args.embedder:
+                sub = load_index(name, chunking="subchunk").meta
+                stamp[f"subchunk index ({name})"] = (
+                    f"{sub['count']} rows, max {config.SUBCHUNK_MAX_WORDS} words per chunk")
+        from meditations_rag.retrieve.rerank import RERANKER_MODELS
+
+        for name in args.reranker:
+            if name.startswith("llm:"):
+                from meditations_rag.retrieve.rerank import LLM_RERANK_PROMPT_VERSION
+
+                stamp[f"reranker ({name})"] = _llm_stamp(get_llm(name[4:]))
+                stamp["prompt (llm rerank)"] = LLM_RERANK_PROMPT_VERSION
+            elif name != "none":
+                stamp[f"reranker ({name})"] = RERANKER_MODELS[name]
+        for cfg in build_grid(args.embedder, args.strategy, args.llm, args.chunking,
+                              args.filter, args.retriever, args.reranker):
+            print(f"  {cfg.label} …", flush=True)
+            results.append(run_config(cfg, hard, canary, content, oos, resources, run_id))
+
+    for name in args.router:
+        if name in LLM_ROUTERS:
+            router = get_router(name)
+            client = router.client
+            stamp[f"llm ({name} router)"] = _llm_stamp(client)
+            # The prompt is part of what a row measures: a prompt edit makes
+            # two rows incomparable as models, so the report says which one.
+            stamp[f"prompt ({name} router)"] = getattr(router, "prompt_version", "unversioned")
+    # Repeat 0 is the normal run. Repeats 1..N-1 rerun only the LLM routers
+    # (the keyword router is deterministic), each under its own cache key,
+    # so stability is measured rather than replayed from the first run.
+    router_rows, router_records, safety_rows, safety_records = [], [], [], []
+    for repeat in range(args.repeats):
+        llm.set_repeat(repeat)
+        names = args.router if repeat == 0 else [n for n in args.router if n in LLM_ROUTERS]
+        if repeat:
+            print(f"  repeat {repeat}: {', '.join(names)} …", flush=True)
+        rows, recs = run_routers(names, router_set) if router_set else ([], [])
+        router_rows += tag_repeat(rows, recs, repeat, args.repeats)
+        router_records += recs
+        if safety_set and resources:
+            rows, recs = run_safety(
+                names, safety_set, RetrievalConfig(embedder=args.embedder[0], k=max(KS)),
+                resources, run_id)
+            safety_rows += tag_repeat(rows, recs, repeat, args.repeats)
+            safety_records += recs
+    llm.set_repeat(0)
+
+    # What actually served each LLM router, from the providers' own responses:
+    # a substituted model, or a backend change between two runs, shows here
+    # rather than as an unexplained shift in the numbers.
+    for name in args.router:
+        if name in LLM_ROUTERS:
+            recs = [r for r in router_records + safety_records if r["router"] == name]
+            served = sorted({m for r in recs for m in r["served_models"]})
+            prints = sorted({f for r in recs for f in r["fingerprints"]})
+            stamp[f"served ({name} router)"] = ", ".join(served) or "not reported"
+            stamp[f"fingerprints ({name} router)"] = ", ".join(prints) or "not reported"
+
+    supp_records, agree_records = [], []
+    if args.suppressor and safety_set and resources:
+        from meditations_rag.retrieve.safety_llm import PROMPT_VERSION as SUPP_PROMPT
+
+        stamp["prompt (suppressor)"] = SUPP_PROMPT
+        for name in args.suppressor:
+            client = get_llm(name)
+            stamp[f"llm ({name} suppressor)"] = _llm_stamp(client)
+        supp_records = run_suppression(args.suppressor, safety_set, args.embedder[0],
+                                       resources, run_id)
+        agree_records = run_agreement(args.suppressor,
+                                      load_jsonl(EVAL_DIR / "suppression_review.jsonl"),
+                                      safety_set, resources[args.embedder[0]][2])
+
+    language_records = run_language(
+        [e["query"] for e in load_jsonl(golden_p) + router_set + safety_set],
+        load_jsonl(language_p))
+
+    exposure_records, skipped_llm = [], []
+    if results:
+        english = list(dict.fromkeys(e["query"] for e in load_jsonl(golden_p) + router_set
+                                     + safety_set))
+        cells = [r["config"] for r in results]
+        free = [c for c in cells if args.exposure_llm or (
+            c.strategy not in LLM_STRATEGIES and not c.reranker.startswith("llm:"))]
+        skipped_llm = [c.label for c in cells if c not in free]
+        exposure_records = run_exposure(free, english, resources, run_id)
 
     report = render(results, router_rows, safety_rows, stamp, skipped)
+    if supp_records or agree_records:
+        report += render_suppression(supp_records, agree_records)
+    report += render_language(language_records)
+    if results:
+        report += render_exposure(exposure_records, skipped_llm)
+        report += render_no_match(exposure_records,
+                                  {e["query"]: e["intent"] for e in router_set})
+    if args.repeats > 1:
+        report += render_stability(router_records, safety_records, args.repeats)
     print("\n" + report)
 
     # The report and its per-query evidence travel together: the matrix is the
@@ -418,9 +1213,12 @@ def main() -> int:
     with detail.open("w", encoding="utf-8") as fh:
         for r in results:
             for rec in r["records"]:
-                fh.write(json.dumps(rec) + "\n")
+                fh.write(json.dumps({"table": "retrieval", **rec}) + "\n")
+        for rec in (router_records + safety_records + language_records + supp_records
+                    + agree_records + exposure_records):
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
     print(f"wrote {out}")
-    if results:
+    if results or router_records:
         print(f"wrote {detail}   <- the losses are where the next technique comes from")
     return 0
 

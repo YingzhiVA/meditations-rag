@@ -11,7 +11,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 
-# Secrets (ANTHROPIC_API_KEY / VOYAGE_API_KEY live in the environment or here)
+# Secrets: API keys live here, loaded by config.py (template: .env.example)
 .env
 
 # Golden-set curation worksheet: a scratch tool for generating the queries.

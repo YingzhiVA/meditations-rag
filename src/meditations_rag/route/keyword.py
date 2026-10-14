@@ -101,6 +101,16 @@ META_NOUNS = (
 )
 _META_NOUN_RE = re.compile(r"\b(?:" + "|".join(re.escape(n) for n in META_NOUNS) + r")\b")
 
+# A question about what the book SAYS is IN_SCOPE even when it names the book
+# (PLAN.md, "Questions about what the book says are IN_SCOPE"): "What do the
+# Meditations say about grief?" wants passages, not the tool's description.
+# It only overrides the meta signals above; "who wrote these passages" has
+# no "about" and stays META.
+_CONTENT_RE = re.compile(
+    r"\b(?:say|says|said|write|writes|wrote|think|thinks|thought|teach|teaches|"
+    r"taught|believe|believes|believed)\b(?: \S+){0,4}? about\b"
+)
+
 # --- safety: high recall, per flag ----------------------------------------
 # Patterns are matched against the normalised input, so write them in
 # lowercase with straight apostrophes and no terminal punctuation.
@@ -111,11 +121,28 @@ _SAFETY_PATTERNS: dict[SafetyFlag, tuple[str, ...]] = {
         r"end(?:ing)? my own life", r"take my (?:own )?life", r"want(?:ed)? to die",
         r"wish(?:ed)? i (?:was|were) dead", r"better off dead",
         r"(?:don't|do not|dont) want to (?:live|be alive|be here|exist|wake up)",
+        # Passive ideation that never says "live" or "die" ("I don't want to
+        # go on anymore", missed by the floor and by Apertus-8B, 2026-09-28).
+        # "go on / carry on / keep going" is SELF_HARM only when it is the
+        # WHOLE message: with no context the dangerous reading is the likely
+        # one, and blocking a bare sentence costs a retry. Inside a longer
+        # message the words cannot tell "…the wrong major. I don't want to go
+        # on anymore" from ideation, so that case is MENTAL_HEALTH (below),
+        # which refers without blocking, and SELF_HARM is left to the LLM.
+        r"^(?:(?:honestly|really|just|i just|i really|i honestly) )?"
+        r"i (?:just |really |honestly )?(?:don't|do not|dont) want to "
+        r"(?:go on|carry on|keep going)(?: (?:anymore|any more|any longer))?$",
+        # "keep living" is no more ambiguous than "want to live", anywhere.
+        r"(?:don't|do not|dont) want to keep living",
         r"(?:no|not|what's the|whats the|what is the) (?:point|reason) (?:in |to |of )?(?:living|go(?:ing)? on|be(?:ing)? alive|carry(?:ing)? on)",
         # Unanchored on negation: it is often several words away ("I don't
         # think my life is worth living"). A positive "life is worth living"
-        # also fires, which is the high-recall trade.
-        r"worth living", r"(?:life|living|going on)(?: is| isn't| isnt| is not| is no longer| not)? worth it",
+        # also fires, which is the high-recall trade. An adverb may sit on
+        # either side of the negation ("life just isn't worth it anymore",
+        # missed by the floor and by Apertus-v1.5-70B, 2026-10-09).
+        r"worth living",
+        r"(?:life|living|going on)(?: (?:just|really|simply|honestly))?"
+        r"(?: is| isn't| isnt| is not| is no longer| not)?(?: (?:really|even))? worth it",
         # Passive ideation (C-SSRS item 1). Not bare "not wake up", which
         # fires on oversleeping and would block retrieval for it.
         r"(?:and|to) (?:not|never) wake up",
@@ -177,6 +204,13 @@ _SAFETY_PATTERNS: dict[SafetyFlag, tuple[str, ...]] = {
         r"depress\w*", r"hopeless\w*", r"worthless\w*", r"helpless\w*",
         r"panic attack\w*", r"anxiety (?:disorder|attack)", r"(?:severe|crippling|chronic) anxiety",
         r"(?:can't|cannot|cant) (?:get out of bed|stop crying|function|cope|go on)",
+        # The in-context reading of the SELF_HARM whole-message pattern above,
+        # and "...like this": as often burnout or a degree as crisis, so the
+        # softer flag, which refers and withholds the death-counsel list
+        # without blocking. Only where the phrase ends the input or the
+        # thought, so "go on the trip" and "carry on with this job" never fire.
+        r"(?:don't|do not|dont) want to (?:go on|carry on|keep going)"
+        r"(?= (?:anymore|any more|any longer|like this)\b|$)",
         r"therap(?:y|ist)", r"psychiatr\w*", r"counsel(?:l)?or", r"antidepress\w*",
         r"medication for", r"(?:mental|nervous) breakdown", r"breaking down",
         r"trauma\w*", r"\bptsd\b", r"\bocd\b", r"bipolar", r"eating disorder",
@@ -227,7 +261,8 @@ class KeywordRouter:
             return RouteDecision(Intent.CHITCHAT, safety)
         if text in CHITCHAT:
             return RouteDecision(Intent.CHITCHAT, safety)
-        if any(phrase in text for phrase in META_PHRASES) or _META_NOUN_RE.search(text):
+        is_meta = any(phrase in text for phrase in META_PHRASES) or _META_NOUN_RE.search(text)
+        if is_meta and not _CONTENT_RE.search(text):
             return RouteDecision(Intent.META, safety)
         # OUT_OF_SCOPE is unreachable here by design; see module docstring.
         return RouteDecision(Intent.IN_SCOPE, safety)

@@ -1,0 +1,40 @@
+publicAI gateway: what actually served the "v1.5" requests, 2026-10-07.
+
+Source: the completions cached by an eval run at 5e50a04 (stopped before it
+wrote a report), now in data/cache/llm-quarantine-2026-10-07/, plus
+GET https://api.publicai.co/v1/models. Prompt: route/llm.PROMPT_VERSION
+d83b622eb0 for the router completions. All requests at temperature 0.
+
+1. SUBSTITUTION ON THE 70B (certain: the provider's own response says so)
+   requested swiss-ai/apertus-v1.5-70b, 102 cached completions:
+     86 served by swiss-ai/apertus-v1.5-70b
+        fingerprint vllm-0.1.dev1+g54b4292c2-tp2-bfd70257
+     16 served by aisingapore/Qwen-SEA-LION-v4-32B-IT, no fingerprint
+   The gateway silently answers some requests with a different model.
+
+2. THE "v1.5" 8B IS VERY LIKELY THE 2509 8B (strong behavioural evidence)
+   requested swiss-ai/apertus-v1.5-8b, 102 cached completions, every
+   response reporting model swiss-ai/apertus-v1.5-8b (fingerprint
+   fp1-nst-nes). But:
+     - the account's usage page lists swiss-ai/apertus-8b-instruct (the
+       2509 8B) and no v1.5 8B;
+     - on the 66 router prompts cached for both, greedy answers were
+       identical on 65 between this model and Apertus-8B-Instruct-2509 via
+       HF -> publicai (63/66 identical output-token counts). v1.5 adds 4T
+       tokens of continued pretraining and a new post-training recipe; two
+       such models do not agree on 65 of 66.
+   So the response's `model` field echoes the requested id and cannot
+   detect this aliasing.
+
+3. WHETHER THE "v1.5" 70B IS v1.5: inconclusive
+   On the 48 router prompts cached for both, the 86 genuine-looking
+   apertus-v1.5-70b answers matched Apertus-70B-Instruct-2509 (publicai,
+   2026-09-29) on 42, differing mostly in safety flags with the same
+   intent. That is the size of the drift measured for the same 2509 70B
+   across days (4 of 27 safety answers), so it neither confirms nor rules
+   out the same weights.
+
+GET /v1/models (2026-10-07) lists, among others: swiss-ai/apertus-8b-instruct,
+swiss-ai/apertus-70b-instruct, swiss-ai/apertus-v1.5-8b, swiss-ai/apertus-v1.5-70b,
+their -thinking variants, aisingapore/Qwen-SEA-LION-v4-32B-IT,
+aisingapore/Gemma-SEA-LION-v4-27B-IT, speakleash/Bielik-11B-v3.0-Instruct.

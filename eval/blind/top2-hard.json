@@ -1,0 +1,1682 @@
+{
+ "T001": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "3.1"
+ },
+ "T002": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "7.2"
+ },
+ "T003": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "4.17"
+ },
+ "T004": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "2.4"
+ },
+ "T005": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "8.58"
+ },
+ "T006": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "3.5"
+ },
+ "T007": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "6.15"
+ },
+ "T008": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "9.21"
+ },
+ "T009": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "4.47"
+ },
+ "T010": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "3.10"
+ },
+ "T011": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "4.50"
+ },
+ "T012": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "7.49"
+ },
+ "T013": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "7.56"
+ },
+ "T014": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "2.17"
+ },
+ "T015": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "4.32"
+ },
+ "T016": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "8.36"
+ },
+ "T017": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "9.3"
+ },
+ "T018": {
+  "query": "I just celebrated my 40th birthday and realized that roughly half of my life is already spent. That though does send shiver down my spine.",
+  "passage_id": "4.26"
+ },
+ "T019": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "7.4"
+ },
+ "T020": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "6.21"
+ },
+ "T021": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "8.40"
+ },
+ "T022": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "6.27"
+ },
+ "T023": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "7.2"
+ },
+ "T024": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "7.24"
+ },
+ "T025": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "9.31"
+ },
+ "T026": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "10.32"
+ },
+ "T027": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "7.26"
+ },
+ "T028": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "2.14"
+ },
+ "T029": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "5.36"
+ },
+ "T030": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "12.14"
+ },
+ "T031": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "11.34"
+ },
+ "T032": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "5.9"
+ },
+ "T033": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "8.1"
+ },
+ "T034": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "11.30"
+ },
+ "T035": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "5.31"
+ },
+ "T036": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "11.18"
+ },
+ "T037": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "12.25"
+ },
+ "T038": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "7.64"
+ },
+ "T039": {
+  "query": "I said something cruel and I can't take it back.",
+  "passage_id": "5.3"
+ },
+ "T040": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "12.1"
+ },
+ "T041": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "5.3"
+ },
+ "T042": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "5.29"
+ },
+ "T043": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "8.40"
+ },
+ "T044": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "9.3"
+ },
+ "T045": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "8.56"
+ },
+ "T046": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "11.19"
+ },
+ "T047": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "5.20"
+ },
+ "T048": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "7.4"
+ },
+ "T049": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "6.20"
+ },
+ "T050": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "8.47"
+ },
+ "T051": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "9.31"
+ },
+ "T052": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "2.16"
+ },
+ "T053": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "9.41"
+ },
+ "T054": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "4.49"
+ },
+ "T055": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "12.36"
+ },
+ "T056": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "11.16"
+ },
+ "T057": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "11.18"
+ },
+ "T058": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "10.36"
+ },
+ "T059": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "8.32"
+ },
+ "T060": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "7.55"
+ },
+ "T061": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "9.21"
+ },
+ "T062": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "9.23"
+ },
+ "T063": {
+  "query": "On my last day at work, not only did my manager not say goodbye, our last conversation was filled with tension. I don't have any attachment to this company anymore but it still left a bad taste in my mouth.",
+  "passage_id": "10.30"
+ },
+ "T064": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "12.4"
+ },
+ "T065": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "7.55"
+ },
+ "T066": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "9.42"
+ },
+ "T067": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "8.1"
+ },
+ "T068": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "5.36"
+ },
+ "T069": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "11.19"
+ },
+ "T070": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "5.3"
+ },
+ "T071": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "10.2"
+ },
+ "T072": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "12.16"
+ },
+ "T073": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "10.30"
+ },
+ "T074": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "8.29"
+ },
+ "T075": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "11.16"
+ },
+ "T076": {
+  "query": "I have low self-esteem. How I can improve that?",
+  "passage_id": "3.6"
+ },
+ "T077": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "9.31"
+ },
+ "T078": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "6.13"
+ },
+ "T079": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "5.4"
+ },
+ "T080": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "5.6"
+ },
+ "T081": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "5.36"
+ },
+ "T082": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "6.42"
+ },
+ "T083": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "10.30"
+ },
+ "T084": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "3.4"
+ },
+ "T085": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "8.48"
+ },
+ "T086": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "8.47"
+ },
+ "T087": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "5.1"
+ },
+ "T088": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "5.3"
+ },
+ "T089": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "10.28"
+ },
+ "T090": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "8.40"
+ },
+ "T091": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "5.5"
+ },
+ "T092": {
+  "query": "My coworker takes credit for my work and it's eating at me",
+  "passage_id": "9.22"
+ },
+ "T093": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "6.19"
+ },
+ "T094": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "7.64"
+ },
+ "T095": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "10.36"
+ },
+ "T096": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "7.27"
+ },
+ "T097": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "11.18"
+ },
+ "T098": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "6.12"
+ },
+ "T099": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "11.9"
+ },
+ "T100": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "8.56"
+ },
+ "T101": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "5.9"
+ },
+ "T102": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "9.16"
+ },
+ "T103": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "11.37"
+ },
+ "T104": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "9.3"
+ },
+ "T105": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "8.40"
+ },
+ "T106": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "10.30"
+ },
+ "T107": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "2.4"
+ },
+ "T108": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "7.55"
+ },
+ "T109": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "6.20"
+ },
+ "T110": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "11.16"
+ },
+ "T111": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "9.12"
+ },
+ "T112": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "10.28"
+ },
+ "T113": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "6.30"
+ },
+ "T114": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "11.2"
+ },
+ "T115": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "8.49"
+ },
+ "T116": {
+  "query": "I really wish I'm more patient with my child, but it's really hard sometimes.",
+  "passage_id": "9.31"
+ },
+ "T117": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "11.2"
+ },
+ "T118": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "12.24"
+ },
+ "T119": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "6.41"
+ },
+ "T120": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "10.32"
+ },
+ "T121": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "6.52"
+ },
+ "T122": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "7.68"
+ },
+ "T123": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "12.4"
+ },
+ "T124": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "7.16"
+ },
+ "T125": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "11.16"
+ },
+ "T126": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "5.25"
+ },
+ "T127": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "8.40"
+ },
+ "T128": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "11.9"
+ },
+ "T129": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "11.19"
+ },
+ "T130": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "4.11"
+ },
+ "T131": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "5.16"
+ },
+ "T132": {
+  "query": "I cannot help but think how other people view me or judge my decisions.",
+  "passage_id": "12.1"
+ },
+ "T133": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "11.16"
+ },
+ "T134": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "10.12"
+ },
+ "T135": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "5.1"
+ },
+ "T136": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "6.31"
+ },
+ "T137": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "9.15"
+ },
+ "T138": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "3.4"
+ },
+ "T139": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "8.12"
+ },
+ "T140": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "7.2"
+ },
+ "T141": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "2.12"
+ },
+ "T142": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "2.4"
+ },
+ "T143": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "6.5"
+ },
+ "T144": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "8.51"
+ },
+ "T145": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "3.11"
+ },
+ "T146": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "6.42"
+ },
+ "T147": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "8.47"
+ },
+ "T148": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "4.3"
+ },
+ "T149": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "10.30"
+ },
+ "T150": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "6.52"
+ },
+ "T151": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "8.36"
+ },
+ "T152": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "6.19"
+ },
+ "T153": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "8.40"
+ },
+ "T154": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "6.41"
+ },
+ "T155": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "5.36"
+ },
+ "T156": {
+  "query": "I've been losing sleep lately thinking about my not-so-good job perspective.",
+  "passage_id": "9.31"
+ },
+ "T157": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "5.29"
+ },
+ "T158": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "8.32"
+ },
+ "T159": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "12.23"
+ },
+ "T160": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "4.22"
+ },
+ "T161": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "7.2"
+ },
+ "T162": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "5.36"
+ },
+ "T163": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "6.19"
+ },
+ "T164": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "10.12"
+ },
+ "T165": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "4.3"
+ },
+ "T166": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "11.16"
+ },
+ "T167": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "10.28"
+ },
+ "T168": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "4.49"
+ },
+ "T169": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "12.14"
+ },
+ "T170": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "2.4"
+ },
+ "T171": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "6.31"
+ },
+ "T172": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "7.27"
+ },
+ "T173": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "9.31"
+ },
+ "T174": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "8.36"
+ },
+ "T175": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "10.3"
+ },
+ "T176": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "3.5"
+ },
+ "T177": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "2.12"
+ },
+ "T178": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "4.26"
+ },
+ "T179": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "8.58"
+ },
+ "T180": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "9.21"
+ },
+ "T181": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "10.22"
+ },
+ "T182": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "5.13"
+ },
+ "T183": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "10.37"
+ },
+ "T184": {
+  "query": "I am in the last round of the interview process of my dream job. I spent so much time preparing for it and I'm really afraid that in the end it's all for nothing.",
+  "passage_id": "10.9"
+ },
+ "T185": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "11.16"
+ },
+ "T186": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "11.19"
+ },
+ "T187": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "5.36"
+ },
+ "T188": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "11.9"
+ },
+ "T189": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "4.49"
+ },
+ "T190": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "8.32"
+ },
+ "T191": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "7.71"
+ },
+ "T192": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "4.3"
+ },
+ "T193": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "5.28"
+ },
+ "T194": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "5.3"
+ },
+ "T195": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "10.36"
+ },
+ "T196": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "10.28"
+ },
+ "T197": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "5.5"
+ },
+ "T198": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "7.68"
+ },
+ "T199": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "6.11"
+ },
+ "T200": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "11.30"
+ },
+ "T201": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "3.7"
+ },
+ "T202": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "10.30"
+ },
+ "T203": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "5.29"
+ },
+ "T204": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "10.32"
+ },
+ "T205": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "9.2"
+ },
+ "T206": {
+  "query": "I think I'm in a toxic relationship, but I don't have the courage to break free.",
+  "passage_id": "8.1"
+ },
+ "T207": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "7.26"
+ },
+ "T208": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "5.6"
+ },
+ "T209": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "3.6"
+ },
+ "T210": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "5.36"
+ },
+ "T211": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "12.4"
+ },
+ "T212": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "6.51"
+ },
+ "T213": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "7.17"
+ },
+ "T214": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "2.1"
+ },
+ "T215": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "9.42"
+ },
+ "T216": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "1.14"
+ },
+ "T217": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "7.74"
+ },
+ "T218": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "5.25"
+ },
+ "T219": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "9.27"
+ },
+ "T220": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "6.19"
+ },
+ "T221": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "5.34"
+ },
+ "T222": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "3.4"
+ },
+ "T223": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "4.49"
+ },
+ "T224": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "6.27"
+ },
+ "T225": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "7.16"
+ },
+ "T226": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "8.1"
+ },
+ "T227": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "12.1"
+ },
+ "T228": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "2.4"
+ },
+ "T229": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "5.16"
+ },
+ "T230": {
+  "query": "I'm jealous of my friend's success.",
+  "passage_id": "5.12"
+ },
+ "T231": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "5.5"
+ },
+ "T232": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "7.2"
+ },
+ "T233": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "9.3"
+ },
+ "T234": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "10.18"
+ },
+ "T235": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "7.60"
+ },
+ "T236": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "4.39"
+ },
+ "T237": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "8.47"
+ },
+ "T238": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "8.54"
+ },
+ "T239": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "9.35"
+ },
+ "T240": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "4.37"
+ },
+ "T241": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "5.9"
+ },
+ "T242": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "4.49"
+ },
+ "T243": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "9.31"
+ },
+ "T244": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "8.21"
+ },
+ "T245": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "2.7"
+ },
+ "T246": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "8.40"
+ },
+ "T247": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "2.17"
+ },
+ "T248": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "5.1"
+ },
+ "T249": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "4.26"
+ },
+ "T250": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "8.48"
+ },
+ "T251": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "5.26"
+ },
+ "T252": {
+  "query": "I used to be very sportive and do a lot outdoor activities. But now with my knee problems I couldn't do those things that I used to enjoy. I feel sad about it.",
+  "passage_id": "10.3"
+ },
+ "T253": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "7.27"
+ },
+ "T254": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "4.26"
+ },
+ "T255": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "11.18"
+ },
+ "T256": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "8.56"
+ },
+ "T257": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "10.28"
+ },
+ "T258": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "9.3"
+ },
+ "T259": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "5.29"
+ },
+ "T260": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "11.16"
+ },
+ "T261": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "3.12"
+ },
+ "T262": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "10.36"
+ },
+ "T263": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "10.3"
+ },
+ "T264": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "5.9"
+ },
+ "T265": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "8.48"
+ },
+ "T266": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "8.32"
+ },
+ "T267": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "7.2"
+ },
+ "T268": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "2.4"
+ },
+ "T269": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "8.40"
+ },
+ "T270": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "6.31"
+ },
+ "T271": {
+  "query": "My girlfriend broke up with me. Although I know it's the best outcome for both of us, I still can't let it go.",
+  "passage_id": "9.31"
+ },
+ "T272": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "9.31"
+ },
+ "T273": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "8.36"
+ },
+ "T274": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "10.36"
+ },
+ "T275": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "5.33"
+ },
+ "T276": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "9.42"
+ },
+ "T277": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "11.16"
+ },
+ "T278": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "5.36"
+ },
+ "T279": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "5.1"
+ },
+ "T280": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "5.5"
+ },
+ "T281": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "8.51"
+ },
+ "T282": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "9.16"
+ },
+ "T283": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "7.65"
+ },
+ "T284": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "1.9"
+ },
+ "T285": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "7.13"
+ },
+ "T286": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "3.4"
+ },
+ "T287": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "7.2"
+ },
+ "T288": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "7.55"
+ },
+ "T289": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "8.54"
+ },
+ "T290": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "7.28"
+ },
+ "T291": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "10.28"
+ },
+ "T292": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "9.9"
+ },
+ "T293": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "5.3"
+ },
+ "T294": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "11.9"
+ },
+ "T295": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "5.16"
+ },
+ "T296": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "9.23"
+ },
+ "T297": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "5.9"
+ },
+ "T298": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "2.17"
+ },
+ "T299": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "8.1"
+ },
+ "T300": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "4.24"
+ },
+ "T301": {
+  "query": "I always boast about my cool, digital normad lifestyle. But deep down I feel lonely.",
+  "passage_id": "5.26"
+ },
+ "T302": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "10.32"
+ },
+ "T303": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "8.48"
+ },
+ "T304": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "5.3"
+ },
+ "T305": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "4.19"
+ },
+ "T306": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "8.47"
+ },
+ "T307": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "2.14"
+ },
+ "T308": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "4.37"
+ },
+ "T309": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "9.31"
+ },
+ "T310": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "1.2"
+ },
+ "T311": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "3.1"
+ },
+ "T312": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "10.28"
+ },
+ "T313": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "8.49"
+ },
+ "T314": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "7.2"
+ },
+ "T315": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "12.26"
+ },
+ "T316": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "6.32"
+ },
+ "T317": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "9.3"
+ },
+ "T318": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "3.16"
+ },
+ "T319": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "2.17"
+ },
+ "T320": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "8.21"
+ },
+ "T321": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "7.26"
+ },
+ "T322": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "4.49"
+ },
+ "T323": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "2.2"
+ },
+ "T324": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "10.34"
+ },
+ "T325": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "9.35"
+ },
+ "T326": {
+  "query": "My father has dementia and he does not recognize me anymore. That makes me sad beyond measure.",
+  "passage_id": "5.4"
+ },
+ "T327": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "11.18"
+ },
+ "T328": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "5.12"
+ },
+ "T329": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "6.32"
+ },
+ "T330": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "6.30"
+ },
+ "T331": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "12.4"
+ },
+ "T332": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "9.3"
+ },
+ "T333": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "7.55"
+ },
+ "T334": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "6.12"
+ },
+ "T335": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "8.49"
+ },
+ "T336": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "7.26"
+ },
+ "T337": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "7.27"
+ },
+ "T338": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "8.8"
+ },
+ "T339": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "6.48"
+ },
+ "T340": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "7.41"
+ },
+ "T341": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "1.17"
+ },
+ "T342": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "10.30"
+ },
+ "T343": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "10.32"
+ },
+ "T344": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "9.31"
+ },
+ "T345": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "5.36"
+ },
+ "T346": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "9.21"
+ },
+ "T347": {
+  "query": "I worry sometimes that I have not been a good mum to my children because I spend much less time with them compared to other mums that work less.",
+  "passage_id": "8.56"
+ },
+ "T348": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "8.50"
+ },
+ "T349": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "2.17"
+ },
+ "T350": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "7.33"
+ },
+ "T351": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "7.68"
+ },
+ "T352": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "6.57"
+ },
+ "T353": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "6.20"
+ },
+ "T354": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "3.16"
+ },
+ "T355": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "8.28"
+ },
+ "T356": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "8.40"
+ },
+ "T357": {
+  "query": "My chronic back pain makes me bitter.",
+  "passage_id": "5.9"
+ },
+ "T358": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "3.4"
+ },
+ "T359": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "7.2"
+ },
+ "T360": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "5.10"
+ },
+ "T361": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "8.29"
+ },
+ "T362": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "8.40"
+ },
+ "T363": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "6.15"
+ },
+ "T364": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "11.19"
+ },
+ "T365": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "5.36"
+ },
+ "T366": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "4.3"
+ },
+ "T367": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "10.28"
+ },
+ "T368": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "5.6"
+ },
+ "T369": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "8.51"
+ },
+ "T370": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "7.55"
+ },
+ "T371": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "11.9"
+ },
+ "T372": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "8.32"
+ },
+ "T373": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "6.52"
+ },
+ "T374": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "8.47"
+ },
+ "T375": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "8.36"
+ },
+ "T376": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "5.29"
+ },
+ "T377": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "7.24"
+ },
+ "T378": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "6.11"
+ },
+ "T379": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "9.21"
+ },
+ "T380": {
+  "query": "I can't seem to shake out the habit of doom-scrolling. I know it's pointless and bad for me. But I just keep doing it regardless.",
+  "passage_id": "7.68"
+ },
+ "T381": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "3.1"
+ },
+ "T382": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "10.28"
+ },
+ "T383": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "11.16"
+ },
+ "T384": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "12.27"
+ },
+ "T385": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "8.56"
+ },
+ "T386": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "7.27"
+ },
+ "T387": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "8.32"
+ },
+ "T388": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "4.32"
+ },
+ "T389": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "2.5"
+ },
+ "T390": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "6.11"
+ },
+ "T391": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "7.55"
+ },
+ "T392": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "2.2"
+ },
+ "T393": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "8.47"
+ },
+ "T394": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "10.37"
+ },
+ "T395": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "3.5"
+ },
+ "T396": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "4.14"
+ },
+ "T397": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "11.37"
+ },
+ "T398": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "9.21"
+ },
+ "T399": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "10.22"
+ },
+ "T400": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "6.42"
+ },
+ "T401": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "5.1"
+ },
+ "T402": {
+  "query": "I think I'm slowly burning out at work. All those deadlines, over and over again.",
+  "passage_id": "8.48"
+ },
+ "T403": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "10.30"
+ },
+ "T404": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "5.9"
+ },
+ "T405": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "8.56"
+ },
+ "T406": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "5.31"
+ },
+ "T407": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "3.5"
+ },
+ "T408": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "5.3"
+ },
+ "T409": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "11.37"
+ },
+ "T410": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "5.16"
+ },
+ "T411": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "10.28"
+ },
+ "T412": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "5.5"
+ },
+ "T413": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "2.4"
+ },
+ "T414": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "9.23"
+ },
+ "T415": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "7.26"
+ },
+ "T416": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "5.1"
+ },
+ "T417": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "5.6"
+ },
+ "T418": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "3.1"
+ },
+ "T419": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "11.19"
+ },
+ "T420": {
+  "query": "I feel like I've not done enough for my family and that I'm failing them.",
+  "passage_id": "1.17"
+ }
+}

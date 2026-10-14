@@ -1,0 +1,113 @@
+"""On-disk completion cache for eval runs (CLAUDE.md, "Network and cost").
+
+A full grid run costs real money, so eval reruns must be free and
+repeatable: the second run of the same configuration is served from disk and
+reproduces the first one's outputs exactly.
+
+THE KEY. CLAUDE.md asks for (strategy, llm, query). This keys on a superset:
+the llm's registry name AND concrete model id, the call shape, and the full
+system prompt, user message and schema. The system prompt is what
+distinguishes one strategy (or the router, or the suppressor) from another,
+so the strategy is covered, and so is every edit to a prompt: a reworded
+router prompt cannot be served the old prompt's labels. The llm is in the
+key for the reason CLAUDE.md gives: without it, switching providers silently
+serves the previous one's completions and the comparison is worthless.
+
+WHAT IS STORED. The output plus the original call's CallRecord fields. A hit
+re-appends that record (marked cached) to llm.base.CALLS, so token and
+latency columns report what the run cost when it was made, not zero. Errors
+are never cached: an outage during one run must not become a permanent
+fallback in every later one.
+
+SAMPLING, PROVIDER AND REPEATS. Three more things go into the key, each only
+when it is not the default, so every entry written before they existed keeps
+its key:
+  - the HF provider, when it is not config.HF_PROVIDER: the same model on
+    another serving stack must never be answered from the old stack's
+    completions (publicai dropped the 70B and featherless-ai took over).
+  - the client's sampling settings, when they differ from
+    config.DEFAULT_SAMPLING. Registry entries that sample also have their
+    own names; this guards against editing a temperature in place.
+  - the repeat index (set_repeat), when it is not 0. Without it, repeating
+    a run to measure stability would be answered from the first run's
+    completions and report perfect stability while measuring nothing.
+Repeat N of a run is cached like any other, so a repeated run reruns free.
+
+One JSON file per entry under config.LLM_CACHE_DIR/<llm name>/, which is
+under data/ and therefore gitignored.
+"""
+
+import hashlib
+import json
+from pathlib import Path
+
+from meditations_rag import config
+from meditations_rag.llm.base import CALLS, CallRecord, LLMClient, capture_calls, current_repeat
+
+
+class CachedClient:
+    """Wraps an LLMClient; same name and model, so rows and cache keys agree."""
+
+    def __init__(self, inner: LLMClient, directory: Path) -> None:
+        self._inner = inner
+        self._dir = directory / inner.name
+
+    @property
+    def name(self) -> str:
+        return self._inner.name
+
+    @property
+    def model(self) -> str:
+        return self._inner.model
+
+    @property
+    def sampling(self) -> dict[str, float | None]:
+        return getattr(self._inner, "sampling", dict(config.DEFAULT_SAMPLING))
+
+    @property
+    def provider(self) -> str | None:
+        """The HF provider, for HF clients; None for clients without one."""
+        return getattr(self._inner, "provider", None)
+
+    def complete(self, system: str, user: str) -> str:
+        return self._through("complete", system, user, None,
+                             lambda: self._inner.complete(system, user))
+
+    def complete_json(self, system: str, user: str, schema: dict,
+                      structured: bool = True) -> dict:
+        # Not in the key: both paths answer the same prompt under the same
+        # schema check, and every entry written so far used the default.
+        return self._through("complete_json", system, user, schema,
+                             lambda: self._inner.complete_json(system, user, schema,
+                                                               structured=structured))
+
+    def key(self, kind: str, system: str, user: str, schema: dict | None) -> str:
+        parts: list = [self.name, self.model, kind, system, user, schema]
+        if self.sampling != config.DEFAULT_SAMPLING:
+            parts.append({"sampling": self.sampling})
+        if self.provider not in (None, config.HF_PROVIDER):
+            parts.append({"provider": self.provider})
+        if current_repeat():
+            parts.append({"repeat": current_repeat()})
+        blob = json.dumps(parts, sort_keys=True, ensure_ascii=False)
+        return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+    def _through(self, kind, system, user, schema, call):
+        path = self._dir / f"{self.key(kind, system, user, schema)}.json"
+        if path.exists():
+            entry = json.loads(path.read_text(encoding="utf-8"))
+            CALLS.extend(CallRecord(**{**r, "cached": True}) for r in entry["calls"])
+            return entry["output"]
+        with capture_calls() as mine:
+            output = call()   # raises on failure; nothing is written
+        entry = {"llm": self.name, "model": self.model, "kind": kind,
+                 "sampling": self.sampling, "provider": self.provider,
+                 "repeat": current_repeat(),
+                 "user": user, "output": output,
+                 # Every provider call this completion took, retries included:
+                 # this thread's own, so concurrent callers cannot mix in.
+                 "calls": [{k: v for k, v in vars(r).items() if k != "cached"}
+                           for r in mine]}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(entry, ensure_ascii=False, indent=1), encoding="utf-8")
+        return output

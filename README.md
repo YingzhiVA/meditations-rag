@@ -37,6 +37,18 @@ See [PLAN.md](PLAN.md) for the phased implementation plan.
 .venv/bin/pytest
 ```
 
+## Languages
+
+**English only, for now.** The keyword safety floor reads English, so it
+cannot detect a crisis described in another language. A local language check
+(`lingua`, offline) therefore runs before anything else: input that is not
+confidently English is declined, before any router or LLM sees it, with a
+static crisis pointer (local emergency numbers and findahelpline.com), since
+a crisis we cannot read cannot be ruled out. The corpus's proper names are
+masked first, so "What did Marcus Aurelius die of?" still reads as English.
+German, then French and Italian, are planned for Phase 6 through the LLM
+path. See "The floor reads English only" in [PLAN.md](PLAN.md).
+
 ## Source text
 
 Project Gutenberg [#55317](https://www.gutenberg.org/ebooks/55317) — *The
@@ -109,7 +121,7 @@ src/meditations_rag/
   llm/claude.py          Claude Sonnet — the eval comparator
   cli.py                 `meditations` entry point
 eval/                    golden set + router set + eval harness
-bench/ann_scaling.py     when does ANN start to pay? (exact search stays)
+bench/ann_scaling.py     when does ANN start to pay? (stub; moved to Phase 7)
 tests/                   parser, index/embedder and router invariants
 data/                    (gitignored) raw text, passages, indexes
 ```
@@ -133,18 +145,28 @@ torch (~2.5 GB); the first `meditations index` then downloads the
 `bge-base-en-v1.5` weights (~440 MB) into the HuggingFace cache. Both are
 one-time. The index is 487 × 768 float32 and builds in a couple of seconds.
 
-The default *LLM* path (Phase 4 onward) needs a **HuggingFace token**:
+The LLM path (Phase 4 onward) needs keys. Put them in `.env`, which is
+gitignored and loaded by `config.py`; rotating a key is then one edited line:
 
+```sh
+cp .env.example .env    # then fill in the values
 ```
-export HF_TOKEN=hf_...
-```
 
-The default Apertus models (`Apertus-8B/70B-Instruct-2509`) are **ungated** —
-no terms to accept, no access request. Switching `config.py` to an
-`Apertus-v1.5-*` model would add that step.
+- `CSCS_INFERENCE_API_KEY` for the default LLM, Apertus v1.5 70B on CSCS
+  (the Swiss National Supercomputing Centre), which records neither
+  prompts nor responses. The default query strategy uses it; without the
+  key, `meditations` says so and searches with the raw query instead.
+- `HF_TOKEN` for the Apertus 2509 rows via HF Inference Providers. A
+  fine-grained token with only "Make calls to Inference Providers" is
+  enough. Alternatively `hf auth login`, which stores a token outside the
+  repo that `huggingface_hub` finds by itself.
+- `ANTHROPIC_API_KEY` is optional, and only needed to run the Claude
+  comparator column of the eval matrix.
 
-`ANTHROPIC_API_KEY` is optional and only needed to run the Claude comparator
-column of the eval matrix.
+A variable already exported in your shell takes precedence over `.env`.
+
+The Apertus 2509 models on HF are **ungated** — no terms to accept. On CSCS
+the key itself grants access to the v1.5 models; no HF gating applies.
 
 ## CLI
 
@@ -152,10 +174,14 @@ column of the eval matrix.
 $ meditations ingest                 # download + parse + store 487 passages
 $ meditations index                  # embed passages with bge-base, build index
 $ meditations "I keep replaying an argument I lost and can't let it go"
+                                     # default: raw+hyde on Apertus v1.5 70B (the Phase 4 winner)
+$ meditations "..." --strategy raw   # the baseline: the message embedded as typed, no LLM
 $ meditations "..." --k 8 --all --scores
 $ meditations "hello"                # routed as chitchat — no retrieval
+$ meditations "..." --router apertus # Phase 4: LLM router (Apertus-8B), keyword floor beneath
 $ meditations show 11.18             # read one passage in full
-$ meditations "..." --strategy hyde --llm apertus   # Phase 4
+$ meditations "..." --strategy raw+hyde --llm claude   # any strategy on any registry LLM
+$ meditations "..." --reranker llm:claude             # LLM listwise rerank of 20 candidates
 $ python eval/run_eval.py            # Phase 3: the comparison matrix + router table
 
 # with tracing:

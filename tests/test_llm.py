@@ -1,0 +1,199 @@
+"""LLM-layer invariant — the completion cache key (CLAUDE.md, "Network and cost").
+
+One claim, silent when broken and poisonous downstream: the cache never
+serves one provider's (or one prompt's) completion for another. If the key
+dropped the llm, switching --llm would quietly replay the previous
+provider's outputs and the Apertus-vs-Claude column would compare a model
+with itself. Nothing crashes; the numbers are just wrong.
+
+The rest of the layer is deliberately untested here. Provider failures are
+loud (LLMError, and the fallback count in the eval report), and the
+structured-output fallback in llm/hf.py is observable in every CallRecord's
+json_path, so the eval report catches it rather than a mocked transport.
+"""
+
+import hashlib
+import json
+
+from meditations_rag import config, llm
+from meditations_rag.llm.base import CALLS, observed_call
+from meditations_rag.llm.cache import CachedClient
+
+
+class _CountingClient:
+    """Answers with its own name, so a cross-served completion is visible."""
+
+    def __init__(self, name: str, model: str, sampling=None) -> None:
+        self.name, self.model, self.calls = name, model, 0
+        self.sampling = dict(sampling or config.DEFAULT_SAMPLING)
+
+    def complete(self, system: str, user: str) -> str:
+        self.calls += 1
+        with observed_call(self.name, self.model, "fake", system, user) as call:
+            call.done(self.name, input_tokens=10, output_tokens=5)
+        return self.name
+
+    def complete_json(self, system: str, user: str, schema: dict,
+                      structured: bool = True) -> dict:
+        return {"by": self.complete(system, user)}
+
+
+def test_cache_never_crosses_llm_model_or_prompt(tmp_path):
+    a = _CountingClient("apertus", "swiss-ai/Apertus-70B-Instruct-2509")
+    b = _CountingClient("claude", "claude-sonnet-5")
+    b_other_model = _CountingClient("claude", "claude-haiku-4-5")
+    ca, cb, cb2 = (CachedClient(c, tmp_path) for c in (a, b, b_other_model))
+
+    assert ca.complete("sys", "q") == "apertus"
+    assert cb.complete("sys", "q") == "claude"          # not apertus's answer
+    assert cb2.complete("sys", "q") == "claude"
+    assert (a.calls, b.calls, b_other_model.calls) == (1, 1, 1)  # all three missed
+
+    # Same llm, same prompt: served from disk, and the replayed record carries
+    # the original call's tokens rather than zero.
+    start = len(CALLS)
+    assert ca.complete("sys", "q") == "apertus"
+    assert a.calls == 1
+    [rec] = CALLS[start:]
+    assert rec.cached and (rec.input_tokens, rec.output_tokens) == (10, 5)
+
+    # A different system prompt (another strategy, or an edited prompt) or a
+    # different call shape is a different entry.
+    ca.complete("other sys", "q")
+    ca.complete_json("sys", "q", {"type": "object"})
+    assert a.calls == 3
+
+
+def test_repeats_and_sampling_get_their_own_entries_and_old_keys_survive(tmp_path):
+    """A repeat served from the first run's cache would report perfect
+    stability while measuring nothing; a sampled client served greedy
+    completions would compare greedy with itself. Both must miss. And the
+    defaults must keep the key the cache used before either existed, or
+    every paid completion already on disk would silently be re-bought."""
+    greedy = CachedClient(_CountingClient("apertus-8b", "m"), tmp_path)
+    sampled = CachedClient(_CountingClient("apertus-8b", "m", {"temperature": 0.8,
+                                                                "top_p": 0.9}), tmp_path)
+    legacy = json.dumps(["apertus-8b", "m", "complete", "sys", "q", None],
+                        sort_keys=True, ensure_ascii=False)
+    assert greedy.key("complete", "sys", "q", None) == hashlib.sha256(legacy.encode()).hexdigest()
+
+    greedy.complete("sys", "q")
+    sampled.complete("sys", "q")
+    assert sampled._inner.calls == 1                 # not served the greedy answer
+    try:
+        llm.set_repeat(1)
+        greedy.complete("sys", "q")
+        assert greedy._inner.calls == 2              # repeat 1 is a fresh call
+        greedy.complete("sys", "q")
+        assert greedy._inner.calls == 2              # and itself reruns free
+    finally:
+        llm.set_repeat(0)
+    greedy.complete("sys", "q")
+    assert greedy._inner.calls == 2                  # repeat 0 still hits the original
+
+
+def test_a_provider_change_is_never_answered_from_the_old_provider(tmp_path):
+    """publicai dropped the 70B and featherless-ai serves it now. Same name,
+    same model, same prompt: without the provider in the key, the new row
+    would be the old provider's completions under a new label."""
+    old = CachedClient(_CountingClient("apertus", "m"), tmp_path)        # default provider
+    new_inner = _CountingClient("apertus", "m")
+    new_inner.provider = "featherless-ai"
+    new = CachedClient(new_inner, tmp_path)
+    old.complete("sys", "q")
+    new.complete("sys", "q")
+    assert new_inner.calls == 1                    # a fresh call, not publicai's answer
+    default_inner = _CountingClient("apertus", "m")
+    default_inner.provider = config.HF_PROVIDER     # naming the default changes nothing
+    assert CachedClient(default_inner, tmp_path).key("complete", "sys", "q", None) == \
+        old.key("complete", "sys", "q", None)
+
+
+def test_publicai_refuses_an_answer_from_a_substituted_model(monkeypatch):
+    """publicAI's gateway answered 16 of 102 'apertus-v1.5-70b' requests with
+    Qwen-SEA-LION. Accepted silently, those answers would be scored and
+    cached as Apertus — a comparison of the wrong model, under the right
+    name, with nothing crashing."""
+    import httpx
+    import pytest
+
+    from meditations_rag.llm.base import LLMError
+    from meditations_rag.llm.gateway import GatewayClient
+
+    def served_by(model):
+        def handler(request):
+            return httpx.Response(200, json={
+                "model": model, "usage": {"prompt_tokens": 5, "completion_tokens": 3},
+                "choices": [{"message": {"content": "fine"}, "finish_reason": "stop"}]})
+        return httpx.MockTransport(handler)
+
+    monkeypatch.setenv("PUBLICAI_API_KEY", "test-key")
+    asked = "swiss-ai/apertus-v1.5-70b"
+    ok = GatewayClient("apertus-v15-70b", asked, "publicai.co", transport=served_by(asked))
+    assert ok.complete("sys", "q") == "fine"
+    swapped = GatewayClient("apertus-v15-70b", asked, "publicai.co",
+                            transport=served_by("aisingapore/Qwen-SEA-LION-v4-32B-IT"))
+    with pytest.raises(LLMError, match="SEA-LION"):
+        swapped.complete("sys", "q")
+
+
+def test_structured_false_skips_response_format(monkeypatch):
+    """The LLM reranker opts out of response_format because constrained
+    decoding looped on whitespace for its long prompt on CSCS. If the flag
+    were ignored, every rerank would burn 15 s and ~1000 tokens of shared
+    capacity before its retry, and nothing would fail."""
+    import json as _json
+
+    import httpx
+
+    from meditations_rag.llm.gateway import GatewayClient
+
+    bodies = []
+
+    def handler(request):
+        bodies.append(_json.loads(request.content))
+        return httpx.Response(200, json={
+            "model": "m", "usage": {"prompt_tokens": 5, "completion_tokens": 3},
+            "choices": [{"message": {"content": '{"a": "x"}'}, "finish_reason": "stop"}]})
+
+    monkeypatch.setenv("PUBLICAI_API_KEY", "test-key")
+    schema = {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}
+    client = GatewayClient("g", "m", "publicai.co", transport=httpx.MockTransport(handler))
+    assert client.complete_json("sys", "q", schema, structured=False) == {"a": "x"}
+    assert "response_format" not in bodies[-1]
+    assert client.complete_json("sys", "q", schema) == {"a": "x"}
+    assert "response_format" in bodies[-1]
+
+
+def test_concurrent_completions_cache_only_their_own_calls(tmp_path):
+    """eval/blind.py judges on a thread pool. The cache used to attribute
+    calls by slicing the process-wide CALLS log, so each entry swallowed
+    every call other threads made meanwhile (13 records on one judge
+    entry): token and latency accounting inflated, and nothing failed."""
+    import json as _json
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    from meditations_rag.llm.cache import CachedClient
+
+    barrier = threading.Barrier(8)
+
+    class _Slow:
+        name, model = "slow", "slow-model"
+        sampling = dict(config.DEFAULT_SAMPLING)
+
+        def complete(self, system, user):
+            with observed_call(self.name, self.model, "fake", system, user) as call:
+                barrier.wait()            # every thread is inside a call at once
+                time.sleep(0.01)
+                call.done(user, input_tokens=int(user), output_tokens=1)
+            return user
+
+    client = CachedClient(_Slow(), tmp_path)
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        assert list(ex.map(lambda i: client.complete("s", str(i)), range(8))) == \
+            [str(i) for i in range(8)]
+    for f in (tmp_path / "slow").glob("*.json"):
+        entry = _json.loads(f.read_text())
+        assert [c["input_tokens"] for c in entry["calls"]] == [int(entry["user"])]

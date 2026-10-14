@@ -1,4 +1,5 @@
-"""Schema and consistency validation for the three labeled sets — Phase 3.
+"""Schema and consistency validation for the labeled sets — Phase 3, plus
+the language set (Phase 4).
 
 Run this while curating, not after. A bad passage id caught at entry 6 costs
 a second; caught at entry 25 it costs a re-read of the book.
@@ -52,6 +53,14 @@ BLOCKING = {f.value for f in SafetyFlag if f.blocks_retrieval}
 GOLDEN_FIELDS = {"query", "gold_ids", "tier", "note", "theme", "failure_mode"}
 ROUTER_FIELDS = {"query", "intent", "safety", "tier", "note"}
 SAFETY_FIELDS = {"query", "flags", "must_not_return", "tier", "note"}
+LANGUAGE_FIELDS = {"query", "lang", "tier", "note"}
+REVIEW_FIELDS = {"list", "id", "verdict", "why"}
+# Which shipped list a review entry belongs to, by the flag that applies it.
+REVIEW_LISTS = {"abuse": SafetyFlag.ABUSE, "death": SafetyFlag.MENTAL_HEALTH}
+LANGUAGE_TIERS = {"crisis", "everyday", "short"}
+# ISO 639-1, plus the ISO 639-3 codes for languages without a 639-1 code
+# (gsw: Swiss German). A label, so checked for shape only.
+LANG_RE = re.compile(r"^[a-z]{2,3}$")
 
 ID_RE = re.compile(r"^(\d{1,2})\.(\d{1,3})$")
 
@@ -279,7 +288,9 @@ def validate_golden(path: Path, known: set[str] | None) -> Report:
         # the oos_accuracy denominator, the other has to be excluded from
         # every metric. Curation makes the second state normal for days at a
         # time, so the harness cannot infer it from emptiness alone.
-        tier = check_tier(rep, n, obj, {"hard", "canary", "out_of_scope"}, "hard")
+        # "content" (Phase 4): a question about what the book says, scored
+        # like a canary on its own line, never folded into hard recall.
+        tier = check_tier(rep, n, obj, {"hard", "canary", "content", "out_of_scope"}, "hard")
         tiers[tier] += 1
         if "theme" in obj:
             # Themes apply to both tiers: the canary line should span concerns
@@ -343,7 +354,7 @@ def validate_golden(path: Path, known: set[str] | None) -> Report:
 
     rep.info("")
     rep.info(f"  {len(entries)} entries: {tiers['hard']} hard, {tiers['canary']} canary, "
-             f"{oos} out-of-scope fixtures")
+             f"{tiers['content']} content, {oos} out-of-scope fixtures")
     rep.info(f"  {labelled} labelled, {unlabelled} awaiting labels")
     if per_query:
         # Reported, not policed. Under hit-ANY, recall rises with the number of
@@ -499,10 +510,88 @@ def validate_safety(path: Path, known: set[str] | None) -> Report:
     return rep
 
 
+# --- language_set.jsonl -----------------------------------------------------
+
+def validate_language(path: Path) -> Report:
+    """Non-English inputs the language guard must decline (PLAN.md, Phase 4).
+    Every entry is a decline by construction, so the label is the language,
+    for per-language reporting, and the tier says what a miss would cost:
+    crisis (a missed referral), everyday (nonsense passages), short (too few
+    words to identify — the hardest case for any detector)."""
+    rep = Report(path)
+    entries = load(path, rep)
+    common(rep, entries, LANGUAGE_FIELDS)
+    tiers: Counter[str] = Counter()
+    langs: Counter[str] = Counter()
+    for n, obj in entries:
+        lang = obj.get("lang")
+        if not isinstance(lang, str) or not LANG_RE.match(lang):
+            rep.error(n, f"lang {lang!r} is not an ISO 639 code (e.g. 'de', 'gsw')")
+            continue
+        if lang == "en":
+            rep.error(n, "lang 'en' in the language set — every entry must be non-English; "
+                         "English false declines are measured on the other three sets")
+        langs[lang] += 1
+        tiers[check_tier(rep, n, obj, LANGUAGE_TIERS, "everyday")] += 1
+    rep.info("")
+    rep.info(f"  {len(entries)} entries: {dict(sorted(tiers.items()))}")
+    rep.info(f"  languages: {dict(sorted(langs.items()))}")
+    if not tiers["crisis"]:
+        rep.warn(None, "no crisis entries — the guard exists for the missed referral, "
+                       "so decline recall on crisis disclosures is the number that matters")
+    return rep
+
+
+# --- suppression_review.jsonl -----------------------------------------------
+
+def validate_review(path: Path, known: set[str] | None) -> Report:
+    """The reviewed keeps and strikes behind retrieve/safety.py, as data for
+    the LLM check's agreement table. PLAN.md stays the reviewed artifact;
+    this is its transcription. Like must_not_return, the verdicts are human
+    claims: a keep the shipped list lacks, or a listed id the review struck,
+    is reported as a NOTE, never derived from the code."""
+    rep = Report(path)
+    entries = load(path, rep)
+    seen: dict[tuple[str, str], int] = {}
+    counts: Counter[tuple[str, str]] = Counter()
+    for n, obj in entries:
+        for key in set(obj) - REVIEW_FIELDS:
+            rep.warn(n, f"unknown field {key!r} — known: {', '.join(sorted(REVIEW_FIELDS))}")
+        lst, pid, verdict = obj.get("list"), obj.get("id"), obj.get("verdict")
+        if lst not in REVIEW_LISTS:
+            rep.error(n, f"list {lst!r} not one of {sorted(REVIEW_LISTS)}")
+            continue
+        if verdict not in ("keep", "strike"):
+            rep.error(n, f"verdict {verdict!r} must be 'keep' or 'strike'")
+            continue
+        if not check_id(rep, n, pid, known):
+            continue
+        if not obj.get("why"):
+            rep.warn(n, "no 'why': the reasons are what let the list be contested later")
+        if (lst, pid) in seen:
+            rep.error(n, f"{pid} reviewed twice for {lst!r}, first at line {seen[(lst, pid)]}")
+        seen[(lst, pid)] = n
+        counts[(lst, verdict)] += 1
+    for lst, flag in REVIEW_LISTS.items():
+        keeps = {pid for (l, pid), _ in seen.items() if l == lst
+                 and next(o for m, o in entries if m == seen[(l, pid)])["verdict"] == "keep"}
+        shipped = set(SUPPRESSION[flag])
+        if keeps - shipped:
+            rep.note(None, f"{lst}: kept {sorted(keeps - shipped)} but not in retrieve/safety.py")
+        if shipped - keeps:
+            rep.note(None, f"{lst}: in retrieve/safety.py but not kept here: {sorted(shipped - keeps)}")
+    rep.info("")
+    rep.info(f"  {len(entries)} entries: " + ", ".join(
+        f"{l} {v} {c}" for (l, v), c in sorted(counts.items())))
+    return rep
+
+
 VALIDATORS = {
     "golden_set.jsonl": lambda p, known: validate_golden(p, known),
     "router_set.jsonl": lambda p, known: validate_router(p),
     "safety_set.jsonl": lambda p, known: validate_safety(p, known),
+    "language_set.jsonl": lambda p, known: validate_language(p),
+    "suppression_review.jsonl": lambda p, known: validate_review(p, known),
 }
 
 

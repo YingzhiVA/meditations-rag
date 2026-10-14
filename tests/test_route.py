@@ -16,6 +16,28 @@ Two claims, both structural, both silent when broken:
 Word-list behaviour ("does 'hey there!' route as chitchat") is deliberately
 not tested here: it is measured by the Phase 3 router eval, and the lists
 are meant to be edited.
+
+Phase 4 adds two for the LLM router, both against a fake client (no network):
+
+3. The floor survives the LLM. An LLM that answers "no flags" for a
+   self-harm disclosure must not remove the flag the keyword floor raised.
+   If the union were ever dropped, the LLM router's safety row would still
+   look plausible — just lower than the floor alone, which is the one
+   direction it must never move.
+4. An outage degrades, visibly. A raising client yields the fallback's
+   decision with the floor intact and `fallback` set, rather than an
+   exception (a lost query) or an unmarked keyword answer (a router row
+   that silently measures the keyword router).
+
+LLM classification quality is not tested here; that is the router eval.
+
+Phase 4's language guard adds one more, the invariant PLAN.md names:
+
+5. Non-English input is declined before ANY work: no router (an LLM router
+   would ship the text to a provider) and no embedding. Asserted with the
+   same raising stubs, plus a raising router. Which inputs the detector
+   gets right is measured by the eval (false declines, decline recall), not
+   tested here.
 """
 
 import json
@@ -25,7 +47,9 @@ import pytest
 
 from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
 from meditations_rag.route.base import Intent, SafetyFlag
+from meditations_rag.llm.base import LLMError
 from meditations_rag.route.keyword import KeywordRouter
+from meditations_rag.route.llm import LLMRouter
 
 ROUTER_SET = Path(__file__).resolve().parents[1] / "eval" / "router_set.jsonl"
 
@@ -50,6 +74,15 @@ class _RaisingIndex:
 
     def __getattr__(self, item):
         raise AssertionError(f"index.{item} touched on a short-circuited query")
+
+
+class _RaisingRouter:
+    """Any route() call proves a declined input reached the router."""
+
+    name = "keyword"
+
+    def route(self, problem):
+        raise AssertionError("router called on an input the language guard should decline")
 
 
 @pytest.fixture
@@ -114,3 +147,57 @@ def test_keyword_router_never_returns_out_of_scope():
     assert len(probes) > 30
     for q in probes:
         assert router.route(q).intent is not Intent.OUT_OF_SCOPE, q
+
+
+class _FakeClient:
+    """An LLMClient that returns a fixed answer, or raises like an outage."""
+
+    name, model = "fake", "fake-model"
+
+    def __init__(self, answer: dict | None = None) -> None:
+        self.answer = answer
+
+    def complete(self, system, user):  # pragma: no cover — routers use JSON
+        raise AssertionError("router called complete()")
+
+    def complete_json(self, system, user, schema):
+        if self.answer is None:
+            raise LLMError("provider error: 503 Service Unavailable")
+        return self.answer
+
+
+DISCLOSURE = "I don't want to be alive anymore"
+
+
+def test_llm_router_cannot_remove_a_floor_flag():
+    router = LLMRouter("fake", _FakeClient({"intent": "in_scope", "safety": []}),
+                       fallback=KeywordRouter())
+    decision = router.route(DISCLOSURE)
+    assert SafetyFlag.SELF_HARM in decision.safety
+    assert decision.fallback is None
+    # The diagnostic keeps the LLM's own answer apart from the union, so the
+    # eval can attribute this catch to the floor rather than to the LLM.
+    assert decision.llm_safety == frozenset()
+
+
+def test_llm_router_outage_falls_back_visibly_with_floor_intact():
+    router = LLMRouter("fake", _FakeClient(None), fallback=KeywordRouter())
+    decision = router.route(DISCLOSURE)          # must not raise
+    assert decision.fallback and "503" in decision.fallback
+    assert decision.intent is KeywordRouter().route(DISCLOSURE).intent
+    assert SafetyFlag.SELF_HARM in decision.safety
+    assert decision.llm_safety is None   # no LLM answered; nothing to attribute
+
+
+@pytest.mark.parametrize("problem", [
+    "chcę umrzeć",                       # PLAN.md's own example
+    "je veux mourir",
+    "Was sagt Marcus Aurelius über den Tod?",   # the corpus's names do not make it English
+])
+def test_non_english_is_declined_before_router_and_embedder(cfg, problem):
+    result = run_query(problem, cfg, router=_RaisingRouter(),
+                       embedder=_RaisingEmbedder(), index=_RaisingIndex())
+    assert result.declined
+    assert result.intent is None
+    assert result.language != "en"
+    assert not result.retrieved

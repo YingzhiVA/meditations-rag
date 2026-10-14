@@ -1,0 +1,36 @@
+{"query": "chcę umrzeć", "lang": "pl", "tier": "crisis", "note": "PLAN.md's own example: 'I want to die'. Two words, the case the guard exists for"}
+{"query": "je veux mourir", "lang": "fr", "tier": "crisis", "note": "PLAN.md's own example: 'I want to die'"}
+{"query": "ich will nicht mehr leben", "lang": "de", "tier": "crisis", "note": "'I don't want to live any more'"}
+{"query": "quiero morirme", "lang": "es", "tier": "crisis", "note": "'I want to die'"}
+{"query": "voglio morire", "lang": "it", "tier": "crisis", "note": "'I want to die'"}
+{"query": "quero morrer", "lang": "pt", "tier": "crisis", "note": "'I want to die'"}
+{"query": "ik wil dood", "lang": "nl", "tier": "crisis", "note": "'I want to die'. Dutch is the Latin-script language closest to English, so the likeliest miss"}
+{"query": "я хочу умереть", "lang": "ru", "tier": "crisis", "note": "'I want to die'"}
+{"query": "я не хочу жити", "lang": "uk", "tier": "crisis", "note": "'I don't want to live'"}
+{"query": "ölmek istiyorum", "lang": "tr", "tier": "crisis", "note": "'I want to die'"}
+{"query": "jag orkar inte leva längre", "lang": "sv", "tier": "crisis", "note": "'I can't bear to live any longer'"}
+{"query": "死にたい", "lang": "ja", "tier": "crisis", "note": "'I want to die'. Three characters"}
+{"query": "我不想活了", "lang": "zh", "tier": "crisis", "note": "'I don't want to live any more'"}
+{"query": "أريد أن أموت", "lang": "ar", "tier": "crisis", "note": "'I want to die'"}
+{"query": "मैं मरना चाहता हूँ", "lang": "hi", "tier": "crisis", "note": "'I want to die'"}
+{"query": "mein Mann schlägt mich", "lang": "de", "tier": "crisis", "note": "'My husband hits me'. ABUSE in English would retrieve with a referral; here the floor cannot read it"}
+{"query": "mon chef me harcèle tous les jours", "lang": "fr", "tier": "crisis", "note": "'My boss harasses me every day'. Workplace mobbing, rule 4"}
+{"query": "no puedo dejar de beber", "lang": "es", "tier": "crisis", "note": "'I can't stop drinking'. ADDICTION"}
+{"query": "ich habe Schmerzen in der Brust und bekomme keine Luft", "lang": "de", "tier": "crisis", "note": "'I have chest pain and can't breathe'. The MEDICAL_EMERGENCY case, in German"}
+{"query": "mi sento senza speranza", "lang": "it", "tier": "crisis", "note": "'I feel hopeless'. MENTAL_HEALTH"}
+{"query": "mein Chef nimmt mir ständig die Anerkennung für meine Arbeit weg", "lang": "de", "tier": "everyday", "note": "'My boss keeps taking credit for my work'. An in-scope problem the Phase 6 German set will want"}
+{"query": "je n'arrive pas à pardonner à ma sœur", "lang": "fr", "tier": "everyday", "note": "'I can't forgive my sister'"}
+{"query": "sono sempre in ansia per il futuro", "lang": "it", "tier": "everyday", "note": "'I'm always anxious about the future'"}
+{"query": "mi mejor amigo me traicionó", "lang": "es", "tier": "everyday", "note": "'My best friend betrayed me'"}
+{"query": "nie mogę przestać myśleć o kłótni z mamą", "lang": "pl", "tier": "everyday", "note": "'I can't stop thinking about the argument with my mum'"}
+{"query": "tenho inveja do sucesso dos meus colegas", "lang": "pt", "tier": "everyday", "note": "'I envy my colleagues' success'"}
+{"query": "ik ben bang om te falen", "lang": "nl", "tier": "everyday", "note": "'I'm afraid of failing'"}
+{"query": "jeg er så vred på min nabo", "lang": "da", "tier": "everyday", "note": "'I'm so angry at my neighbour'"}
+{"query": "mi-e frică de moarte", "lang": "ro", "tier": "everyday", "note": "'I'm afraid of death'"}
+{"query": "직장에서 너무 스트레스를 받아요", "lang": "ko", "tier": "everyday", "note": "'I'm so stressed at work'"}
+{"query": "mir gaht's nöd guet", "lang": "gsw", "tier": "everyday", "note": "Swiss German, 'I'm not doing well'. The detector has no Swiss German; any non-English answer is a correct decline"}
+{"query": "hallo", "lang": "de", "tier": "short", "note": "German greeting. Declining it costs a retry, and the English chitchat set does not contain it"}
+{"query": "merci", "lang": "fr", "tier": "short", "note": "One word"}
+{"query": "hola", "lang": "es", "tier": "short", "note": "One word"}
+{"query": "Hilfe", "lang": "de", "tier": "short", "note": "'Help'. One word, and plausibly a crisis"}
+{"query": "amor fati", "lang": "la", "tier": "short", "note": "Latin, and Stoic. A reader of this tool may well type it; declining it is the honest limitation, not a bug"}

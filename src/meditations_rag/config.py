@@ -7,9 +7,35 @@ embedder, or the LLM provider is a one-line change.
 import os
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_dotenv(path: Path) -> None:
+    """Read KEY=VALUE lines from the gitignored .env into os.environ, so API
+    keys live in one file that rotating a key means editing (see
+    .env.example). Real environment variables always win: setdefault never
+    overwrites. Stdlib only — `export ` prefixes, # comments and surrounding
+    quotes are handled, and nothing fancier is needed for two keys."""
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.removeprefix("export ").split("=", 1)
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        if value:
+            os.environ.setdefault(key.strip(), value)
+
+
+# Before anything reads the environment (tracing flags below, the SDKs later).
+_load_dotenv(REPO_ROOT / ".env")
+
 # --- Paths -----------------------------------------------------------------
 # data/ is gitignored; every artifact under it is reproducible from source.
-DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+DATA_DIR = REPO_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"            # cached Gutenberg download
 PASSAGES_PATH = DATA_DIR / "passages.jsonl"  # output of `meditations ingest`
 INDEX_DIR = DATA_DIR / "index"        # one subdir per embedder name
@@ -44,18 +70,59 @@ EXPECTED_PER_BOOK_COUNTS = {
 # be silently truncated by a 512-token embedder. Passages over the threshold
 # are flagged is_long; Phase 4 evaluates parent-child sub-chunking for them.
 LONG_PASSAGE_WORDS = 300
+# Phase 4 sub-chunking (index/chunking.py): a long passage without the
+# author's own numbered seams splits at sentence ends into balanced chunks of
+# at most this many words, about a long ordinary passage (p75 is 103), so a
+# chunk competes with whole passages on equal terms. Untuned.
+SUBCHUNK_MAX_WORDS = 150
 
 # --- LLM (Phase 4: query transformation + routing; no synthesis in v1) -------
 # The LLM is a swappable seam (llm/base.py) and an eval axis, not a fixed
-# dependency. Default is Apertus via the HuggingFace Inference API — an open
-# model is genuinely competitive at these short transformation/classification
-# calls, and it is the model the Apertus Hackathon targets.
-DEFAULT_LLM = "apertus"      # key into the llm registry; see llm/__init__.py
+# dependency. Default is Apertus — an open model, and the one the Apertus
+# Hackathon targets — now v1.5 70B on CSCS: the generation still served
+# (publicai dropped the 2509 70B), identity verified, and on the router
+# and safety sets at least the 2509 70B's level (PLAN.md, Phase 4 results).
+DEFAULT_LLM = "apertus-v15-70b"  # key into the llm registry; see llm/__init__.py
 
 # HuggingFace Inference Providers. "publicai" is the one provider verified live
 # for these models; "featherless-ai" currently reports an error status, which is
 # why llm/hf.py needs a fallback path rather than assuming availability.
-HF_PROVIDER = "publicai"
+HF_PROVIDER = "publicai"          # the default; entries may name another (below)
+# publicai stopped serving Apertus-70B-Instruct-2509 after 2026-09-29 ("Model
+# ... is not supported by provider publicai"); HF lists featherless-ai as the
+# one live provider for it. The 8B is still live on publicai. The provider is
+# part of every LLM's stamp and, when not the default, of its cache key: the
+# same model behind another serving stack is a different row.
+HF_GEN_PROVIDER = "featherless-ai"
+HF_ROUTER_PROVIDER = "publicai"
+# The blind eval's judge (eval/blind.py): an open-weight model of a third
+# lineage, so it can favour neither Apertus's picks nor Claude's.
+# Non-reasoning (no thinking tokens to pay for); deepinfra, not
+# featherless-ai, which did not honour response_format (Risk 2).
+JUDGE_MODEL = "Qwen/Qwen3-235B-A22B-Instruct-2507"
+JUDGE_PROVIDER = "deepinfra"
+
+# OpenAI-compatible gateways called directly (llm/gateway.py), for models HF
+# Inference Providers does not serve: Apertus v1.5 has no live HF provider.
+# Each names its key's environment variable (.env) and where to get one.
+GATEWAYS: dict[str, dict[str, str]] = {
+    "publicai.co": {"base_url": "https://api.publicai.co/v1",
+                    "key_env": "PUBLICAI_API_KEY",
+                    "where": "platform.publicai.co, Settings, API keys"},
+    # CSCS, the Swiss National Supercomputing Centre: "does not record user
+    # prompts or model responses", which matters for this tool's inputs.
+    "cscs": {"base_url": "https://api.inference.cscs.ch/v1",
+             "key_env": "CSCS_INFERENCE_API_KEY",
+             "where": "ui.inference.cscs.ch"},
+}
+# Apertus v1.5 on publicAI: the non-thinking releases. NOT USED — its
+# "v1.5-8b" serves the 2509 8B and its gateway substitutes models (PLAN.md,
+# Risk 1). Kept for the record; the registry serves v1.5 from CSCS.
+PUBLICAI_GEN_MODEL = "swiss-ai/apertus-v1.5-70b"
+PUBLICAI_ROUTER_MODEL = "swiss-ai/apertus-v1.5-8b"
+# The same models on CSCS, ids as on HF; the -thinking variants are not used.
+CSCS_GEN_MODEL = "swiss-ai/Apertus-v1.5-70B"
+CSCS_ROUTER_MODEL = "swiss-ai/Apertus-v1.5-8B"
 # Generation-quality work (HyDE writes prose in a 1902 register) gets the 70B.
 HF_GEN_MODEL = "swiss-ai/Apertus-70B-Instruct-2509"
 # Routing is short classification — no reason to pay 70B latency per query.
@@ -66,12 +133,54 @@ HF_ROUTER_MODEL = "swiss-ai/Apertus-8B-Instruct-2509"
 
 # Comparator on the eval grid, NOT the default path. Sonnet rather than Opus:
 # these calls are short and cheap, and the interesting question is whether the
-# open model holds up, not how good a frontier model can be.
+# open model holds up, not how good a frontier model can be. Same split as the
+# Apertus pair: Sonnet for generation and judgement, Haiku for routing.
 CLAUDE_MODEL = "claude-sonnet-5"
-CLAUDE_EFFORT = "low"        # output_config={"effort": ...}; short calls
+CLAUDE_ROUTER_MODEL = "claude-haiku-4-5"
+# output_config={"effort": ...} on Sonnet only: Haiku 4.5 rejects the field.
+CLAUDE_EFFORT = "low"
 
 # Query transformation outputs are short; keep the cap tight. Provider-neutral.
 LLM_MAX_TOKENS = 1024
+# Sampling. Every LLM call defaults to greedy decoding (temperature 0, no
+# top_p): classification and the eval want the most likely answer, not a
+# sample. The Apertus model cards recommend temperature 0.8 / top_p 0.9 "in
+# the sampling parameters", for open-ended chat; the *-t08 registry entries
+# run that setting as its own eval row, with --repeats, since one sample at
+# 0.8 measures nothing on its own.
+DEFAULT_SAMPLING: dict[str, float | None] = {"temperature": 0.0, "top_p": None}
+APERTUS_RECOMMENDED_SAMPLING: dict[str, float | None] = {"temperature": 0.8, "top_p": 0.9}
+
+# Per attempt. The router sits on the latency path of every query, so a hung
+# provider has to turn into a keyword fallback in seconds, not minutes.
+LLM_TIMEOUT_S = 30.0
+
+# Completion cache for eval runs (CLAUDE.md, "Network and cost"). Keyed by
+# llm name + model + the full prompt, so switching providers or editing a
+# prompt can never serve a stale completion. Off unless the harness enables
+# it; the CLI always goes to the provider.
+LLM_CACHE_DIR = DATA_DIR / "cache" / "llm"
+
+# USD per million tokens (input, output), for the eval's $/query columns.
+# Only models with a published per-token rate: publicai states none for
+# Apertus, so those rows report tokens and leave $ blank rather than guess.
+LLM_PRICES_PER_MTOK: dict[str, tuple[float, float]] = {
+    "claude-sonnet-5": (2.00, 10.00),
+    "claude-haiku-4-5": (1.00, 5.00),
+    # publicAI's own gateway publishes per-token rates (unlike its HF route).
+    "swiss-ai/apertus-v1.5-8b": (0.10, 0.20),
+    "swiss-ai/apertus-v1.5-70b": (0.82, 2.92),
+}
+
+# --- Language guard (Phase 4) ------------------------------------------------
+# The keyword safety floor reads English only (PLAN.md, "The floor reads
+# English only"), so a language joins this tuple only once it has its own
+# safety set scoring the LLM router in that language. Phase 6 adds "de".
+SUPPORTED_LANGUAGES: tuple[str, ...] = ("en",)
+# A supported language is accepted only when it ranks first AND its
+# confidence is at least this multiple of the runner-up's; anything less is
+# "unsure", and unsure is declined. Measured in route/language.py's docstring.
+LANGUAGE_MIN_RATIO = 1.2
 
 # --- Router (Phase 2 interface, Phase 4 LLM impls) --------------------------
 # Pre-retrieval intent classification: not every input warrants a meditation.
@@ -101,10 +210,30 @@ DEFAULT_EMBEDDER = "bge-base"  # key into embed registry; see embed/__init__.py
 BGE_BASE_MODEL = "BAAI/bge-base-en-v1.5"
 
 # --- Retrieval defaults ------------------------------------------------------
-DEFAULT_STRATEGY = "raw"     # baseline; eval winner becomes the default later
+# Two defaults, kept apart on purpose. BASELINE_STRATEGY is what a bare
+# RetrievalConfig() means: the eval's reference row, which the safety and
+# exposure tables also run on, so it never moves with the product.
+# DEFAULT_STRATEGY is what ships (CLI, web UI): the Phase 4 winner on both
+# measures, raw fused with an Apertus HyDE passage (PLAN.md, the dead@2
+# result: R@5 80% against raw's 75%, dead@2 22% against 48%). Its LLM is
+# DEFAULT_LLM; if that call fails the pipeline falls back to the raw query.
+BASELINE_STRATEGY = "raw"
+DEFAULT_STRATEGY = "raw+hyde"
 DEFAULT_TOP_K = 5            # results shown by default
 OVERRETRIEVE_K = 20          # candidates fetched before rerank (Phase 4)
-# Below this cosine score the CLI should say "no strong match" instead of
-# presenting the least-bad passage. Tune against the golden set in Phase 4.
-# This is POST-retrieval rejection; the router handles PRE-retrieval rejection.
-MIN_SCORE_THRESHOLD = 0.0    # PLACEHOLDER — 0.0 disables the check for now
+# Reciprocal Rank Fusion (retrieve/fusion.py), for strategies that embed more
+# than one string. Both untuned on purpose: C is the standard constant, and
+# each list is searched this deep before fusing so a passage ranked low in
+# several lists can still rise.
+RRF_C = 60
+RRF_DEPTH = 50
+# When the user's own message comes no closer than this to any passage, the
+# CLI says "no strong match" above the nearest passages (it hedges; it never
+# hides them). POST-retrieval; the router does PRE-retrieval rejection.
+# A floor, not a classifier (PLAN.md, the no-match item): message top-1
+# cosines of in-scope and out-of-scope questions overlap from 0.459 up, so
+# no cosine separates them, and only the trivially off-topic fall below
+# (radiator valve 0.389, linked list 0.419, Zurich weather 0.425). 0.43
+# catches those with 0.029 of margin under the lowest in-scope query in any
+# set; read off these sets, so the fresh-query check is its real test.
+MIN_SCORE_THRESHOLD = 0.43

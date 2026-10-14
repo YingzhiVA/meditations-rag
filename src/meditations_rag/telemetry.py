@@ -34,19 +34,34 @@ DESIGN RULES
 SPAN TREE
 ---------
     query                       (CHAIN, root: config metadata, shown ids)
-      ├─ route                  (CHAIN; an LLM router nests its LLM span)
-      ├─ strategy.expand        (CHAIN)
-      │    └─ llm.generate      (LLM — HyDE / multi-query / rewrite; Phase 4)
+      ├─ language               (GUARDRAIL — a declined input stops here)
+      ├─ route                  (CHAIN)
+      │    └─ llm.generate      (LLM — LLM routers only; none on a chitchat
+      │                          exact match or with the keyword router)
+      ├─ strategy.expand        (CHAIN — output: the strings to embed, and
+      │    │                     the fallback reason if the LLM failed)
+      │    └─ llm.generate      (LLM — rewrite / introspect / hyde / multi,
+      │                          and their raw+ variants; none for raw)
       ├─ load                   (CHAIN — CLI cold start only)
-      ├─ embed.query            (EMBEDDING)
-      ├─ index.search           (RETRIEVER — documents with scores and text)
-      ├─ rerank                 (RERANKER; Phase 4)
+      ├─ embed.query            (EMBEDDING ┐ once per embedded string: one
+      ├─ index.search           (RETRIEVER ┘ pair for raw, two for raw+X,
+      │                          three for multi; documents with scores and
+      │                          text, after the metadata filter and, on a
+      │                          sub-chunked index, the dedupe to parents)
+      ├─ lexical.search         (RETRIEVER — hybrid only: BM25 over the
+      │                          user's own words)
+      ├─ fuse                   (CHAIN — RRF; only when there is more than
+      │                          one ranked list)
+      ├─ rerank                 (RERANKER — only with cfg.reranker: the
+      │                          candidates in, the reranked top k out)
       └─ safety.suppress        (GUARDRAIL — only when a flag fired)
+           └─ llm.generate      (LLM — one per passage and test, LLM suppressor only)
 
 ATTRIBUTES THAT MAKE IT USEFUL
 ------------------------------
 Tag the root span with the full RetrievalConfig (embedder, strategy, llm,
-router, reranker, k) and, when running under the harness, an eval_run_id.
+router, reranker, suppressor, chunking, filter, retriever, k: every field of
+RetrievalConfig.as_dict) and, when running under the harness, an eval_run_id.
 That is the whole tie-in: it lets latency and token cost be sliced BY
 CONFIGURATION in Phoenix, and lets run_eval.py read p50/p95 latency and
 $/query back out of the same spans it already grids over. Without those tags
@@ -55,8 +70,11 @@ the traces are decoration; with them they are the cost half of the matrix.
 WHERE SPANS ARE OPENED. At the call sites in retrieve/pipeline.run_query,
 not inside each embedder, index or router: one file carries the
 instrumentation, and every implementation Phase 4 adds is traced with no
-edit. The exception is llm/ (Phase 4), whose token counts only the client
-sees, so its LLM spans will be opened there. A `load` span appears only when
+edit. The exception is llm/, whose token counts only the client sees, so its
+LLM spans are opened there, by llm/base.observed_call around each provider
+round trip. They nest under whichever stage made the call. A call that
+retries (the HF prompt-JSON path) shows as sibling llm.generate spans; a
+completion served from the eval cache opens none. A `load` span appears only when
 run_query builds the model and index itself (the CLI's cold start); the
 harness passes them in, so its traces are pure per-query cost.
 
@@ -223,6 +241,22 @@ def set_metadata(span, metadata: Mapping[str, object], tags: list[str] = ()) -> 
         {k: v for k, v in metadata.items() if v is not None}, default=str))
     if tags:
         span.set_attribute(sa.TAG_TAGS, list(tags))
+
+
+def set_llm(span, *, model: str, provider: str, input_tokens: int,
+            output_tokens: int) -> None:
+    """Model and token counts on an LLM span — what Phoenix sums into cost
+    per trace, and so per configuration."""
+    if not span.is_recording():
+        return
+    sa, _ = _keys()
+    span.set_attributes({
+        sa.LLM_MODEL_NAME: model,
+        sa.LLM_PROVIDER: provider,
+        sa.LLM_TOKEN_COUNT_PROMPT: input_tokens,
+        sa.LLM_TOKEN_COUNT_COMPLETION: output_tokens,
+        sa.LLM_TOKEN_COUNT_TOTAL: input_tokens + output_tokens,
+    })
 
 
 def set_documents(span, docs: list[tuple[str, float, str]]) -> None:

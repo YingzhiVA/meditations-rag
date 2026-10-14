@@ -17,6 +17,31 @@ tests/test_route.py.
 No FakeEmbedder: a hash-based double would make (3) a tautology and, being
 symmetric, could never fail (2). The two real-model tests skip cleanly when
 the weights or the index are absent, so a fresh clone still passes.
+
+Phase 4's sub-chunking adds three, for the same reasons:
+
+4. Chunking loses and repeats nothing (real corpus): each long passage's
+   chunks hold exactly its words, in order. A dropped sentence would make a
+   labelled passage unfindable and look like a bad embedder.
+5. Ordinal seams fire on 11.18 only, as measured, giving 11 chunks; and no
+   chunk is long enough to be truncated, which is the point of the row.
+6. Dedupe-to-parent (fixture, no model): exactly k distinct parents come
+   back when children crowd the top, with the matching child recorded; and a
+   hit on 11.18's tenth-precept chunk is still withheld from an ABUSE
+   reader, since suppression stays whole-passage (PLAN.md).
+7. The Book I filter (fixture, no model): with "no-book-1", no Book I
+   passage comes back even when Book I rows, children included, rank first,
+   and the query still returns k passages. A filter that also shrank the
+   result list would read as a recall loss caused by the filter.
+
+Hybrid retrieval (BM25 from FTS5) adds two:
+
+8. A message is never FTS5 syntax: quotes, apostrophes and operators are
+   words or nothing, and a message with no letters returns no hits instead
+   of raising, so a user cannot crash the lexical half or steer it.
+9. The BM25 list joins the fusion with cosines, not BM25 scores, and obeys
+   the metadata filter: a passage only BM25 finds can be shown, carrying
+   its cosine, and a Book I passage BM25 ranks first is still excluded.
 """
 
 import json
@@ -239,3 +264,144 @@ def test_self_retrieval(embedder, real_index, passages):
         if hits[0].passage_id != pid:
             misses.append((pid, [(h.passage_id, round(h.score, 3)) for h in hits]))
     assert not misses, f"self-retrieval misses: {misses}"
+
+
+# --- 4-6. sub-chunking ------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def corpus():
+    from meditations_rag.corpus.store import CorpusMissingError, load_passages
+
+    try:
+        return load_passages()
+    except CorpusMissingError:
+        pytest.skip("no passages.jsonl — run `meditations ingest`")
+
+
+def test_chunks_preserve_every_word(corpus):
+    from meditations_rag.index.chunking import chunk_corpus, parent_id, split_passage
+
+    for p in corpus:
+        parts = split_passage(p)
+        assert " ".join(parts).split() == p.text.split(), p.id
+        if not p.is_long:
+            assert parts == [p.text]
+    rows = chunk_corpus(corpus)
+    ids = [i for i, _ in rows]
+    assert len(set(ids)) == len(ids)
+    assert {parent_id(i) for i in ids} == {p.id for p in corpus}
+
+
+def test_only_11_18_has_ordinal_seams_and_no_chunk_is_truncation_sized(corpus):
+    from meditations_rag.index.chunking import ordinal_paragraphs, split_passage
+
+    assert [p.id for p in corpus if ordinal_paragraphs(p.text)] == ["11.18"]
+    by_id = {p.id: p for p in corpus}
+    assert len(split_passage(by_id["11.18"])) == 11
+    # bge's window is 512 tokens, about 380 words of this text; the longest
+    # chunk measured is 201 tokens. 250 words leaves room and still fails
+    # long before truncation would.
+    assert max(len(t.split()) for p in corpus if p.is_long for t in split_passage(p)) <= 250
+
+
+def test_subchunk_dedupe_returns_k_parents_and_keeps_11_18_withheld():
+    from meditations_rag.corpus.store import Passage
+    from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
+    from meditations_rag.route.keyword import KeywordRouter
+
+    ids = ["11.18#11", "11.18#2", "5.1", "6.1", "7.1"]
+    sims = [0.99, 0.98, 0.9, 0.8, 0.7]
+    vectors = np.array([[s, np.sqrt(1 - s * s), 0.0] for s in sims], dtype=np.float32)
+    index = vi.LoadedIndex(embedder="bge-base", vectors=vectors, ids=ids, meta={})
+    passages = [Passage(id=i, book=int(i.split(".")[0]), number=int(i.split(".")[1]), text="x")
+                for i in ("11.18", "5.1", "6.1", "7.1")]
+
+    class _Embedder:
+        name, dim = "bge-base", 3
+
+        def embed_query(self, q):
+            return np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+    cfg = RetrievalConfig(embedder="bge-base", strategy="raw", router="keyword",
+                          chunking="subchunk", k=3)
+    res = run_query("how do I stop worrying about the future", cfg, router=KeywordRouter(),
+                    embedder=_Embedder(), index=index, passages=passages)
+    assert [rp.passage.id for rp in res.passages] == ["11.18", "5.1", "6.1"]
+    assert [rp.chunk for rp in res.passages] == ["11.18#11", None, None]
+
+    res = run_query("my manager has been humiliating me in front of the team", cfg,
+                    router=KeywordRouter(), embedder=_Embedder(), index=index,
+                    passages=passages)
+    assert res.withheld == ["11.18"]
+    assert [rp.passage.id for rp in res.passages] == ["5.1", "6.1"]   # no backfill
+
+
+def test_no_book_1_filter_excludes_book_one_and_still_returns_k():
+    from meditations_rag.corpus.store import Passage
+    from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
+    from meditations_rag.route.keyword import KeywordRouter
+
+    ids = ["1.16#1", "1.16#2", "1.2", "5.1", "6.1", "7.1"]
+    sims = [0.99, 0.98, 0.97, 0.9, 0.8, 0.7]
+    vectors = np.array([[s, np.sqrt(1 - s * s), 0.0] for s in sims], dtype=np.float32)
+    index = vi.LoadedIndex(embedder="bge-base", vectors=vectors, ids=ids, meta={})
+    passages = [Passage(id=i, book=int(i.split(".")[0]), number=int(i.split(".")[1]), text="x")
+                for i in ("1.16", "1.2", "5.1", "6.1", "7.1")]
+
+    class _Embedder:
+        name, dim = "bge-base", 3
+
+        def embed_query(self, q):
+            return np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+    cfg = RetrievalConfig(embedder="bge-base", strategy="raw", router="keyword",
+                          chunking="subchunk", filter="no-book-1", k=3)
+    res = run_query("how do I become more patient", cfg, router=KeywordRouter(),
+                    embedder=_Embedder(), index=index, passages=passages)
+    assert [rp.passage.id for rp in res.passages] == ["5.1", "6.1", "7.1"]
+
+
+def test_lexical_search_treats_any_message_as_words():
+    from meditations_rag.index.lexical import LexicalIndex
+
+    ix = LexicalIndex([("2.1", "Begin the morning by saying to yourself"),
+                       ("4.3", "Men seek retreats for themselves"),
+                       ("6.1", 'The substance of the universe is "obedient"')])
+    assert ix.search("men", 5) == ["4.3"]
+    for hostile in ('what\'s "NEAR" * AND OR -- ;', 'body: men*', '"', "NOT (men)"):
+        ix.search(hostile, 5)                     # must not raise
+    assert ix.search("12345 !!! ...", 5) == []
+
+
+def test_hybrid_fuses_bm25_with_cosines_and_obeys_the_filter():
+    from meditations_rag.corpus.store import Passage
+    from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
+    from meditations_rag.route.keyword import KeywordRouter
+
+    texts = {"1.2": "patience patience patience", "5.1": "on the morning",
+             "7.1": "the universe", "8.1": "of change", "9.1": "on the gods",
+             "6.1": "patience in all things"}
+    ids = ["1.2", "5.1", "7.1", "8.1", "9.1", "6.1"]
+    # Dense ranks 6.1, the only BM25 match the filter leaves, last of five;
+    # without the lexical list it would not reach the top 3.
+    sims = [0.95, 0.9, 0.8, 0.7, 0.6, 0.1]
+    vectors = np.array([[s, np.sqrt(1 - s * s), 0.0] for s in sims], dtype=np.float32)
+    index = vi.LoadedIndex(embedder="bge-base", vectors=vectors, ids=ids, meta={})
+    passages = [Passage(id=i, book=int(i.split(".")[0]), number=int(i.split(".")[1]),
+                        text=texts[i]) for i in ids]
+
+    class _Embedder:
+        name, dim = "bge-base", 3
+
+        def embed_query(self, q):
+            return np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+    cfg = RetrievalConfig(embedder="bge-base", strategy="raw", router="keyword",
+                          retriever="hybrid", filter="no-book-1", k=3)
+    res = run_query("how do I find patience", cfg, router=KeywordRouter(),
+                    embedder=_Embedder(), index=index, passages=passages)
+    shown = {rp.passage.id: rp.score for rp in res.passages}
+    assert "1.2" not in shown                       # Book I, though BM25 ranks it first
+    assert "6.1" in shown                           # lifted by BM25 alone
+    assert abs(shown["6.1"] - 0.1) < 1e-6           # carrying its cosine, not a BM25 score

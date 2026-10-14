@@ -24,3 +24,5 @@
 {"query": "on how to live with discomfort and pain", "gold_ids": ["7.64", "7.33", "8.28"], "tier": "canary", "theme": "pain"}
 {"query": "How to be calm and clear-minded?", "gold_ids": ["8.51", "4.24", "9.31"], "tier": "canary", "theme": "control"}
 {"query": "How to deal with change?", "gold_ids": ["9.35", "7.18", "9.21"], "tier": "canary", "theme": "impermanence"}
+{"query": "Does Marcus say anything about wanting praise?", "gold_ids": ["4.19", "4.20"], "tier": "content", "theme": "reputation", "note": "Content question phrased yes/no, with 'anything' between the verb and 'about'"}
+{"query": "What does Marcus teach about living in the present moment?", "gold_ids": ["2.14", "3.10"], "tier": "content", "theme": "distraction", "note": "Content question; 'distraction' is the one theme with a single hard entry"}

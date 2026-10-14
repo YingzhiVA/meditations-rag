@@ -60,7 +60,7 @@ class Intent(str, Enum):
 
     CHITCHAT = "chitchat"          # "hello", "thanks", "how are you"
     META = "meta"                  # "what can you do", "how does this work"
-    IN_SCOPE = "in_scope"          # a real problem worth retrieving for
+    IN_SCOPE = "in_scope"          # a real problem, or what the book says on a topic
     OUT_OF_SCOPE = "out_of_scope"  # a real question, but not Marcus's subject
 
 
@@ -101,10 +101,24 @@ class RouteDecision:
     conservative reading is the union: every flag's referral is owed, every
     flag's suppression list applies, and one blocking flag blocks. Empty
     when nothing fired — the common case, and the zero-cost path through
-    retrieve/safety.py."""
+    retrieve/safety.py.
+
+    `fallback` is set (to the reason) when an LLM router lost its provider
+    and config.ROUTER_FALLBACK decided instead. Added in Phase 4 without
+    touching the two axes: the CLI owes the user a quiet note that they got
+    the keyword path, and the eval owes the reader a count, since a router
+    row measured during an outage is the keyword row under another name.
+
+    `llm_safety` is diagnostic only: the flags the LLM raised by itself,
+    before the keyword floor was merged into `safety`. None when no LLM
+    answered (the keyword router, the chitchat shortcut, a fallback). Nothing
+    downstream acts on it — the union in `safety` is what ships; it exists
+    so the eval can say what an LLM catches, and over-flags, on its own."""
 
     intent: Intent
     safety: frozenset[SafetyFlag] = field(default_factory=frozenset)
+    fallback: str | None = None
+    llm_safety: frozenset[SafetyFlag] | None = None
 
     @property
     def retrieves(self) -> bool:

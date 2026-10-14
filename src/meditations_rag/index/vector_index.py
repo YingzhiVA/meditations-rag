@@ -16,12 +16,13 @@ not normalize, a re-normalizing index would silently hide a quality bug
 (the embedder's own dot products would be wrong elsewhere), whereas the
 assert names it.
 
-Phase 4 note — parent-child chunking: when indexing sub-chunks of the 14 long
-passages (Passage.is_long), ids become "<passage_id>#<n>". The index stays
-oblivious; retrieve/pipeline.py dedupes hits back to the parent § so citations
-always name a whole passage. Keep sub-chunked indexes in their own embedder
-subdir (e.g. "bge-base-subchunk") so both variants can sit in the eval grid
-at once.
+Phase 4 — parent-child chunking (index/chunking.py): with chunking="subchunk"
+the 14 long passages (Passage.is_long) are indexed as children with ids
+"<passage_id>#<n>". The index stays oblivious; retrieve/pipeline.py dedupes
+hits back to the parent § so citations always name a whole passage. A
+sub-chunked index lives in its own subdir ("bge-base-subchunk") and records
+its chunking in meta.json, checked on load, so both variants sit in the eval
+grid at once and neither can be loaded as the other.
 
 On-disk layout (one subdir per embedder, so eval can grid without clobbering):
     data/index/<embedder.name>/
@@ -93,8 +94,16 @@ class LoadedIndex:
         return len(self.ids)
 
 
-def index_dir(embedder_name: str) -> Path:
-    return config.INDEX_DIR / embedder_name
+# "passage": one row per numbered §, as in Phase 2. "subchunk": the long
+# passages split into children (index/chunking.py).
+CHUNKINGS: tuple[str, ...] = ("passage", "subchunk")
+
+
+def index_dir(embedder_name: str, chunking: str = "passage") -> Path:
+    if chunking not in CHUNKINGS:
+        raise ValueError(f"unknown chunking {chunking!r}; known: {', '.join(CHUNKINGS)}")
+    return config.INDEX_DIR / (embedder_name if chunking == "passage"
+                               else f"{embedder_name}-{chunking}")
 
 
 def _assert_unit_rows(vectors: np.ndarray, where: str) -> None:
@@ -123,26 +132,34 @@ def _provenance(embedder: Embedder) -> dict:
     return out
 
 
-def build_index(passages: list[Passage], embedder: Embedder) -> Path:
-    """Embed all passage texts with embedder.embed_texts, assert unit norms,
-    write the layout above. Called by `meditations index --embedder X`.
-    Idempotent: the embedder's subdir is replaced wholesale, so a partial
+def build_index(passages: list[Passage], embedder: Embedder, chunking: str = "passage") -> Path:
+    """Embed all passage texts (or, with chunking="subchunk", the long
+    passages' children) with embedder.embed_texts, assert unit norms, write
+    the layout above. Called by `meditations index --embedder X [--chunking
+    subchunk]`. Idempotent: the subdir is replaced wholesale, so a partial
     write from an interrupted run cannot survive alongside fresh files."""
     if not passages:
         raise ValueError("cannot build an index over zero passages")
-    ids = [p.id for p in passages]
-    if len(set(ids)) != len(ids):
+    if len({p.id for p in passages}) != len(passages):
         raise ValueError("duplicate passage ids in corpus")
+    if chunking == "passage":
+        rows = [(p.id, p.text) for p in passages]
+    else:
+        from meditations_rag.index.chunking import chunk_corpus
 
-    vectors = np.asarray(embedder.embed_texts([p.text for p in passages]), dtype=np.float32)
-    if vectors.shape != (len(passages), embedder.dim):
+        index_dir(embedder.name, chunking)   # validates the name
+        rows = chunk_corpus(passages)
+    ids = [i for i, _ in rows]
+
+    vectors = np.asarray(embedder.embed_texts([t for _, t in rows]), dtype=np.float32)
+    if vectors.shape != (len(rows), embedder.dim):
         raise IndexCorruptError(
             f"embedder {embedder.name!r} returned shape {vectors.shape}, "
-            f"expected {(len(passages), embedder.dim)}"
+            f"expected {(len(rows), embedder.dim)}"
         )
     _assert_unit_rows(vectors, f"build_index({embedder.name})")
 
-    target = index_dir(embedder.name)
+    target = index_dir(embedder.name, chunking)
     tmp = target.with_name(target.name + ".building")
     if tmp.exists():
         shutil.rmtree(tmp)
@@ -154,6 +171,7 @@ def build_index(passages: list[Passage], embedder: Embedder) -> Path:
         "embedder": embedder.name,
         "dim": int(embedder.dim),
         "count": len(ids),
+        "chunking": chunking,
         **_provenance(embedder),
     }
     (tmp / META_FILE).write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
@@ -164,16 +182,18 @@ def build_index(passages: list[Passage], embedder: Embedder) -> Path:
     return target
 
 
-def load_index(embedder_name: str, expected_dim: int | None = None) -> LoadedIndex:
+def load_index(embedder_name: str, expected_dim: int | None = None,
+               chunking: str = "passage") -> LoadedIndex:
     """Load vectors + ids for an embedder. Clear error if missing; every
     cross-check between the three files is made here so a stale or
     hand-damaged index fails loudly instead of retrieving garbage."""
-    path = index_dir(embedder_name)
+    path = index_dir(embedder_name, chunking)
+    flag = "" if chunking == "passage" else f" --chunking {chunking}"
     files = [path / VECTORS_FILE, path / IDS_FILE, path / META_FILE]
     if not all(f.exists() for f in files):
         raise IndexMissingError(
-            f"No index for embedder {embedder_name!r} at {path}. "
-            f"Run `meditations index --embedder {embedder_name}` first."
+            f"No {chunking} index for embedder {embedder_name!r} at {path}. "
+            f"Run `meditations index --embedder {embedder_name}{flag}` first."
         )
 
     with np.load(path / VECTORS_FILE) as npz:
@@ -202,10 +222,13 @@ def load_index(embedder_name: str, expected_dim: int | None = None) -> LoadedInd
         problems.append(f"index dim {dim} != embedder dim {expected_dim}")
     if len(set(ids)) != len(ids):
         problems.append("duplicate ids")
+    # Indexes built before Phase 4 carry no chunking key and are passage indexes.
+    if meta.get("chunking", "passage") != chunking:
+        problems.append(f"meta.chunking={meta.get('chunking', 'passage')!r} != {chunking!r}")
     if problems:
         raise IndexCorruptError(
             f"stale or inconsistent index at {path}: " + "; ".join(problems)
-            + f". Rebuild with `meditations index --embedder {embedder_name}`."
+            + f". Rebuild with `meditations index --embedder {embedder_name}{flag}`."
         )
     _assert_unit_rows(vectors, f"load_index({embedder_name})")
 

@@ -26,7 +26,7 @@ One JSON object per line (comments aren't valid in JSONL, hence this README):
   it as a miss.
 - Multiple ids allowed — several passages can be legitimately right; scoring is
   hit-ANY. One to three you are confident about; a fourth only dilutes.
-- `tier`: `"hard"`, `"canary"` or `"out_of_scope"`. **Hard** cases are the evaluation — modern
+- `tier`: `"hard"`, `"canary"`, `"content"` or `"out_of_scope"`. **Hard** cases are the evaluation — modern
   phrasing with little lexical overlap, where configurations plausibly
   disagree. **Canaries** are the easy lexical-anchor queries every
   configuration should get; they are a regression check, not a comparison, and
@@ -38,7 +38,13 @@ One JSON object per line (comments aren't valid in JSONL, hence this README):
   otherwise ambiguous between *deliberately no-match* and *not labelled yet*,
   and those are opposites — one is the `oos_accuracy` denominator, the other
   must be excluded from every metric. Curation makes the second state normal
-  for days at a time. Absent, `tier` is treated as `"hard"`.
+  for days at a time. **`content`** (Phase 4) marks a question about what the
+  book says ("What does Marcus say about the afterlife?"), which the router
+  sends `in_scope` (PLAN.md, "Questions about what the book says are
+  `IN_SCOPE`"). It is a different kind of input from a problem statement, so
+  it is scored like a canary, on its own column, and never folded into
+  recall@k. Like canaries it takes `theme` but not `failure_mode`. Absent,
+  `tier` is treated as `"hard"`.
 - `theme` and `failure_mode`: optional curation metadata, read only by
   `validate_sets.py`'s coverage report — see **Two axes** below. Unlike
   `Intent` and `SafetyFlag` they are not enums in the package, because nothing
@@ -56,29 +62,39 @@ and reports theme/failure-mode coverage as the set fills in.
 
 ## Curating the golden set (Phase 3)
 
-**Labels are sparse, not exhaustive.** Scoring is hit-ANY and MRR uses the
-first gold hit, so an entry needs one to three passages you are confident
-about — not every passage that could plausibly apply. Judging all 487 passages
-against every query would be ~19,000 decisions, and is not the job.
+**How the labels were made: one read of the whole book.** The plan was to
+pool, judging only what a retriever surfaced. The labels actually come from
+reading all 487 passages with the golden queries in mind and picking, for each
+situation, the passages that might help, whatever they appear to be about.
+That matters for how the numbers read:
 
-**Pool, don't enumerate.** This is the workable order, and the reason Phase 3
-follows Phase 2 rather than preceding it — you need a retriever to generate
-the pool:
+- **A missing label is a choice, not a blind spot.** A passage without a label
+  for a query was read and not picked. So every configuration is scored
+  against the same labels, with no re-judging round when a new one lands. A
+  strategy that surfaces unlabelled passages is preferring passages the
+  curator passed over, and the score should say exactly that.
+- **Recall is still not absolute.** An entry carries the passages the curator
+  was confident about (about three and a half on average, never more than
+  six), not every passage that could help, and scoring is hit-ANY. An apt
+  passage left out by choice still counts as a miss. The absolute numbers are
+  a lower bound; the comparison between rows is what the matrix is for.
 
-1. Run the draft queries through the Phase 2 baseline; take top-10 each.
-2. Judge only what surfaced: a few hundred (query, passage) pairs, mostly
-   short passages and mostly quick rejects.
-3. In Phase 4, each new configuration surfaces candidates the pool missed.
-   Judge the new ones only, incrementally.
+**This does not scale, and the project should say so.** A full read was
+possible because the corpus is 487 short passages and the set about thirty
+queries. Most real retrieval systems cannot afford one: the corpus is too
+large, and it changes. The route that scales is pooling the top-k of every
+configuration and judging only what surfaced (`eval/pool.py`), and past that
+an LLM judge calibrated against human labels. These full-read labels are what
+such a judge would be checked against.
 
-Pool from every configuration, not just the baseline. A config that finds good
-passages nobody labeled is scored as if it failed, and widening the pool is
-what limits that.
+**Pooling, when the set grows.** For new entries, `eval/pool.py` runs the
+draft queries through the grid and writes the top-10 of every configuration
+to one file, so a candidate list exists before anything is labelled. It is a
+drafting aid, not the boundary of what may be labelled.
 
-**Say this in the README results section:** every recall number is a floor,
-not a true value, because an apt but unlabeled passage counts as a miss. Fine
-for comparing configurations — which is what the matrix is for — but the
-absolute numbers should not be presented as absolute.
+**Say this in the README results section:** recall is measured against one
+curator's confident picks. It is a lower bound, not a true value, and is meant
+for comparing configurations.
 
 **Composition: ~25 entries — about 20 `hard`, about 5 `canary`.** A query
 every configuration answers correctly teaches nothing about which
@@ -110,8 +126,8 @@ can land obliquely — reach a problem it shares no vocabulary and no evident
 subject matter with, the way a walk in fresh air has nothing to do with losing
 a job and helps anyway. Deciding in advance that a given passage cannot serve a
 given problem presumes more than anyone knows about how a text works on a
-reader. This is the real argument for the pooling protocol above: it never asks
-you to declare what is irrelevant, only to judge what actually surfaced.
+reader. Reading the whole book serves this: every passage gets its chance to
+land, including ones no retriever would surface.
 
 **Instead of a held-out split:** at this size, splitting off a fifth of the
 entries leaves a set too small to tell you anything while costing a fifth of
@@ -125,7 +141,9 @@ human-verified against the actual text.
 Note when labeling: Book I is a list of debts to particular people ("From
 Rusticus I learned…") rather than counsel, so it rarely deserves a gold label
 even when it matches lexically. Whether excluding Book I from the index helps is
-itself a Phase 4 experiment.
+itself a Phase 4 experiment. (Measured: the full read labelled no Book I
+passage, and raw shows one in 73 retrieving queries, so the filter ties; see
+PLAN.md.)
 
 ## Two axes: theme and failure mode
 

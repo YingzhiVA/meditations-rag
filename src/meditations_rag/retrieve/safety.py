@@ -27,9 +27,11 @@ behaviour change for the queries where none of this applies. NO BACKFILL:
 pulling ranks 6-7 in to replace a withheld passage risks surfacing another
 endurance passage. Show what remains and say plainly that some were withheld.
 
-Phase 2 suppresses whole passages. Phase 4's sub-chunking refines 11.18 to
-precept level (suppress precepts 4, 5, 7, 9; keep the tenth, which is Marcus
-limiting the endurance doctrine himself).
+Suppression is by whole passage, sub-chunked index or not. PLAN.md once
+planned to refine 11.18 to precept level (withhold 4, 5, 7, 9; keep the
+tenth, Marcus limiting the endurance doctrine himself), but results are
+shown whole, so showing 11.18 for a tenth-precept match would show the
+other nine too. Kept whole (2026-10-12); PLAN.md records the open question.
 
 WHAT LIVES HERE AND WHAT DOES NOT. This module states the whole per-flag
 policy as data: the suppression list, the reason a withheld passage is
@@ -44,12 +46,12 @@ from meditations_rag.route.base import SafetyFlag
 
 # Rule-4 list: counsel accepting, minimizing or forgiving the other person's
 # continued conduct with no correction or action offered as an alternative.
-ABUSE_SUPPRESSED = frozenset({"2.1", "4.3", "6.20", "7.26", "11.18"})
+ABUSE_SUPPRESSED = frozenset({"2.1", "4.3", "6.20", "7.26", "8.59", "11.18"})
 
 # Death-counsel list: counsel or license leaving life, or frame death as
 # welcome or preferable to continuing. Merely observing mortality is not a
 # hazard — 14% of the corpus does that.
-DEATH_COUNSEL_SUPPRESSED = frozenset({"5.29", "8.47", "9.3", "10.8", "10.32", "10.36"})
+DEATH_COUNSEL_SUPPRESSED = frozenset({"5.29", "7.24", "8.47", "9.2", "9.3", "10.8", "10.32", "10.36"})
 
 SUPPRESSION: dict[SafetyFlag, frozenset[str]] = {
     SafetyFlag.ABUSE: ABUSE_SUPPRESSED,
@@ -119,6 +121,19 @@ REFERRAL: dict[SafetyFlag, str] = {
 
 # Most serious first: when flags co-occur, this is the order their
 # referrals are owed in.
+# Rule 3 when the input could not be read (route/language.py). We cannot rule
+# out a crisis in a language the floor cannot read, so the cautious reading
+# is that there might be one: every decline carries a static crisis pointer
+# (PLAN.md, "The floor reads English only"). English, because we do not know
+# what the reader reads; the numbers and the directory are language-neutral.
+LANGUAGE_DECLINE = (
+    "This tool can only read English for now, so it cannot respond to this "
+    "message. If you are in crisis or thinking about ending your life, please "
+    "contact your local emergency number now (112 across Europe, 911 in North "
+    "America) or a crisis line: findahelpline.com lists free, confidential "
+    "helplines in over 175 countries."
+)
+
 FLAG_ORDER: tuple[SafetyFlag, ...] = (
     SafetyFlag.SELF_HARM,
     SafetyFlag.MEDICAL_EMERGENCY,
@@ -148,8 +163,11 @@ def withheld_reasons(flags: frozenset[SafetyFlag], withheld: list[str]) -> list[
 
 def _parent_id(passage_id: str) -> str:
     """Sub-chunk ids are '<passage_id>#<n>' (Phase 4); suppression applies
-    to the parent passage."""
-    return passage_id.split("#", 1)[0]
+    to the parent passage. The pipeline dedupes to parents before this runs;
+    this is the second line, in case a child id ever reaches it."""
+    from meditations_rag.index.chunking import parent_id
+
+    return parent_id(passage_id)
 
 
 def apply_suppression(

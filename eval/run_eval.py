@@ -25,11 +25,13 @@ comparisons that matter.
              "content") get their own column too: they are a different kind
              of input from a problem statement, and PLAN.md asks for them to
              be reported apart.
-             dead@5 is the golden set's opposite (eval/dead_set.jsonl, from
-             the blind re-judging): dead passages shown over JUDGED passages
-             shown in the top 5, all queries. Lower is better; unjudged
-             slots count neither way. ~17 judged slots per row, so it is
-             printed with its counts.
+             The dead set (eval/dead_set.jsonl, from the blind re-judging)
+             is the golden set's opposite: passages judged definitely not
+             helping. dead@2 (hard) is exact for every Phase 4 row: every
+             top-2 slot on the hard queries was judged (gold counted not
+             dead); a new row may show unjudged passages and says so.
+             dead@5 (sample) is a ~17-slot random sample per row: noisy,
+             kept for the record. Lower is better for both.
 
   Router     reported as a PAIR: out_of_scope recall AND in_scope retention.
              Recall alone is gameable by rejecting everything, and the real
@@ -307,7 +309,25 @@ def run_config(cfg, hard, canary, content, oos, resources, run_id=None) -> dict:
 
 
 # (query, passage) -> dead, from eval/dead_set.jsonl; empty when absent.
+# DEAD: sample rows only (a uniform draw, for dead@5). DEAD2: every judged row
+# plus gold counted not dead, which covers every top-2 slot on the hard
+# queries of every Phase 4 configuration (for dead@2).
 DEAD: dict[tuple[str, str], bool] = {}
+DEAD2: dict[tuple[str, str], bool] = {}
+
+
+def dead2_cell(records: list[dict]) -> str:
+    """dead@2 on the hard queries. Exact when every slot is judged; a new
+    configuration can show unjudged passages, and then the cell says how
+    many slots it could judge."""
+    if not DEAD2:
+        return "—"
+    slots = [(r["query"], p) for r in records if r["tier"] == "hard" for p in r["returned"][:2]]
+    judged = [DEAD2[s] for s in slots if s in DEAD2]
+    if not judged:
+        return "—"
+    cell = f"{sum(judged) / len(judged):.0%} ({sum(judged)}/{len(judged)})"
+    return cell if len(judged) == len(slots) else cell + f", {len(slots) - len(judged)} unjudged"
 
 
 def dead_cell(records: list[dict]) -> str:
@@ -881,6 +901,7 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
                 *[pct(m[f"recall@{k}"]) for k in KS], f"{m['mrr']:.3f}",
                 pct(c["recall@5"]) + f" ({c['n']})" if c else "—",
                 pct(ct["recall@5"]) + f" ({ct['n']})" if ct else "—",
+                dead2_cell(r["records"]),
                 dead_cell(r["records"]),
                 pct(o["accuracy"]) + f" ({o['n']})" if o else "—",
                 f"{statistics.median(lat):.0f}",
@@ -888,7 +909,7 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
                 *strategy_cost_cells(r),
             ])
         L += [table(["config", "n", "R@1", "R@3", "R@5", "MRR", "canary R@5",
-                     "content R@5", "dead@5", "oos acc", "p50 ms", "p95 ms", "tok", "$/q"], rows), ""]
+                     "content R@5", "dead@2 (hard)", "dead@5 (sample)", "oos acc", "p50 ms", "p95 ms", "tok", "$/q"], rows), ""]
         for r in results:
             n_rr = sum(1 for rec in r["records"] if rec["rerank_fallback"])
             if n_rr:
@@ -1014,7 +1035,13 @@ def main() -> int:
     language_p = args.language_set or EVAL_DIR / "language_set.jsonl"
     hard, canary, content, oos, skipped = split_golden(load_jsonl(golden_p))
     dead_p = EVAL_DIR / "dead_set.jsonl"
-    DEAD.update({(e["query"], e["passage_id"]): e["dead"] for e in load_jsonl(dead_p)})
+    dead_rows = load_jsonl(dead_p)
+    DEAD.update({(e["query"], e["passage_id"]): e["dead"] for e in dead_rows
+                 if e.get("layer", "sample") == "sample"})
+    if any(e.get("layer") == "top2-hard" for e in dead_rows):
+        DEAD2.update({(e["query"], g): False for e in load_jsonl(golden_p)
+                      for g in e.get("gold_ids", [])})
+        DEAD2.update({(e["query"], e["passage_id"]): e["dead"] for e in dead_rows})
     router_set, safety_set = load_jsonl(router_p), load_jsonl(safety_p)
 
     try:

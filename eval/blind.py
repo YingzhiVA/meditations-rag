@@ -8,6 +8,7 @@ every configuration actually showed, blind to which configuration showed it.
     .venv/bin/python eval/blind.py judge     # the LLM judge over the whole pool
     .venv/bin/python eval/blind.py score     # agreement, then per-config scores
     .venv/bin/python eval/blind.py dead-set  # export the human verdicts as eval/dead_set.jsonl
+    .venv/bin/python eval/blind.py layer     # a COMPLETE top-2 layer on the hard queries
 
 THE POOL is every (query, passage) pair that any configuration put in its top
 5, read from the committed eval/results/phase-4-*-per-query.jsonl files. Each
@@ -35,6 +36,13 @@ shown over JUDGED passages shown, in its top 5. Unjudged slots count neither
 way, so a configuration whose slots happened to be sampled less is not
 favoured; with ~17 judged slots per configuration a single row is noisy,
 which is why both counts are always printed.
+
+THE TOP-2 LAYER (added 2026-10-14) makes the dead set complete at one depth:
+every pair any configuration ranked first or second on a hard query, minus
+the pairs the sample already judged and the gold-labelled ones (no gold pair
+was struck blind). Judged in full, it gives an exact dead@2 on the hard
+queries for every configuration, with no sampling noise. Same sheet format,
+its own ids (T001…) and key, so the two sheets cannot be confused.
 
 THE GATE, set before any judgement was seen: configurations are scored on the
 judge's verdicts only if its agreement with the human sample reaches Cohen's
@@ -164,10 +172,66 @@ def cmd_sheet() -> None:
           f"{kept} existing ticks kept)")
 
 
-def read_sheet() -> dict[str, bool]:
-    """S-id -> struck."""
-    marks = re.findall(r"^- \[( |x|X)\] (S\d{3})\b", SHEET.read_text(encoding="utf-8"), re.M)
+def read_sheet(path: Path = SHEET, prefix: str = "S") -> dict[str, bool]:
+    """Sheet id -> struck."""
+    marks = re.findall(rf"^- \[( |x|X)\] ({prefix}\d{{3}})\b", path.read_text(encoding="utf-8"),
+                       re.M)
     return {sid: m.lower() == "x" for m, sid in marks}
+
+
+LAYER_K = 2
+LAYER_SHEET = BLIND / "sheet-top2-hard.md"
+LAYER_KEY = BLIND / "top2-hard.json"
+
+
+def layer_pairs() -> list[tuple[str, str]]:
+    """Every pair ranked in the top LAYER_K on a hard query by any config."""
+    tier = {e["query"]: e.get("tier", "hard") for e in golden()}
+    order = {e["query"]: i for i, e in enumerate(golden())}
+    pairs = {(q, pid) for (_, q), ret in top5_lists().items() if tier[q] == "hard"
+             for pid in ret[:LAYER_K]}
+    return sorted(pairs, key=lambda p: (order[p[0]], p[1]))
+
+
+def cmd_layer() -> None:
+    """The top-2 layer sheet: layer pairs minus sample-judged and gold ones."""
+    if LAYER_KEY.exists():
+        raise SystemExit(f"{LAYER_KEY} exists: the layer sheet is already out; not regenerating")
+    sample = {(v["query"], v["passage_id"])
+              for v in json.loads(SAMPLE_KEY.read_text(encoding="utf-8")).values()}
+    gold = {(e["query"], g) for e in golden() for g in e["gold_ids"]}
+    todo = [p for p in layer_pairs() if p not in sample and p not in gold]
+    rng = random.Random(SEED + LAYER_K)
+    by_query = defaultdict(list)
+    for q, pid in todo:
+        by_query[q].append(pid)
+    order = {e["query"]: i for i, e in enumerate(golden())}
+    texts = _texts()
+    key, n = {}, 0
+    L = ["# Blind judging sheet: the top-2 layer, hard queries", "",
+         f"{len(todo)} (message, passage) pairs: every passage any Phase 4 configuration ranked "
+         "first or second on a hard query, except those already judged in the first sheet and "
+         "the gold-labelled ones. Which configuration showed a passage, and at what rank, are "
+         "left out on purpose.", "",
+         "**Tick `[x]` to strike a passage that is DEFINITELY NOT HELPING the person who "
+         "wrote the message.** Anything that could reasonably help, even obliquely, stays "
+         "unticked. Same rule as the first sheet.", "",
+         "Please do not open `top2-hard.json` (the key) or the results files while judging.", ""]
+    for q in sorted(by_query, key=order.get):
+        pids = by_query[q]
+        rng.shuffle(pids)
+        L += ["---", "", f"## “{q}”", ""]
+        for pid in pids:
+            n += 1
+            tid = f"T{n:03d}"
+            key[tid] = {"query": q, "passage_id": pid}
+            body = "\n".join("  > " + line if line else "  >" for line in texts[pid].split("\n"))
+            book, number = pid.split(".")
+            L += [f"- [ ] {tid} · Book {book}, §{number}", body, ""]
+    LAYER_SHEET.write_text("\n".join(L), encoding="utf-8")
+    LAYER_KEY.write_text(json.dumps(key, indent=1) + "\n", encoding="utf-8")
+    print(f"layer: {len(layer_pairs())} top-{LAYER_K} pairs on hard queries; "
+          f"{n} to judge over {len(by_query)} messages -> {LAYER_SHEET}")
 
 
 # --- judge ------------------------------------------------------------------
@@ -263,30 +327,75 @@ DEAD_SET = EVAL_DIR / "dead_set.jsonl"
 
 
 def cmd_dead_set() -> None:
+    """Both sheets' verdicts. `layer` says which: "sample" rows are a uniform
+    draw from the top-5 pool and alone feed dead@5; "top2-hard" rows complete
+    the top-2 layer and, with the sample and gold, feed dead@2."""
     key = json.loads(SAMPLE_KEY.read_text(encoding="utf-8"))
     struck = read_sheet()
     rows = [{"query": v["query"], "passage_id": v["passage_id"], "dead": struck[sid],
-             "source": f"blind sample {sid}, seed {SEED}"}
+             "layer": "sample", "source": f"blind sample {sid}, seed {SEED}"}
             for sid, v in key.items() if sid in struck]
+    if LAYER_KEY.exists():
+        lkey = json.loads(LAYER_KEY.read_text(encoding="utf-8"))
+        lmarks = read_sheet(LAYER_SHEET, "T")
+        rows += [{"query": v["query"], "passage_id": v["passage_id"], "dead": lmarks[tid],
+                  "layer": "top2-hard", "source": f"top-2 layer {tid}"}
+                 for tid, v in lkey.items() if tid in lmarks]
     DEAD_SET.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
                         encoding="utf-8")
     print(f"{DEAD_SET}: {len(rows)} judged pairs, {sum(r['dead'] for r in rows)} dead")
 
 
+def dead_rows() -> list[dict]:
+    return [json.loads(l) for l in open(DEAD_SET, encoding="utf-8") if l.strip()]
+
+
+def dead2_rates() -> list[str]:
+    """EXACT dead@2 on the hard queries: every top-2 slot is judged, by the
+    sample, the top-2 layer, or a gold label (counted not dead: no gold pair
+    was struck blind). Fails loudly if a slot is unjudged."""
+    verdict = {(r["query"], r["passage_id"]): r["dead"] for r in dead_rows()}
+    for e in golden():
+        for g in e["gold_ids"]:
+            verdict.setdefault((e["query"], g), False)
+    tier = {e["query"]: e.get("tier", "hard") for e in golden()}
+    per = defaultdict(lambda: [0, 0, 0])          # dead@2, slots, dead first passages
+    for (c, q), ret in top5_lists().items():
+        if tier[q] != "hard":
+            continue
+        for i, pid in enumerate(ret[:LAYER_K]):
+            if (q, pid) not in verdict:
+                raise SystemExit(f"unjudged top-2 slot: {c} / {q[:40]} / {pid}")
+            per[c][0] += verdict[(q, pid)]
+            per[c][1] += 1
+            per[c][2] += verdict[(q, pid)] and i == 0
+    L = ["## Dead@2 on the hard queries (exact)", "",
+         "*Every passage any configuration ranked first or second on a hard query was judged "
+         "blind (the sample, then the complete top-2 layer; gold labels count as not dead). "
+         "Dead passages over the 40 top-2 slots of the 20 hard queries; lower is better. No "
+         "sampling noise, so single rows compare.*", "",
+         "| config | dead@2 | dead first passage |", "|---|---|---|"]
+    for c, (d, n, d1) in sorted(per.items(), key=lambda kv: (kv[1][0] / kv[1][1], kv[0])):
+        L += [f"| `{c}` | {d}/{n} ({d / n:.0%}) | {d1}/{n // LAYER_K} |"]
+    return L + [""]
+
+
 def dead_rates() -> list[str]:
-    """Dead rate of every Phase 4 configuration, from its committed top 5."""
+    """Sampled dead@5 of every Phase 4 configuration, from its committed top 5.
+    Sample rows only: the top-2 layer is not a uniform draw."""
     judged = {(r["query"], r["passage_id"]): r["dead"]
-              for r in map(json.loads, open(DEAD_SET, encoding="utf-8"))}
+              for r in dead_rows() if r.get("layer", "sample") == "sample"}
     per = defaultdict(lambda: [0, 0])
     for (c, q), ret in top5_lists().items():
         for pid in ret:
             if (q, pid) in judged:
                 per[c][0] += judged[(q, pid)]
                 per[c][1] += 1
-    L = ["## Dead set, by configuration", "",
+    L = ["## Dead@5 from the random sample, by configuration", "",
          "*Dead passages shown / judged passages shown, in each configuration's top 5 over the "
-         "28 golden queries. Lower is better. About 17 judged slots per configuration, shared "
-         "between configurations: read families, not single rows.*", "",
+         "28 golden queries, sample rows only. About 17 judged slots per configuration: too "
+         "noisy for single rows, and the exact dead@2 above disagrees with it for some "
+         "families. Kept for the record.*", "",
          "| config | dead / judged | dead rate |", "|---|---|---|"]
     for c, (d, j) in sorted(per.items(), key=lambda kv: (kv[1][0] / kv[1][1], kv[0])):
         L += [f"| `{c}` | {d}/{j} | {d / j:.0%} |"]
@@ -328,6 +437,8 @@ def cmd_score(out: Path) -> None:
 
     L += human_only(key, struck)
     if DEAD_SET.exists():
+        if any(r.get("layer") == "top2-hard" for r in dead_rows()):
+            L += dead2_rates()
         L += dead_rates()
     if k < KAPPA_GATE:
         L += [f"**Below the gate ({KAPPA_GATE}): the judge's verdicts do not score the "
@@ -361,6 +472,7 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("sheet")
     sub.add_parser("dead-set")
+    sub.add_parser("layer")
     j = sub.add_parser("judge")
     j.add_argument("--workers", type=int, default=8)
     s = sub.add_parser("score")
@@ -370,6 +482,8 @@ def main() -> int:
         cmd_sheet()
     elif a.cmd == "dead-set":
         cmd_dead_set()
+    elif a.cmd == "layer":
+        cmd_layer()
     elif a.cmd == "judge":
         cmd_judge(a.workers)
     else:

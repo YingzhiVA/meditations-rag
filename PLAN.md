@@ -1652,6 +1652,19 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
         few confident picks made the top 5; dead@2 asks how much of what
         the reader sees first is useless. The second is closer to what a
         reader experiences, and it is the one free of the coverage bias.
+
+      **The shipped default is now `raw+hyde` on Apertus v1.5 70B**
+      (decided 2026-10-14, without waiting for the fresh-query check: it
+      wins both measures, runs on the open model at no cost, and fails
+      safe). `config.DEFAULT_STRATEGY = "raw+hyde"` is the product default
+      (CLI, web UI); `config.BASELINE_STRATEGY = "raw"` is what a bare
+      `RetrievalConfig()` means, so the eval's reference row and its safety
+      and exposure tables do not move with it. If the LLM call fails, the
+      pipeline embeds the raw query (strategy fallback); if the CSCS key is
+      missing altogether, the CLI's default searches with raw and says so,
+      while an explicit `--strategy raw+hyde` stays a setup error. The
+      fresh-query check before Phase 5 remains the independent test, now
+      of the default itself.
 - [ ] **"No good match" handling**: score threshold or LLM relevance check.
       **Scoped down for the delivery:** the threshold only, set from
       evidence once rerank has landed.

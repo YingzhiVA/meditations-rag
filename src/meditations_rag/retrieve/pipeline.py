@@ -90,7 +90,7 @@ class RetrievalConfig:
     skip that axis for them rather than running identical configurations."""
 
     embedder: str = config.DEFAULT_EMBEDDER
-    strategy: str = config.DEFAULT_STRATEGY
+    strategy: str = config.BASELINE_STRATEGY   # the eval baseline, not the shipped default
     llm: str | None = None
     router: str = config.DEFAULT_ROUTER
     reranker: str = "none"

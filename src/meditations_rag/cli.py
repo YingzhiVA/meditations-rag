@@ -153,8 +153,11 @@ def _add_query_parser(sub: argparse._SubParsersAction, config) -> argparse.Argum
     p.add_argument("--k", type=int, default=config.DEFAULT_TOP_K,
                    help=f"how many passages to show (default {config.DEFAULT_TOP_K})")
     p.add_argument("--all", action="store_true", help="print every candidate in full")
-    p.add_argument("--strategy", default=config.DEFAULT_STRATEGY,
-                   help=f"query strategy (see retrieve/); default {config.DEFAULT_STRATEGY}")
+    # None, not the default itself: an explicit --strategy that cannot reach
+    # its LLM is an error, the default degrades to raw (see cmd_query).
+    p.add_argument("--strategy", default=None,
+                   help=f"query strategy (see retrieve/); default {config.DEFAULT_STRATEGY} "
+                        f"on {config.DEFAULT_LLM}, or raw when that LLM is not configured")
     p.add_argument("--embedder", default=config.DEFAULT_EMBEDDER,
                    help=f"embedder name (see embed/); default {config.DEFAULT_EMBEDDER}")
     p.add_argument("--chunking", default="passage", choices=("passage", "subchunk"),
@@ -394,6 +397,19 @@ def cmd_query(args: argparse.Namespace) -> None:
 
     if args.k <= 0:
         raise CLIError("--k must be positive")
+    if args.strategy is None:
+        # The shipped default needs DEFAULT_LLM. Without its key (a fresh
+        # clone) every query would be a setup error, so the default falls back
+        # to raw and says so; an explicit --strategy stays strict.
+        args.strategy = config.DEFAULT_STRATEGY
+        try:
+            from meditations_rag.llm import get_llm
+
+            get_llm(args.llm or config.DEFAULT_LLM)
+        except LLMError as exc:
+            print(f"({args.llm or config.DEFAULT_LLM} is not configured ({exc}); searching with "
+                  "the raw query instead)", file=sys.stderr)
+            args.strategy, args.llm = "raw", None
     llm_name = args.llm
     if args.strategy in LLM_STRATEGIES:
         llm_name = llm_name or config.DEFAULT_LLM

@@ -133,7 +133,8 @@ land, including ones no retriever would surface.
 entries leaves a set too small to tell you anything while costing a fifth of
 the development signal. When Phase 5 picks a winner, write ~10 genuinely fresh queries and
 check that it still behaves. That catches the overfitting that actually
-happens — a score threshold tuned to the exact set.
+happens — a score threshold tuned to the exact set. Built as `eval/fresh.py`
+over `eval/fresh_set.jsonl` (format in its docstring).
 
 Candidates may be brainstormed with an LLM's help, but every label is
 human-verified against the actual text.

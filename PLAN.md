@@ -1747,6 +1747,18 @@ section that tells this is a Phase 5 item.
 
 ## Phase 5 — Benchmark, polish, web UI & writeup (~3–4 days)
 
+- [ ] **Fresh-query check (Risk 5)**, the independent test of everything
+      Phase 4 read off its own sets: the `raw+hyde` default, the 0.43
+      no-match threshold, the language guard's ratio, the floor's
+      passive-ideation phrasings. `eval/fresh.py`: I write
+      `eval/fresh_set.jsonl` (~10 problem statements, plus a few
+      out-of-scope, safety and non-English inputs, each with its
+      expectation) before anything runs on them. Every entry goes through
+      the shipped path and is scored on its expectations and the hedge; the
+      problem statements are scored by blind dead@2, the Phase 4 top-2
+      layer's method, over `raw`, the shipped `raw+hyde@apertus-v15-70b`
+      and `raw+llm:claude` (the second candidate; ~10 Claude calls, under
+      $0.10, approved 2026-10-14). Report: `eval/results/phase-5-fresh.md`.
 - [ ] README results section: the matrix, the router table, 2–3 worked examples
       (query → baseline vs tuned pipeline), cost notes. (The ANN crossover
       moved to Phase 7.)

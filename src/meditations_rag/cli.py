@@ -171,8 +171,11 @@ def _add_query_parser(sub: argparse._SubParsersAction, config) -> argparse.Argum
     p.add_argument("--filter", default="none", choices=("none", "no-book-1"),
                    help="metadata filter: no-book-1 leaves out Book I, Marcus's list "
                         "of debts to particular people")
-    p.add_argument("--router", default=config.DEFAULT_ROUTER,
-                   help=f"intent router (see route/); default {config.DEFAULT_ROUTER}")
+    # None, as for --strategy: an explicit LLM router without its key is an
+    # error, the default degrades to keyword routing (see cmd_query).
+    p.add_argument("--router", default=None,
+                   help=f"intent router (see route/); default {config.DEFAULT_ROUTER}, "
+                        f"or {config.ROUTER_FALLBACK} when that LLM is not configured")
     p.add_argument("--llm", default=None,
                    help="LLM provider for an LLM strategy such as rewrite (see llm/); "
                         f"default {config.DEFAULT_LLM}")
@@ -401,6 +404,19 @@ def cmd_query(args: argparse.Namespace) -> None:
 
     if args.k <= 0:
         raise CLIError("--k must be positive")
+    if args.router is None:
+        # The shipped default router needs its LLM's key; without it the
+        # default routes with the keyword router (the safety floor runs
+        # either way) and says so. An explicit --router stays strict.
+        args.router = config.DEFAULT_ROUTER
+        try:
+            from meditations_rag.route import get_router
+
+            get_router(args.router)
+        except LLMError as exc:
+            print(f"({args.router} router is not configured ({exc}); routing with "
+                  f"{config.ROUTER_FALLBACK} instead)", file=sys.stderr)
+            args.router = config.ROUTER_FALLBACK
     if args.strategy is None:
         # The shipped default needs DEFAULT_LLM. Without its key (a fresh
         # clone) every query would be a setup error, so the default falls back

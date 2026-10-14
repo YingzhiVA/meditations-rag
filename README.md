@@ -154,8 +154,9 @@ cp .env.example .env    # then fill in the values
 
 - `CSCS_INFERENCE_API_KEY` for the default LLM, Apertus v1.5 70B on CSCS
   (the Swiss National Supercomputing Centre), which records neither
-  prompts nor responses. The default query strategy uses it; without the
-  key, `meditations` says so and searches with the raw query instead.
+  prompts nor responses. The default router and query strategy use it;
+  without the key, `meditations` says so and falls back to the keyword
+  router and the raw query. The keyword safety floor runs either way.
 - `HF_TOKEN` for the Apertus 2509 rows via HF Inference Providers. A
   fine-grained token with only "Make calls to Inference Providers" is
   enough. Alternatively `hf auth login`, which stores a token outside the
@@ -174,11 +175,11 @@ the key itself grants access to the v1.5 models; no HF gating applies.
 $ meditations ingest                 # download + parse + store 487 passages
 $ meditations index                  # embed passages with bge-base, build index
 $ meditations "I keep replaying an argument I lost and can't let it go"
-                                     # default: raw+hyde on Apertus v1.5 70B (the Phase 4 winner)
+                                     # default: routed and searched (raw+hyde) by Apertus v1.5 70B
 $ meditations "..." --strategy raw   # the baseline: the message embedded as typed, no LLM
 $ meditations "..." --k 8 --all --scores
 $ meditations "hello"                # routed as chitchat — no retrieval
-$ meditations "..." --router apertus # Phase 4: LLM router (Apertus-8B), keyword floor beneath
+$ meditations "..." --router keyword # the free word-list router (the eval baseline; no LLM call)
 $ meditations show 11.18             # read one passage in full
 $ meditations "..." --strategy raw+hyde --llm claude   # any strategy on any registry LLM
 $ meditations "..." --reranker llm:claude             # LLM listwise rerank of 20 candidates

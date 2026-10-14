@@ -95,7 +95,7 @@ class RetrievalConfig:
     embedder: str = config.DEFAULT_EMBEDDER
     strategy: str = config.BASELINE_STRATEGY   # the eval baseline, not the shipped default
     llm: str | None = None
-    router: str = config.DEFAULT_ROUTER
+    router: str = config.BASELINE_ROUTER       # the eval baseline, not the shipped default
     reranker: str = "none"
     # "passage" (one vector per §) or "subchunk" (the long passages split
     # into children, deduped back to the parent at query time).

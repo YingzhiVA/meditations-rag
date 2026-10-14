@@ -1752,6 +1752,22 @@ section that tells this is a Phase 5 item.
       moved to Phase 7.)
 - [ ] `meditations` UX polish: pleasant passage rendering, `--all` paging,
       config defaults set to the eval winner.
+      **Defaults set (2026-10-14).** Strategy: `raw+hyde` on Apertus v1.5
+      70B (end of Phase 4). Router: Apertus v1.5 70B
+      (`config.DEFAULT_ROUTER`), the only router that sends anything out of
+      scope: 16 of 18 out-of-scope questions caught, 15 of 16 in-scope kept,
+      every safety flag caught with the keyword floor beneath, ~0.3 s
+      (`eval/results/phase-4-floor-fix.md`). `BASELINE_ROUTER = "keyword"`
+      keeps the eval's retrieval rows from making router calls. Without a
+      CSCS key the CLI's defaults fall back to keyword routing and the raw
+      query and say so; on an outage the router falls back to keyword with
+      the floor intact. Known miss, left as measured: "What does Marcus say
+      about the afterlife?" routes `meta` and gets the tool's description.
+      A deterministic override (keep `in_scope` when the keyword router's
+      content-question pattern matches) would fix it by spec; it would need
+      its own router row first. Still to do here: the CLI's "routing
+      with…" and "raw+hyde with…" status lines print even when no call
+      follows (chitchat, a declined language).
 - [ ] Repo hygiene: license note (Gutenberg text is public domain; state the
       edition and translator), reproducibility instructions, `HF_TOKEN` setup.
 

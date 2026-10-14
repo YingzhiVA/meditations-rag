@@ -185,7 +185,15 @@ LANGUAGE_MIN_RATIO = 1.2
 # --- Router (Phase 2 interface, Phase 4 LLM impls) --------------------------
 # Pre-retrieval intent classification: not every input warrants a meditation.
 # See route/base.py for why this does NOT subsume MIN_SCORE_THRESHOLD.
-DEFAULT_ROUTER = "keyword"   # free, deterministic baseline; see route/__init__
+# Two defaults, as for the strategy. BASELINE_ROUTER is what a bare
+# RetrievalConfig() routes with: the eval's retrieval rows, which must not
+# start making LLM calls or move with the product. DEFAULT_ROUTER is what
+# ships (CLI, web UI): Apertus v1.5 70B on CSCS, the only router that sends
+# anything out of scope (16 of 18 caught, 15 of 16 in-scope kept, every
+# safety flag with the floor beneath; eval/results/phase-4-floor-fix.md).
+# On a provider error it falls back to ROUTER_FALLBACK with the floor intact.
+BASELINE_ROUTER = "keyword"
+DEFAULT_ROUTER = "apertus-v15-70b"
 # Where an LLM router falls back when its provider errors, rather than failing
 # the whole query. Must name a router that never touches the network.
 ROUTER_FALLBACK = "keyword"

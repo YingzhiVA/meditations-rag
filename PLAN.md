@@ -1583,6 +1583,36 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       this sample none clearly beats it on duds either. Growing the golden
       set from the kept candidates is the way to make recall stop favouring
       raw; it is a labelling job, so it goes to Phase 7.
+
+      **The dead set** (`eval/dead_set.jsonl`, added the same day): the
+      human sample as an eval set, the golden set's opposite. Every judged
+      pair with its verdict; a configuration's **dead@5** is dead passages
+      shown over judged passages shown in its top 5, all 28 queries, lower
+      better. Unjudged slots count neither way, so no row gains from being
+      sampled less. `run_eval.py` prints it on every retrieval row from now
+      on; `eval/blind.py score` gives it for all 52 Phase 4 configurations
+      from their committed top 5s. About 17 judged slots per row, shared
+      between rows: read families, not single rows.
+
+      | config | R@5 | dead@5 |
+      |---|---|---|
+      | `raw` | 75% | 28% (5/18) |
+      | `raw` + `llm:claude` | 70% | **6% (1/18)** |
+      | `raw` + `llm:apertus-v15-70b` | 65% | 24% (4/17) |
+      | `raw` + `ce-minilm` | 55% | 15% (3/20) |
+      | `raw+hyde@claude` + `ce-minilm` | 60% | 6% (1/17) |
+      | `multi@claude` | 25% | 50% (9/18) |
+
+      **Recall and dead@5 disagree, and the disagreement is the finding.**
+      The rerank rows, which lost recall against the golden set, show the
+      fewest dead passages: every reranked row sits at or below raw, and the
+      MultiQuery rows sit highest (36-50%). `raw` + `llm:claude` gives up
+      one hard query at R@5 and shows one dead passage where raw shows five,
+      at $0.0086 and ~1.8 s a query. One row against another is not
+      significant at this n (5/18 against 1/18: Fisher exact p ~ 0.18); the
+      family pattern is the evidence. It makes `raw` + `llm:claude` the
+      second candidate for the fresh-query check before Phase 5, beside
+      `raw+hyde@claude`: the shipped default stays raw until that check.
 - [ ] **"No good match" handling**: score threshold or LLM relevance check.
       **Scoped down for the delivery:** the threshold only, set from
       evidence once rerank has landed.

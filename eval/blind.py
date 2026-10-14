@@ -7,6 +7,7 @@ every configuration actually showed, blind to which configuration showed it.
     .venv/bin/python eval/blind.py sheet     # pool + the human sample sheet
     .venv/bin/python eval/blind.py judge     # the LLM judge over the whole pool
     .venv/bin/python eval/blind.py score     # agreement, then per-config scores
+    .venv/bin/python eval/blind.py dead-set  # export the human verdicts as eval/dead_set.jsonl
 
 THE POOL is every (query, passage) pair that any configuration put in its top
 5, read from the committed eval/results/phase-4-*-per-query.jsonl files. Each
@@ -26,6 +27,14 @@ HELPING; anything that could reasonably help, even obliquely, stays unticked.
 THE JUDGE is an open-weight model of a third lineage (config.JUDGE_MODEL), so
 it favours neither Apertus's picks nor Claude's, given the same instruction
 as the human, one call per pair, cached like every other completion.
+
+THE DEAD SET (eval/dead_set.jsonl) is the human sample as an eval set, the
+opposite of the golden set: every judged (query, passage) pair with its
+verdict, `dead` when struck. A configuration's dead rate is dead passages
+shown over JUDGED passages shown, in its top 5. Unjudged slots count neither
+way, so a configuration whose slots happened to be sampled less is not
+favoured; with ~17 judged slots per configuration a single row is noisy,
+which is why both counts are always printed.
 
 THE GATE, set before any judgement was seen: configurations are scored on the
 judge's verdicts only if its agreement with the human sample reaches Cohen's
@@ -250,6 +259,40 @@ def human_only(key: dict, struck: dict[str, bool]) -> list[str]:
     return L
 
 
+DEAD_SET = EVAL_DIR / "dead_set.jsonl"
+
+
+def cmd_dead_set() -> None:
+    key = json.loads(SAMPLE_KEY.read_text(encoding="utf-8"))
+    struck = read_sheet()
+    rows = [{"query": v["query"], "passage_id": v["passage_id"], "dead": struck[sid],
+             "source": f"blind sample {sid}, seed {SEED}"}
+            for sid, v in key.items() if sid in struck]
+    DEAD_SET.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
+                        encoding="utf-8")
+    print(f"{DEAD_SET}: {len(rows)} judged pairs, {sum(r['dead'] for r in rows)} dead")
+
+
+def dead_rates() -> list[str]:
+    """Dead rate of every Phase 4 configuration, from its committed top 5."""
+    judged = {(r["query"], r["passage_id"]): r["dead"]
+              for r in map(json.loads, open(DEAD_SET, encoding="utf-8"))}
+    per = defaultdict(lambda: [0, 0])
+    for (c, q), ret in top5_lists().items():
+        for pid in ret:
+            if (q, pid) in judged:
+                per[c][0] += judged[(q, pid)]
+                per[c][1] += 1
+    L = ["## Dead set, by configuration", "",
+         "*Dead passages shown / judged passages shown, in each configuration's top 5 over the "
+         "28 golden queries. Lower is better. About 17 judged slots per configuration, shared "
+         "between configurations: read families, not single rows.*", "",
+         "| config | dead / judged | dead rate |", "|---|---|---|"]
+    for c, (d, j) in sorted(per.items(), key=lambda kv: (kv[1][0] / kv[1][1], kv[0])):
+        L += [f"| `{c}` | {d}/{j} | {d / j:.0%} |"]
+    return L + [""]
+
+
 def cmd_score(out: Path) -> None:
     key = json.loads(SAMPLE_KEY.read_text(encoding="utf-8"))
     struck = read_sheet()
@@ -284,6 +327,8 @@ def cmd_score(out: Path) -> None:
           f"judge {sum(g_j)}/{len(g_j)} over the pool.*", ""]
 
     L += human_only(key, struck)
+    if DEAD_SET.exists():
+        L += dead_rates()
     if k < KAPPA_GATE:
         L += [f"**Below the gate ({KAPPA_GATE}): the judge's verdicts do not score the "
               "configurations.**", ""]
@@ -315,6 +360,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("sheet")
+    sub.add_parser("dead-set")
     j = sub.add_parser("judge")
     j.add_argument("--workers", type=int, default=8)
     s = sub.add_parser("score")
@@ -322,6 +368,8 @@ def main() -> int:
     a = ap.parse_args()
     if a.cmd == "sheet":
         cmd_sheet()
+    elif a.cmd == "dead-set":
+        cmd_dead_set()
     elif a.cmd == "judge":
         cmd_judge(a.workers)
     else:

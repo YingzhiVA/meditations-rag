@@ -25,6 +25,11 @@ comparisons that matter.
              "content") get their own column too: they are a different kind
              of input from a problem statement, and PLAN.md asks for them to
              be reported apart.
+             dead@5 is the golden set's opposite (eval/dead_set.jsonl, from
+             the blind re-judging): dead passages shown over JUDGED passages
+             shown in the top 5, all queries. Lower is better; unjudged
+             slots count neither way. ~17 judged slots per row, so it is
+             printed with its counts.
 
   Router     reported as a PAIR: out_of_scope recall AND in_scope retention.
              Recall alone is gameable by rejecting everything, and the real
@@ -299,6 +304,20 @@ def run_config(cfg, hard, canary, content, oos, resources, run_id=None) -> dict:
                 "oos": oos_metrics([r for r in records if r["tier"] == "out_of_scope"]),
             },
             "latency": latencies}
+
+
+# (query, passage) -> dead, from eval/dead_set.jsonl; empty when absent.
+DEAD: dict[tuple[str, str], bool] = {}
+
+
+def dead_cell(records: list[dict]) -> str:
+    if not DEAD:
+        return "—"
+    judged = [DEAD[(r["query"], p)] for r in records for p in r["returned"]
+              if (r["query"], p) in DEAD]
+    if not judged:
+        return "—"
+    return f"{sum(judged) / len(judged):.0%} ({sum(judged)}/{len(judged)})"
 
 
 def tier_metrics(records: list[dict]) -> dict | None:
@@ -862,13 +881,14 @@ def render(results, router_rows, safety_rows, stamp, skipped) -> str:
                 *[pct(m[f"recall@{k}"]) for k in KS], f"{m['mrr']:.3f}",
                 pct(c["recall@5"]) + f" ({c['n']})" if c else "—",
                 pct(ct["recall@5"]) + f" ({ct['n']})" if ct else "—",
+                dead_cell(r["records"]),
                 pct(o["accuracy"]) + f" ({o['n']})" if o else "—",
                 f"{statistics.median(lat):.0f}",
                 f"{sorted(lat)[max(0, int(0.95 * len(lat)) - 1)]:.0f}",
                 *strategy_cost_cells(r),
             ])
         L += [table(["config", "n", "R@1", "R@3", "R@5", "MRR", "canary R@5",
-                     "content R@5", "oos acc", "p50 ms", "p95 ms", "tok", "$/q"], rows), ""]
+                     "content R@5", "dead@5", "oos acc", "p50 ms", "p95 ms", "tok", "$/q"], rows), ""]
         for r in results:
             n_rr = sum(1 for rec in r["records"] if rec["rerank_fallback"])
             if n_rr:
@@ -993,6 +1013,8 @@ def main() -> int:
     safety_p = args.safety_set or EVAL_DIR / "safety_set.jsonl"
     language_p = args.language_set or EVAL_DIR / "language_set.jsonl"
     hard, canary, content, oos, skipped = split_golden(load_jsonl(golden_p))
+    dead_p = EVAL_DIR / "dead_set.jsonl"
+    DEAD.update({(e["query"], e["passage_id"]): e["dead"] for e in load_jsonl(dead_p)})
     router_set, safety_set = load_jsonl(router_p), load_jsonl(safety_p)
 
     try:
@@ -1005,6 +1027,7 @@ def main() -> int:
              "git": rev or "unknown", "corpus md5": md5(PASSAGES_FILE),
              "golden_set md5": md5(golden_p), "router_set md5": md5(router_p),
              "safety_set md5": md5(safety_p), "language_set md5": md5(language_p),
+             "dead_set md5": md5(dead_p),
              "lingua": _version("lingua-language-detector"),
              "language_min_ratio": config.LANGUAGE_MIN_RATIO,
              "min_score_threshold": config.MIN_SCORE_THRESHOLD}

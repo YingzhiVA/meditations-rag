@@ -1665,7 +1665,7 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       while an explicit `--strategy raw+hyde` stays a setup error. The
       fresh-query check before Phase 5 remains the independent test, now
       of the default itself.
-- [ ] **"No good match" handling**: score threshold or LLM relevance check.
+- [x] **"No good match" handling**: score threshold or LLM relevance check.
       **Scoped down for the delivery:** the threshold only, set from
       evidence once rerank has landed.
       Post-retrieval rejection — distinct from the router; see `route/base.py`.
@@ -1673,6 +1673,37 @@ Each item lands as a new row/column in the eval matrix. Implement in order:
       score means the passage shares little vocabulary with the query, not
       that it cannot help. Passages that land obliquely are part of what this
       corpus is for, and an eager threshold suppresses exactly those.
+
+      **Built** (`config.MIN_SCORE_THRESHOLD = 0.43`,
+      `eval/results/phase-4-nomatch.md`). Two decisions:
+      - **The hedge reads the best cosine between the message as typed and
+        any passage** (`QueryResult.match_score`), not the fused list's
+        scores. Under the shipped
+        `raw+hyde` default the fused score is the better of the message and
+        a HyDE passage, and a passage in Marcus's register lands near some
+        passage whatever was asked. So the default and the raw baseline
+        hedge identically, at no LLM cost. A test pins it.
+      - **A floor, as Phase 2 predicted, not a classifier.** Across every
+        set, message top-1 cosines of in-scope and out-of-scope questions
+        overlap from 0.459 up: the hard out-of-scope questions score higher
+        than the hard golden ones (median 0.553 against 0.528), and "Did the
+        Stoics believe in an afterlife?" scores 0.606. Nor does the score
+        predict a dead first passage (dead 0.494-0.554, kept 0.470-0.589,
+        from the top-2 layer). Only the trivially off-topic fall below:
+        radiator valve 0.389, linked list 0.419, Zurich weather 0.425.
+        0.43 catches those three with 0.029 of margin under the lowest
+        in-scope query ("everyone online seems to be doing better than me",
+        0.459).
+      **Result** (a new No-match table in `run_eval.py`, from the exposure
+      run): the hedge fires on 0 of 57 in-scope queries that retrieve and
+      on 3 of 16 out-of-scope ones, and on none of the 28 golden queries
+      under either raw or the default. It hedges; it never hides: the
+      nearest passages are still shown. The threshold was read off these
+      same sets, so the fresh-query check before Phase 5 is its real test.
+      **Out-of-scope detection stays the router's job**, and the shipped
+      router is still `keyword`, which never routes out of scope; the
+      Apertus v1.5 70B router catches 89% (16 of 18). Whether the web UI
+      ships the LLM router is a Phase 5 decision.
 
 **The headline comparison of this phase** is Apertus-70B vs Claude Sonnet 5 on
 HyDE. HyDE is style imitation rather than classification, so it's where an open
@@ -1705,6 +1736,14 @@ budgeted. Three API facts that shape the implementation:
 
 **Done when:** the matrix shows a clear best configuration and the README can
 tell the story: baseline X% recall@5 → best pipeline Y%, at Z ms and $W/query.
+
+**Met (2026-10-14), with the measure the phase had to build to see it.**
+Baseline `raw`: R@5 75%, dead@2 (hard) 48%, ~20 ms, no LLM. Best and shipped:
+`raw+hyde` on Apertus v1.5 70B: R@5 80%, dead@2 22% (Fisher p ~ 0.03 against
+raw), ~1.4 s a query, $0 (CSCS bills node hours). On gold recall alone no
+configuration beat raw clearly; the golden set leaned toward raw, and the
+blind dead set is what made the best configuration clear. The README results
+section that tells this is a Phase 5 item.
 
 ## Phase 5 — Benchmark, polish, web UI & writeup (~3–4 days)
 

@@ -45,10 +45,13 @@ adds the language guard, fusion, rerank, and the LLM-backed routers/strategies):
    retrieve/safety_llm.py, the comparator; it falls back to the list on any
    provider error.
 7. Attach Passage objects (corpus.store.load_passages) + final scores.
-   Flag results below config.MIN_SCORE_THRESHOLD so the CLI can render an
-   honest "no strong match — Marcus may be silent on this" instead of the
-   least-bad passage. This is POST-retrieval rejection: the query looked like
-   a real problem, and the corpus simply had no good answer.
+   Flag a query when the best cosine between THE MESSAGE AS TYPED and any
+   passage (QueryResult.match_score) is below config.MIN_SCORE_THRESHOLD,
+   so the CLI can render an honest "no strong match — Marcus may be silent
+   on this" above the least-bad passages. Not the fused list's scores, which
+   also hold cos(HyDE passage, passage): a HyDE passage is written in the
+   corpus's register and lands near some passage whatever was asked. This is POST-retrieval rejection: the query
+   looked like a real problem, and the corpus simply had no good answer.
 
 Phase 4 — parent-child chunking (cfg.chunking == "subchunk",
 index/chunking.py): search returns child ids. Each list is searched deep
@@ -175,6 +178,9 @@ class QueryResult:
     passages: list[RetrievedPassage] = field(default_factory=list)
     withheld: list[str] = field(default_factory=list)
     no_strong_match: bool = False
+    # The cosine no_strong_match was decided on: the user's own message's
+    # best match (None when nothing was retrieved).
+    match_score: float | None = None
     queries: list[str] = field(default_factory=list)
     router_fallback: str | None = None
     language: str = "en"
@@ -443,7 +449,13 @@ def _run_query(problem, cfg, router, strategy, reranker, embedder, index,
                          rerank_score=rerank_scores.get(h.passage_id))
         for r, h in enumerate(kept, start=1)
     ]
-    no_strong_match = bool(hits) and hits[0].score < config.MIN_SCORE_THRESHOLD
+    # The ranked list of the message as typed, when it was embedded (raw,
+    # raw+X, hybrid): its top score is max cos(message, passage). A
+    # strategy that never embeds the message as typed falls back to the
+    # fused top, with the bias toward a match that implies.
+    own = lists[queries.index(problem)] if problem in queries else hits
+    match_score = own[0].score if own else None
+    no_strong_match = match_score is not None and match_score < config.MIN_SCORE_THRESHOLD
 
     return QueryResult(
         intent=decision.intent,
@@ -451,6 +463,7 @@ def _run_query(problem, cfg, router, strategy, reranker, embedder, index,
         passages=shown,
         withheld=[h.passage_id for h in withheld],
         no_strong_match=no_strong_match,
+        match_score=match_score,
         queries=queries,
         router_fallback=decision.fallback,
         language=verdict.language,

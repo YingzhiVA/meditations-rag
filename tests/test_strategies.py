@@ -25,6 +25,12 @@ Fusion (Phase 4, with MultiQuery) adds three:
    them; if it concatenated them it would be the one-query strategy again.
 6. MultiQuery keeps at most three themes, so a model that over-delivers
    does not get more votes in the fusion than another.
+
+The no-match threshold adds one:
+
+7. no_strong_match reads the cosine of the user's OWN message, not the
+   fused list's: a HyDE passage lands near some passage whatever was asked,
+   so letting it decide would switch the hedge off for every query.
 """
 
 import pytest
@@ -208,3 +214,33 @@ def test_multi_query_keeps_at_most_three_themes():
             return {"themes": ["On a", " ", "On b", "On c", "On d", "On e"]}
 
     assert MultiQuery(_JSONClient(None)).expand(PROBLEM) == ["On a", "On b", "On c"]
+
+
+def test_no_match_reads_the_message_not_the_hyde_passage():
+    import numpy as np
+
+    from meditations_rag import config
+    from meditations_rag.corpus.store import Passage
+    from meditations_rag.index.vector_index import LoadedIndex
+
+    eye = np.eye(3, dtype=np.float32)
+    weak = np.array([0.2, 0.0, np.sqrt(1 - 0.04)], dtype=np.float32)   # cosine 0.2 to 1.1
+    vectors = {PROBLEM: weak, "A pseudo-passage.": eye[0]}            # cosine 1.0 to 1.1
+
+    class _Embedder(_RecordingEmbedder):
+        dim = 3
+
+        def embed_query(self, query):
+            return vectors[query]
+
+    passages = [Passage(id="1.1", book=1, number=1, text="x"),
+                Passage(id="2.1", book=2, number=1, text="y")]
+    index = LoadedIndex(embedder="bge-base", ids=["1.1", "2.1"], vectors=eye[:2], meta={})
+    cfg = RetrievalConfig(embedder="bge-base", strategy="raw+hyde", llm="fake",
+                          router="keyword", k=2)
+    res = run_query(PROBLEM, cfg, router=KeywordRouter(),
+                    strategy=get_strategy("raw+hyde", _FakeClient("A pseudo-passage.")),
+                    embedder=_Embedder(), index=index, passages=passages)
+    assert res.passages[0].score == 1.0                    # the fused list matches strongly
+    assert abs(res.match_score - 0.2) < 1e-6               # but the message does not
+    assert 0.2 < config.MIN_SCORE_THRESHOLD and res.no_strong_match

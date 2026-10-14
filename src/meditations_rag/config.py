@@ -227,7 +227,13 @@ OVERRETRIEVE_K = 20          # candidates fetched before rerank (Phase 4)
 # several lists can still rise.
 RRF_C = 60
 RRF_DEPTH = 50
-# Below this cosine score the CLI should say "no strong match" instead of
-# presenting the least-bad passage. Tune against the golden set in Phase 4.
-# This is POST-retrieval rejection; the router handles PRE-retrieval rejection.
-MIN_SCORE_THRESHOLD = 0.0    # PLACEHOLDER — 0.0 disables the check for now
+# When the user's own message comes no closer than this to any passage, the
+# CLI says "no strong match" above the nearest passages (it hedges; it never
+# hides them). POST-retrieval; the router does PRE-retrieval rejection.
+# A floor, not a classifier (PLAN.md, the no-match item): message top-1
+# cosines of in-scope and out-of-scope questions overlap from 0.459 up, so
+# no cosine separates them, and only the trivially off-topic fall below
+# (radiator valve 0.389, linked list 0.419, Zurich weather 0.425). 0.43
+# catches those with 0.029 of margin under the lowest in-scope query in any
+# set; read off these sets, so the fresh-query check is its real test.
+MIN_SCORE_THRESHOLD = 0.43

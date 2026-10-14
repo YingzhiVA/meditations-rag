@@ -706,9 +706,34 @@ def run_exposure(cfgs, queries: list[str], resources, run_id=None) -> list[dict]
                                      if unflagged and p.id in ABUSE_SUPPRESSED],
                 "death_counsel_unflagged": [p.id for p in shown
                                             if unflagged and p.id in DEATH_COUNSEL_SUPPRESSED],
+                "no_strong_match": res.no_strong_match, "match_score": res.match_score,
                 "strategy_fallback": res.strategy_fallback,
             })
     return records
+
+
+def render_no_match(records: list[dict], intents: dict[str, str]) -> str:
+    """How often the no-match hedge fires, from the exposure records: on
+    in-scope queries (golden, safety, router in_scope: false alarms) and on
+    the router set's out_of_scope ones, which retrieve under the keyword
+    router. The hedge reads the message's own cosine, so any row that
+    embeds the message as typed (raw, raw+X) fires exactly as raw does."""
+    L = ["## No-match threshold", "",
+         f"*config.MIN_SCORE_THRESHOLD = {config.MIN_SCORE_THRESHOLD}, on the cosine of the "
+         "message itself. Fired = \"No strong match — Marcus may be silent on this\" above the "
+         "nearest passages (they are still shown).*", ""]
+    rows = []
+    for label in dict.fromkeys(r["config"] for r in records):
+        rs = [r for r in records if r["config"] == label]
+        ins = [r for r in rs if intents.get(r["query"], "in_scope") == "in_scope"]
+        oos = [r for r in rs if intents.get(r["query"]) == "out_of_scope"]
+        fired_in = [r["query"] for r in ins if r["no_strong_match"]]
+        rows.append([f"`{label}`", f"{len(fired_in)}/{len(ins)}",
+                     f"{sum(r['no_strong_match'] for r in oos)}/{len(oos)}",
+                     "; ".join(f"\"{q[:40]}\"" for q in fired_in) or "—"])
+    L += [table(["config", "fired on in-scope (false alarms)", "fired on out_of_scope",
+                 "in-scope queries it fired on"], rows), ""]
+    return "\n".join(L) + "\n"
 
 
 def render_exposure(records: list[dict], skipped_llm: list[str]) -> str:
@@ -1169,6 +1194,8 @@ def main() -> int:
     report += render_language(language_records)
     if results:
         report += render_exposure(exposure_records, skipped_llm)
+        report += render_no_match(exposure_records,
+                                  {e["query"]: e["intent"] for e in router_set})
     if args.repeats > 1:
         report += render_stability(router_records, safety_records, args.repeats)
     print("\n" + report)

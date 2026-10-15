@@ -1747,7 +1747,7 @@ section that tells this is a Phase 5 item.
 
 ## Phase 5 — Benchmark, polish, web UI & writeup (~3–4 days)
 
-- [ ] **Fresh-query check (Risk 5)**, the independent test of everything
+- [x] **Fresh-query check (Risk 5)**, the independent test of everything
       Phase 4 read off its own sets: the `raw+hyde` default, the 0.43
       no-match threshold, the language guard's ratio, the floor's
       passive-ideation phrasings. `eval/fresh.py`: I write
@@ -1759,6 +1759,52 @@ section that tells this is a Phase 5 item.
       layer's method, over `raw`, the shipped `raw+hyde@apertus-v15-70b`
       and `raw+llm:claude` (the second candidate; ~10 Claude calls, under
       $0.10, approved 2026-10-14). Report: `eval/results/phase-5-fresh.md`.
+
+      **Run (2026-10-15), on ten problem statements.** The out-of-scope,
+      safety and non-English extras are left to a future iteration, so the
+      language ratio and the floor's passive-ideation phrasings still have
+      no independent test.
+
+      | config | dead@2 (fresh) | dead@2 (Phase 4 hard) | dead first passage |
+      |---|---|---|---|
+      | `raw` | 35% (7/20) | 48% | 4/10 |
+      | `raw+hyde@apertus-v15-70b` (shipped) | 15% (3/20), p ~ 0.27 | 22% | 0/10 |
+      | `raw+llm:claude` | **0% (0/20)**, p ~ 0.01 | 15% | 0/10 |
+
+      - **The default holds.** Same order as Phase 4, at about the same
+        size, on queries nothing was tuned on; ten queries alone cannot
+        make it significant, but the direction is no longer from one set.
+        Per query against raw, HyDE fixed five (the sister, the finance
+        degree, the cool kid, the estranged family, where raw's top two
+        were both dead, the trapped manager), broke two (job rejections,
+        the promotion), tied three. The shipped path's top 2 equals its
+        matrix row on all ten: the LLM router raised no flag the keyword
+        router did not.
+      - **`raw+llm:claude` is the cleanest top 2 again**, the only
+        difference from raw that is significant here. It is not shipped:
+        ~$0.009 a query on a public page, and not the open model. Its
+        prompt is close to the blind sheet's rule (help for this reader,
+        obliquely included), so it optimises nearly what dead@2 measures.
+      - **The router was right on all ten**: `in_scope`, no false flag,
+        none declined, ~2.0 s p50 with the router.
+      - **The no-match threshold failed its test.** "I've been looking for
+        a job for half a year and all I ever get are rejections" scores
+        0.416 and is hedged; "…I feel so trapped" scores 0.435. Phase 4's
+        lowest in-scope was 0.459, and "linked list" scores 0.419, so no
+        threshold separates real problems from the trivially off-topic.
+        Not re-tuned on these numbers; the hedge's wording was changed
+        instead (UX polish, below).
+      - **Both LLM rows concentrate:** 10.32, 4.26 and 5.36 each fill
+        three of the shipped row's twenty top-2 slots (each struck at most
+        once). A reader trying several messages will meet them again.
+      - **The HyDE completion is not reproducible live.** The CLI calls
+        CSCS uncached, and Apertus v1.5 70B at temperature 0 words its
+        HyDE passage slightly differently from call to call: two CLI runs
+        of the job-rejection message gave two different top 5s, one of
+        them the eval's (2026-10-15). So every dead@2 above is one sample
+        per query, and the public draws a fresh one each time. How much
+        dead@2 moves between samples is unmeasured (~3 HyDE calls per
+        query and a small extra sheet; after the delivery).
 - [ ] README results section: the matrix, the router table, 2–3 worked examples
       (query → baseline vs tuned pipeline), cost notes. (The ANN crossover
       moved to Phase 7.)
@@ -1865,7 +1911,8 @@ router. Say this in the README rather than leaving it for someone to probe.
 
 **Done when:** the README results section tells the X% → Y% story; the Space is public and serves the eval-winner config; a query
 through the web UI returns the same `QueryResult` as the CLI for the same
-config; and the usage cap, the outage path and a revoked key (a bogus key,
+config and the same LLM completions (live completions vary between calls,
+see the fresh-query check, so the comparison runs both from the cache); and the usage cap, the outage path and a revoked key (a bogus key,
 on purpose) have each been triggered and seen to degrade as specified.
 
 ## Phase 6 — Multilingual queries, German first (~2–3 days, mostly curation)
@@ -2097,6 +2144,8 @@ grid rerun is cents, and nearly free from the completion cache.
 5. **Overfitting to the golden set** — at ~40 queries a held-out split is too
    small to be informative and costs a fifth of the development signal.
    Instead, sanity-check the Phase 5 winner on ~10 genuinely fresh queries.
+   **Done (2026-10-15)**: the default held; the no-match threshold did not
+   (Phase 5, "Fresh-query check").
 6. **Telemetry scope creep.** Keep tracing optional, no-op when disabled, and
    confined behind `telemetry.py`. `run_eval.py` stays authoritative for
    quality; Phoenix is observability only.

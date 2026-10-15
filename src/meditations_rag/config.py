@@ -202,6 +202,15 @@ ROUTER_FALLBACK = "keyword"
 # Off by default and no-op when off: telemetry must never be a hard dependency
 # of the pipeline. Export is OTLP/HTTP to a local Phoenix instance.
 TRACING_ENABLED = os.environ.get("MEDITATIONS_TRACING", "0") == "1"
+
+# --- Web UI (Phase 5, web.py) -------------------------------------------------
+# The LLM runs on a shared research key (CSCS, Hack Apertus): rationed, and
+# past either cap the page runs keyword routing and the raw query. An
+# in-scope query costs two calls (router, HyDE). Set low; raise only if
+# real use asks for it.
+WEB_DAILY_LLM_CALLS = 200
+WEB_SESSION_QUERIES_PER_HOUR = 10
+WEB_MAX_CHARS = 2000   # longer messages are refused, not truncated
 OTLP_ENDPOINT = os.environ.get(
     "MEDITATIONS_OTLP_ENDPOINT", "http://localhost:6006/v1/traces"
 )

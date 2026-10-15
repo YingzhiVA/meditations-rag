@@ -201,10 +201,47 @@ kept all ten problem statements `in_scope` with no false flag.
   from the same person. An LLM judge was tried as a second rater and did
   not reach the agreement gate set before judging (Cohen's κ ≥ 0.6), so it
   scores nothing.
-- **Prompt injection is bounded by design.** No LLM text ever reaches the
-  user: the LLM only routes the message and writes a query to embed. An
-  injected message can at worst misroute itself, and for English the
-  keyword safety floor still runs beneath the router.
+- **Prompt injection is bounded by design.** Outside the web UI's x-ray,
+  no LLM text reaches the user: the LLM only routes the message and writes
+  a query to embed. An injected message can at worst misroute itself, and
+  for English the keyword safety floor still runs beneath the router.
+  X-ray shows the HyDE text, so there an injected message can make the
+  model write something back, but only to the person who typed it,
+  escaped to plain text, and never under a safety flag.
+
+## Web UI
+
+```sh
+.venv/bin/python -m pip install -e ".[web]"
+.venv/bin/python app.py               # http://127.0.0.1:7860
+```
+
+The same pipeline as the CLI, with the shipped defaults, built for a public
+HuggingFace Space (`app.py` is the Space's entry point). One option, and
+one panel that is always there:
+
+- **Compare with baseline**: the same message searched as typed, with no
+  language model, beside the shipped result. It reuses the shipped router's
+  decision, so the referral, flags and withheld passages are the same and
+  only the search differs.
+- **X-ray**, beside the query box: what the pipeline did. First the
+  passage Apertus wrote in Marcus's style to search with, then language,
+  routing, safety flags, the
+  search strategy, each passage's score, every language-model call (model,
+  latency, tokens). The written passage is labelled as machine-written
+  search input, not advice. X-ray never names withheld passages (only their count), and under
+  any safety flag it does not show the written text at all: nothing
+  reviews it.
+
+**Usage is rationed.** The language model runs on a shared research key
+(CSCS, through Hack Apertus) that may be revoked after the hackathon. A
+daily cap on model calls, a per-visitor hourly cap and a refused message
+over 2,000 characters keep usage small. Past any cap, or after a `401` or
+`403` from the provider, the page runs keyword routing and the plain
+search, and says so. The keyword safety floor runs either way.
+
+**Privacy.** The page stores and logs nothing you type, and tracing is
+off. Messages go to CSCS, which does not record prompts or responses.
 
 ## Languages
 

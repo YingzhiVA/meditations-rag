@@ -1864,7 +1864,7 @@ the cap counts calls, not dollars (CSCS bills node hours, so the `$/query`
 column is blank and a dollar cap would never trip), and a revoked key is an
 expected state of the deployment, not an incident.
 
-- [ ] **Extract the rendering contract** from `cli.py` into `render.py`: the
+- [x] **Extract the rendering contract** from `cli.py` into `render.py`: the
       *decisions* (referral first, the framing line under a flag, the
       withheld count, the intent replies) come back as structured blocks, and
       the CLI and the web UI only format them. Two front ends that each
@@ -1874,6 +1874,13 @@ expected state of the deployment, not an incident.
       withheld id or reason appears outside debug output.
       A leak here is silent and a product violation, so it meets the Phase 2
       bar for a test.
+      **Done (2026-10-15).** `render.blocks()` returns the decisions in
+      order; `cli.render_result` and `web.py` only format them. The CLI's
+      output is unchanged: 24,576 synthetic results (every intent, up to
+      two flags, hedge, withheld, fallbacks, declined, four display modes)
+      render byte-identical before and after. `tests/test_render.py` runs
+      the invariants over all 32 flag sets, and fails when either a
+      withheld id or flagged search text is let through on purpose.
 - [ ] **Web front end**: Gradio on a HuggingFace Space. The Space holds
       `CSCS_INFERENCE_API_KEY` as a secret (a Space secret is an environment
       variable, and `_load_dotenv` never overrides one), the free CPU tier is
@@ -1884,10 +1891,29 @@ expected state of the deployment, not an incident.
       scored. Ship `passages.jsonl` and the index built by the same code, so a
       cold start never hits Gutenberg, and install the CPU torch wheel, not
       the 2.5 GB CUDA build.
-- [ ] **"Compare with baseline"**: the Phase 5 worked examples, live. The
+      **Built, runs locally (2026-10-15)**: `src/meditations_rag/web.py`,
+      `python app.py`; Gradio is the `web` extra. Not yet deployed.
+- [x] **"Compare with baseline"**: the Phase 5 worked examples, live. The
       `raw` row makes no LLM call, so a side-by-side with the tuned pipeline
-      costs one extra embedding.
-- [ ] **Usage cap**: a global daily cap on CSCS calls, counted at the
+      costs one extra embedding. **Built:** the baseline replays the
+      shipped router's decision (`web._Replay`) rather than routing again,
+      so both columns share the referral, the flags and the suppression,
+      and only the search differs.
+- [x] **X-ray mode** (added 2026-10-15): always on, in a narrower panel
+      beside the query box (capped in height, scrolling inside), describing
+      the main search, never the baseline. It shows what the pipeline did: language, routing, flags, search, the message's best
+      cosine against the hedge threshold, each passage's score, every LLM
+      call (model served, latency, tokens; never text), and the HyDE
+      passage Apertus wrote, labelled as machine-written search input, not
+      advice. Not the CLI's `--debug`, which stays a developer tool. Two
+      things stay out, by decision: **withheld passages beyond their
+      count** (an id or a reason points a flagged reader to exactly what
+      the lists keep from them), and **the HyDE text under any safety
+      flag**, since no list reviews it. `render.xray()`, held to every
+      flag set by `tests/test_render.py`. LLM and corpus text are escaped
+      (Markdown and HTML), so an injected message cannot make the page
+      show a link or load an image.
+- [x] **Usage cap**: a global daily cap on CSCS calls, counted at the
       gateway client (an in-scope query costs two: router and HyDE; chitchat,
       `meta` and a declined language cost one or none), set low and raised
       only if real use asks for it. Plus a per-session rate limit. Past the
@@ -1896,33 +1922,49 @@ expected state of the deployment, not an incident.
       as Risk 1, so running out of budget needs no new behaviour, only a new
       trigger. The counter lives in memory; a Space restart resets it, which
       is acceptable at this scale and needs no storage.
-- [ ] **Revoked key latches outage mode.** A `401`/`403` from CSCS switches
+      **Built:** `config.WEB_DAILY_LLM_CALLS = 200` (~100 in-scope queries),
+      `WEB_SESSION_QUERIES_PER_HOUR = 10`, and messages over
+      `WEB_MAX_CHARS = 2000` are refused rather than sent. Unit-tested
+      (`tests/test_web.py`); the live trigger is for the deployed Space.
+- [x] **Revoked key latches outage mode.** A `401`/`403` from CSCS switches
       the Space to outage mode for the life of the process, so a dead key
-      costs one failed call, not one per query, and the page says the
+      costs one query's failed calls (router and HyDE), not two per query
+      forever, and the page says the
       hackathon LLM access has ended and the demo now runs the keyword
       router and `raw` (the matrix's baseline row). A transient error
       (timeout, `5xx`) keeps the per-query fallback it has today.
-- [ ] **Privacy**: people will describe abuse and crisis in this box. By
+      **Triggered on purpose (2026-10-15)**, with a bogus key on a local
+      run: the first query fell back to keyword and `raw` and said so; the
+      second ran in reduced mode with no LLM attempt.
+- [x] **Privacy**: people will describe abuse and crisis in this box. By
       default the Space **stores no query text**. Tracing stays off in the
       deployment (Phoenix spans carry the input verbatim), and logs record
       config, latency and flags, not the input. An upfront notice says the
       query is sent to Apertus on CSCS, the Swiss National Supercomputing
       Centre, which does not record prompts or responses, and that this is
-      not a substitute for professional help.
+      not a substitute for professional help. **Built:** no flagging, no
+      analytics, `config.TRACING_ENABLED` forced off at launch; the notice
+      also links findahelpline.com.
 - [ ] **Referral text reviewed for strangers.** Until now only I have seen it.
       The public cannot be assumed to be in any one country, so every
       referral also carries an international helpline directory, not only
       local numbers.
-- [ ] **Optional, opt-in feedback**: a per-result "this helped / this missed"
+- [ ] ~~**Optional, opt-in feedback**~~ **moved to Phase 7 (2026-10-15)**:
+      it needs consent wording and storage of query text, which is new
+      privacy surface a day before delivery. A per-result "this helped / this missed"
       that stores the query only with explicit consent. These are candidates
       for Risk 5's fresh queries, **never golden-set labels as they are**. They
       go through the same human verification as every other label, in their
       own commit.
 
-**Prompt injection is bounded by design.** In v1 no LLM text ever reaches the
-user; the LLM only routes and rewrites queries. So an injected query can at
-worst misroute itself, and for English the floor still runs beneath the
-router. Say this in the README rather than leaving it for someone to probe.
+**Prompt injection is bounded by design.** In v1 no LLM text reaches the
+user outside x-ray; the LLM only routes and rewrites queries. So an injected
+query can at worst misroute itself, and for English the floor still runs
+beneath the router. X-ray shows the HyDE text, so there an injected message
+can make Apertus write something back, but only to the person who typed it
+(nothing is stored or shared), escaped so it renders as plain text, and
+never under a safety flag. Say this in the README rather than leaving it
+for someone to probe.
 
 **Done when:** the README results section tells the X% → Y% story; the Space is public and serves the eval-winner config; a query
 through the web UI returns the same `QueryResult` as the CLI for the same
@@ -2001,6 +2043,11 @@ That is the scaling argument against keyword lists, stated as work.
   query rewriting pays off properly** — resolving "what about when it's my
   manager?" into a standalone query is the task rewriting was invented for; in
   v1 it only gets to do half its job.
+- Opt-in web feedback ("this helped / this missed"), moved from Phase 5 on
+  2026-10-15: stores a query only with explicit consent, as candidates for
+  fresh-query checks, never as labels without human verification.
+- HyDE sample variance: how much dead@2 moves between live HyDE samples
+  (Phase 5, fresh-query check).
 
 **Moved here from Phases 4 and 5 (2026-10-13).** The project ships as a
 hackathon artifact on 2026-10-16, polished and with the web UI, so work that

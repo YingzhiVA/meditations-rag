@@ -31,6 +31,9 @@ dev = [
     "arize-phoenix",            # Phase 3: local trace UI — dev tool, not runtime
     # "hnswlib",                # Phase 5: bench/ann_scaling.py only
 ]
+web = [
+    "gradio",                   # Phase 5: the public web UI (web.py, app.py)
+]
 
 [project.scripts]
 meditations = "meditations_rag.cli:main"

@@ -318,43 +318,11 @@ def cmd_show(passage_id: str) -> None:
 
 # --- query ------------------------------------------------------------------
 
-_META_TEXT = """\
-This tool retrieves passages from Marcus Aurelius' *Meditations* that speak to
-a problem you describe — in Marcus's own words, cited by Book and §. It does
-not write advice of its own (v1).
-
-Edition: Project Gutenberg #55317, translated by George W. Chrystal (1902), "a
-new rendering based on the Foulis translation of 1742". Public domain. Twelve
-books, 487 numbered sections; one section is one passage.
-
+# The CLI's own lines under the shared description (render.META_TEXT).
+_CLI_USAGE = """\
   meditations "describe what is troubling you"   retrieve passages
   meditations show 4.7                           read one passage in full
-  meditations --help                             every flag
-"""
-
-_OUT_OF_SCOPE_TEXT = """\
-That is not something Marcus wrote about, so there is no passage to offer.
-This tool speaks to personal difficulty — anger, grief, fear, others' faults,
-what is and is not in your control — not to practical, factual, medical or
-legal questions.
-"""
-
-def _render_referral(flags) -> str:
-    """Rule 3: the referral leads. Wording and order come from
-    retrieve/safety.py; this only wraps."""
-    from meditations_rag.retrieve.safety import referrals
-
-    return "\n\n".join(textwrap.fill(text, WRAP) for text in referrals(flags))
-
-
-def _withheld_notice(result) -> str:
-    """Say that passages were withheld, and no more. The reason is
-    deliberately NOT shown: for a reader flagged MENTAL_HEALTH, "it speaks of
-    leaving life as a welcome thing" is a signpost to exactly the text the
-    list exists to keep away from them. Ids and reasons are available with
-    --debug (and on QueryResult.withheld for the eval harness)."""
-    n = len(result.withheld)
-    return f"{n} passage{'s' if n != 1 else ''} withheld."
+  meditations --help                             every flag"""
 
 
 def _debug_block(result) -> str:
@@ -473,97 +441,55 @@ def cmd_query(args: argparse.Namespace) -> None:
 
 def render_result(result, *, show_all: bool = False, show_scores: bool = False,
                   debug: bool = False) -> str:
-    """The rendering contract; a pure function so it can be eyeballed in
-    tests and reused by anything that is not a terminal."""
+    """Format render.blocks() for a terminal. Every decision about WHAT is
+    shown lives there, shared with the web UI; this only wraps text, lays
+    out passages, and adds the CLI's own usage hints."""
+    from meditations_rag import render
+
+    blocks = render.blocks(result)
     out: list[str] = []
+    for b in blocks:
+        if b.kind in ("referral", "decline", "hedge"):
+            out.append(textwrap.fill(b.text, WRAP))
+        elif b.kind == "passages":
+            out.append(_render_passages(b.passages, show_all, show_scores) or b.text)
+        elif b.kind == "withheld":
+            continue  # joined to the passages tail below, as one paragraph
+        else:
+            out.append(b.text)
+            if b.text == render.META_TEXT:
+                out.append(_CLI_USAGE)
 
-    # Rule 3: the referral leads, whatever else follows.
-    if result.safety:
-        out.append(_render_referral(result.safety))
-
-    if result.declined:
-        # The input could not be read (route/language.py): say so, with the
-        # static crisis pointer, and nothing else — there is no intent.
-        from meditations_rag.retrieve.safety import LANGUAGE_DECLINE
-
-        out.append(textwrap.fill(LANGUAGE_DECLINE, WRAP))
-        return _finish(out, result, debug)
-
-    if result.intent is Intent.CHITCHAT:
-        if not result.safety:
-            out.append("Hello. Describe what is troubling you and I will look for "
-                       "what Marcus Aurelius wrote that speaks to it.")
-        return _finish(out, result, debug)
-    if result.intent is Intent.META:
-        out.append(_META_TEXT.rstrip())
-        return _finish(out, result, debug)
-    if result.intent is Intent.OUT_OF_SCOPE:
-        out.append(_OUT_OF_SCOPE_TEXT.rstrip())
-        return _finish(out, result, debug)
-
-    # IN_SCOPE.
-    if not result.retrieved:
-        # A blocking safety flag: referral only, by design.
-        return _finish(out, result, debug)
-
-    # The hedge is a quality warning added up front, never a substitute for
-    # the framing line below: a flagged message that matches weakly still
-    # needs rule 4's "not counsel on what you should put up with". It fires
-    # on real problems too (eval/results/phase-5-fresh.md), so it promises
-    # nothing about whether Marcus speaks to this.
-    if result.no_strong_match:
-        out.append(textwrap.fill(
-            "Note: the match is weaker than usual, so these passages may not "
-            "speak closely to your situation. They are the nearest Marcus offers.", WRAP))
-    if SafetyFlag.ABUSE in result.safety:
-        out.append("What follows is offered for reflection, not as counsel on "
-                   "what you should put up with:")
-    elif result.safety:
-        out.append("What follows is offered for reflection, not as counsel:")
-
-    if not result.passages:
-        out.append("No passages to show.")
-    else:
-        lines = []
-        for rp in result.passages:
-            p = rp.passage
-            score = f"  [{rp.score:.2f}]" if show_scores or show_all else ""
-            if show_all:
-                body = "\n".join(
-                    textwrap.fill(para, WRAP, initial_indent="   ", subsequent_indent="   ")
-                    for para in p.text.split("\n\n")
-                )
-                lines.append(f"{rp.rank}. {p.citation}{score}\n\n{body}")
-            else:
-                head = textwrap.fill(
-                    f"{rp.rank}. {p.citation} — “{_preview(p)}”{score}",
-                    WRAP, subsequent_indent="   ",
-                )
-                lines.append(head)
-        out.append(("\n\n" if show_all else "\n").join(lines))
-
-    n = len(result.passages)
-    tail = []
-    if result.withheld:
-        tail.append(_withheld_notice(result))
+    shown = next((b.passages for b in blocks if b.kind == "passages"), ())
+    n = len(shown)
+    tail = [b.text for b in blocks if b.kind == "withheld"]
     if n and not show_all:
-        first = result.passages[0].passage.id
+        first = shown[0].passage.id
         tail.append(f"(showing {n} passage{'s' if n != 1 else ''} — pass --all to read every "
                     f"one in full, or `meditations show {first}` to read one)")
     if tail:
-        out.append("\n".join(tail))
-    return _finish(out, result, debug)
-
-
-def _finish(out: list[str], result, debug: bool) -> str:
-    if result.router_fallback:
-        # Quiet but not silent: the user should know they got the keyword
-        # path. The reason (an HTTP error, a timeout) is for --debug.
-        out.append("(The language-model router was unavailable, so keyword "
-                   "matching classified this message.)")
-    if result.strategy_fallback:
-        out.append("(The language model was unavailable, so your message was "
-                   "searched as you typed it.)")
+        # Before the fallback notices, which render.blocks() puts last.
+        notices = sum(1 for b in blocks if b.kind == "notice")
+        out.insert(len(out) - notices, "\n".join(tail))
     if debug:
         out.append(_debug_block(result))
     return "\n\n".join(out)
+
+
+def _render_passages(passages, show_all: bool, show_scores: bool) -> str:
+    lines = []
+    for rp in passages:
+        p = rp.passage
+        score = f"  [{rp.score:.2f}]" if show_scores or show_all else ""
+        if show_all:
+            body = "\n".join(
+                textwrap.fill(para, WRAP, initial_indent="   ", subsequent_indent="   ")
+                for para in p.text.split("\n\n")
+            )
+            lines.append(f"{rp.rank}. {p.citation}{score}\n\n{body}")
+        else:
+            lines.append(textwrap.fill(
+                f"{rp.rank}. {p.citation} — “{_preview(p)}”{score}",
+                WRAP, subsequent_indent="   ",
+            ))
+    return ("\n\n" if show_all else "\n").join(lines)

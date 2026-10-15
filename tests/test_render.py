@@ -37,3 +37,69 @@ def test_hedge_keeps_the_generic_framing_line():
 
 def test_no_hedge_on_a_strong_match():
     assert "weaker than usual" not in render_result(_result(frozenset(), weak=False))
+
+
+# --- the shared contract (render.py), over every flag combination ----------
+
+import itertools
+from dataclasses import fields
+
+from meditations_rag import render
+from meditations_rag.retrieve.pipeline import RetrievalConfig
+from meditations_rag.retrieve.safety import withheld_reasons
+
+FLAG_SETS = [frozenset(c) for r in range(len(SafetyFlag) + 1)
+             for c in itertools.combinations(SafetyFlag, r)]
+WITHHELD = ["10.32", "7.24"]
+MESSAGE = "my message"
+WRITTEN = "A passage the LLM wrote in Marcus's voice."
+
+
+def _every_result():
+    """Each flag set under each intent, weak and strong, plus the declined."""
+    for flags in FLAG_SETS:
+        yield _result(flags, weak=False).__class__(
+            intent=None, safety=flags, declined=True, language="pl")
+        for intent, weak in itertools.product(Intent, (False, True)):
+            base = _result(flags, weak)
+            yield base.__class__(**{**{f.name: getattr(base, f.name) for f in fields(base)},
+                                    "intent": intent, "withheld": WITHHELD,
+                                    "queries": [MESSAGE, WRITTEN]})
+
+
+def test_referral_leads_under_every_flag_combination():
+    for res in _every_result():
+        bs = render.blocks(res)
+        if res.safety:
+            assert bs and bs[0].kind == "referral", (res.intent, res.safety)
+            n = sum(b.kind == "referral" for b in bs)
+            assert [b.kind for b in bs[:n]] == ["referral"] * n
+
+
+def test_no_withheld_id_or_reason_reaches_the_reader():
+    for res in _every_result():
+        reasons = withheld_reasons(res.safety, res.withheld) if res.safety else []
+        for b in render.blocks(res):
+            assert not {rp.passage.id for rp in b.passages} & set(WITHHELD)
+            for wid in WITHHELD:
+                assert wid not in b.text
+            for reason in reasons:
+                assert reason not in b.text
+
+
+def test_xray_never_shows_withheld_passages_or_flagged_search_text():
+    cfg = RetrievalConfig(strategy="raw+hyde", llm="apertus-v15-70b",
+                          router="apertus-v15-70b")
+    for res in _every_result():
+        x = render.xray(res, MESSAGE, cfg)
+        reasons = withheld_reasons(res.safety, res.withheld) if res.safety else []
+        visible = " ".join(str(getattr(x, f.name)) for f in fields(x))
+        for wid in WITHHELD:
+            assert wid not in visible
+        for reason in reasons:
+            assert reason not in visible
+        if res.safety:
+            assert WRITTEN not in visible
+            assert x.search_text_withheld == bool(res.queries)
+        elif res.queries:
+            assert x.searched_with == WRITTEN and not x.search_text_withheld

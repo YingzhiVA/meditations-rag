@@ -103,3 +103,20 @@ def test_xray_never_shows_withheld_passages_or_flagged_search_text():
             assert x.search_text_withheld == bool(res.queries)
         elif res.queries:
             assert x.searched_with == WRITTEN and not x.search_text_withheld
+
+
+def test_every_referral_ends_with_the_directory_exactly_once():
+    from meditations_rag.retrieve.safety import HELPLINE_DIRECTORY
+
+    for res in _every_result():
+        texts = [b.text for b in render.blocks(res)]
+        n = sum("findahelpline.com" in t for t in texts)
+        if res.safety == {SafetyFlag.MEDICAL_EMERGENCY} and not res.declined:
+            assert n == 0           # the emergency number is the action
+        elif res.safety:
+            assert n == 1, (res.intent, res.safety, res.declined)
+            if not res.declined:
+                k = sum(b.kind == "referral" for b in render.blocks(res))
+                assert texts[k - 1] == HELPLINE_DIRECTORY
+        elif not res.declined:
+            assert n == 0

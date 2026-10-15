@@ -1950,10 +1950,19 @@ expected state of the deployment, not an incident.
       not a substitute for professional help. **Built:** no flagging, no
       analytics, `config.TRACING_ENABLED` forced off at launch; the notice
       also links findahelpline.com.
-- [ ] **Referral text reviewed for strangers.** Until now only I have seen it.
+- [x] **Referral text reviewed for strangers.** Until now only I have seen it.
       The public cannot be assumed to be in any one country, so every
       referral also carries an international helpline directory, not only
       local numbers.
+      **Reviewed (2026-10-15).** One shared line,
+      `safety.HELPLINE_DIRECTORY` ("Wherever you are, findahelpline.com
+      lists free, confidential helplines in over 175 countries."), closes
+      the referrals once, not per referral, since flags co-occur. Left out
+      after a declined message (the decline carries it) and for a medical
+      emergency alone (the emergency number is the action). Self-harm and
+      medical emergency now also give 112 (Europe) and 911 (North
+      America). The other wording is unchanged. `tests/test_render.py`
+      checks the directory's placement over every flag set.
 - [ ] ~~**Optional, opt-in feedback**~~ **moved to Phase 7 (2026-10-15)**:
       it needs consent wording and storage of query text, which is new
       privacy surface a day before delivery. A per-result "this helped / this missed"

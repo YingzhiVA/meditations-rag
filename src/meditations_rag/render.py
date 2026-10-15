@@ -83,10 +83,15 @@ def withheld_text(n: int) -> str:
 
 def blocks(result) -> list[Block]:
     """What the reader is shown, in order, for one QueryResult."""
-    from meditations_rag.retrieve.safety import LANGUAGE_DECLINE, referrals
+    from meditations_rag.retrieve.safety import HELPLINE_DIRECTORY, LANGUAGE_DECLINE, referrals
 
-    # Rule 3: the referral leads, whatever else follows.
+    # Rule 3: the referral leads, whatever else follows; the international
+    # directory closes it, once. Not after a declined message (the decline
+    # carries its own) and not for a medical emergency alone, where the
+    # emergency number is the action and a helpline list is beside the point.
     out = [Block("referral", text) for text in referrals(result.safety)] if result.safety else []
+    if out and not result.declined and result.safety != {SafetyFlag.MEDICAL_EMERGENCY}:
+        out.append(Block("referral", HELPLINE_DIRECTORY))
 
     if result.declined:
         # The input could not be read (route/language.py): say so, with the

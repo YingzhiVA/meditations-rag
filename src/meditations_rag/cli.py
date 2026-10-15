@@ -506,10 +506,16 @@ def render_result(result, *, show_all: bool = False, show_scores: bool = False,
         # A blocking safety flag: referral only, by design.
         return _finish(out, result, debug)
 
+    # The hedge is a quality warning added up front, never a substitute for
+    # the framing line below: a flagged message that matches weakly still
+    # needs rule 4's "not counsel on what you should put up with". It fires
+    # on real problems too (eval/results/phase-5-fresh.md), so it promises
+    # nothing about whether Marcus speaks to this.
     if result.no_strong_match:
-        out.append("No strong match found — Marcus may be silent on this. "
-                   "The nearest passages, for what they are worth:")
-    elif SafetyFlag.ABUSE in result.safety:
+        out.append(textwrap.fill(
+            "Note: the match is weaker than usual, so these passages may not "
+            "speak closely to your situation. They are the nearest Marcus offers.", WRAP))
+    if SafetyFlag.ABUSE in result.safety:
         out.append("What follows is offered for reflection, not as counsel on "
                    "what you should put up with:")
     elif result.safety:

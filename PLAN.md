@@ -1826,6 +1826,15 @@ section that tells this is a Phase 5 item.
       its own router row first. Still to do here: the CLI's "routing
       with…" and "raw+hyde with…" status lines print even when no call
       follows (chitchat, a declined language).
+      **The no-match hedge is a quality warning, up front (2026-10-15).**
+      It said "Marcus may be silent on this", and it *replaced* the framing
+      line, so a weakly matching abuse message lost rule 4's "not as counsel
+      on what you should put up with". It now says the match is weaker than
+      usual and the passages may not speak closely to the situation, comes
+      first, and the framing line follows it under any flag
+      (`tests/test_render.py`). Retrieval is unchanged: the passages are
+      shown either way. Prompted by the fresh-query check, where the hedge
+      fired on a real problem.
 - [ ] Repo hygiene: license note (Gutenberg text is public domain; state the
       edition and translator), reproducibility instructions, key setup
       (`CSCS_INFERENCE_API_KEY` for the shipped path; `HF_TOKEN` only to
@@ -1856,7 +1865,8 @@ expected state of the deployment, not an incident.
       the CLI and the web UI only format them. Two front ends that each
       re-implement rule 3 will drift, and the one that drifts is the public
       one. **Test invariant:** for every flag combination, the referral block
-      comes first and no withheld id or reason appears outside debug output.
+      comes first, the framing line survives the no-match hedge, and no
+      withheld id or reason appears outside debug output.
       A leak here is silent and a product violation, so it meets the Phase 2
       bar for a test.
 - [ ] **Web front end**: Gradio on a HuggingFace Space. The Space holds

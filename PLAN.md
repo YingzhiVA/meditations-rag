@@ -1805,9 +1805,14 @@ section that tells this is a Phase 5 item.
         per query, and the public draws a fresh one each time. How much
         dead@2 moves between samples is unmeasured (~3 HyDE calls per
         query and a small extra sheet; after the delivery).
-- [ ] README results section: the matrix, the router table, 2–3 worked examples
+- [x] README results section: the matrix, the router table, 2–3 worked examples
       (query → baseline vs tuned pipeline), cost notes. (The ANN crossover
       moved to Phase 7.)
+      **Written (2026-10-15).** Headline: dead@2 48% → 22% on the hard
+      golden queries, recall@5 75% → 80%, and 35% → 15% on the fresh ones.
+      The worked examples are fresh queries, one of them a loss, so none
+      was picked from the set the default was chosen on. Also states the
+      recall lower bound, the single rater and the prompt-injection bound.
 - [ ] `meditations` UX polish: pleasant passage rendering, `--all` paging,
       config defaults set to the eval winner.
       **Defaults set (2026-10-14).** Strategy: `raw+hyde` on Apertus v1.5

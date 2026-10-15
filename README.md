@@ -37,13 +37,18 @@ Marcus's register), with reviewed suppression lists under a safety flag. See
 
 ## Results
 
-**Baseline → shipped, on the 20 hard golden queries:** the message embedded
+**Baseline → shipped, on the validation set (20 hard golden queries):** the message embedded
 as typed (`raw`) puts a useless passage in **48%** of its top-2 slots; the
 shipped `raw+hyde` on Apertus v1.5 70B puts one in **22%** (Fisher p ≈ 0.03),
 and recall@5 goes from **75%** to **80%**. The cost is ~1.4 s a query and no
-money (CSCS bills node hours to the project, not per token). On ten fresh
-queries written after every decision was made, the same comparison reads
-**35% → 15%**.
+money (CSCS bills node hours to the project, not per token). On the test
+set, ten queries written after every decision was made, the same
+comparison reads **35% → 15%**.
+
+**Two query sets.** The *validation set* is the 20 hard queries of the
+golden set: every configuration was compared and chosen on it. The *test
+set* is ten problem statements written afterwards and held out until the
+choice was made, to check the choice was not fitted to the validation set.
 
 ### Two measures, and why the second one decided
 
@@ -55,15 +60,15 @@ queries written after every decision was made, the same comparison reads
   toward it. It is for comparing rows, and on it nothing beat `raw` by more
   than one query.
 - **dead@2, blind.** Every passage that any configuration ranked first or
-  second on a hard query was judged once, blind to which configuration
+  second on a validation query was judged once, blind to which configuration
   showed it and at what rank: struck if it is *definitely not helping* the
   person who wrote the message, kept if it could help even obliquely (504
   pairs; gold-labelled ones count as kept). dead@2 is the share of
   struck passages in a configuration's top 2: what the reader sees first.
-  It is exact on the hard queries, with no sampling, and free of the
+  It is exact on the validation set, with no sampling, and free of the
   labels' lean toward `raw`.
 
-### The matrix (hard golden queries, n = 20)
+### The matrix (validation set, n = 20)
 
 | configuration | recall@5 | dead@2 | dead first passage | p50 latency | $/query |
 |---|---|---|---|---|---|
@@ -94,22 +99,23 @@ What the rows say:
   70B and Claude Sonnet 5 are within noise of each other (recall@5 80% and
   75%, dead@2 22% and 28%), and Apertus is the one that ships.
 - **The cleanest top 2 is Claude reranking `raw`** (dead@2 15% against 48%,
-  p ≈ 0.003), at ~$0.009 a query. It is the documented alternative, not the
-  default: it costs money on a public page and is not the open model. Its
-  prompt is also close to the judging rule, so it optimises nearly what
-  dead@2 measures.
+  p ≈ 0.003), at ~$0.009 a query. It is the comparison, not a candidate:
+  the project was built for the Hack Apertus hackathon to run on Apertus,
+  and every Claude row is there to show how the open model fares against a
+  leading closed one. Its prompt is also close to the judging rule, so it
+  optimises nearly what dead@2 measures.
 - **Off-the-shelf rerankers and lexical retrieval hurt.** Cross-encoders
   trained on web search reward topical overlap, and BM25 rewards shared
   words; this corpus's gap is conceptual (Chrystal's 1902 English is
   readable, the vocabulary is Stoic).
 
-### Fresh queries: the check against overfitting
+### Test set: the check against overfitting
 
-Every decision above was read off the sets it was scored on. Ten new
-problem statements, written afterwards and judged blind the same way
+Every decision above was read off the validation set. Ten new problem
+statements, written afterwards and judged blind the same way
 ([eval/results/phase-5-fresh.md](eval/results/phase-5-fresh.md)):
 
-| configuration | dead@2 (fresh) | dead first passage |
+| configuration | dead@2 (test) | dead first passage |
 |---|---|---|
 | `raw` | 35% (7/20) | 4/10 |
 | `raw+hyde` @ Apertus v1.5 70B (shipped) | 15% (3/20) | 0/10 |
@@ -123,7 +129,7 @@ half a year and all I ever get are rejections", cosine 0.416). No score
 separates real problems from off-topic input, so the hedge is now only a
 quality note shown before the passages, never a refusal.
 
-### Worked examples (fresh queries; top 2 shown, † = struck as not helping)
+### Worked examples (test set; top 2 shown, † = struck as not helping)
 
 **"I saw my neighbours with their children and grandchildren the other day.
 They were so blissful together. I regret that I enstranged myself from my
@@ -176,7 +182,7 @@ pair, because rejecting everything games recall alone; safety flags on
 
 The keyword safety floor always runs beneath the LLM router, so what ships
 is the union. The floor is what makes an open router safe enough: on its
-own the 70B catches 8 of 20 flags. On the fresh queries the shipped router
+own the 70B catches 8 of 20 flags. On the test set the shipped router
 kept all ten problem statements `in_scope` with no false flag.
 
 ### Cost
@@ -194,7 +200,7 @@ kept all ten problem statements `in_scope` with no false flag.
 
 ### Caveats
 
-- **Small n.** 20 hard golden queries and 10 fresh ones: a five-point move
+- **Small n.** 20 validation queries and 10 test queries: a five-point move
   in recall@5 is one query. The per-query files in `eval/results/` are the
   evidence; the matrix is the summary.
 - **One curator, one judge.** The gold labels and the blind verdicts come

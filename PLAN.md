@@ -1760,6 +1760,10 @@ section that tells this is a Phase 5 item.
       and `raw+llm:claude` (the second candidate; ~10 Claude calls, under
       $0.10, approved 2026-10-14). Report: `eval/results/phase-5-fresh.md`.
 
+      **Naming (2026-10-15):** the README and the web page call these ten
+      the **test set** and the 20 hard golden queries the **validation
+      set**; the entries below keep "fresh" and "hard" as written.
+
       **Run (2026-10-15), on ten problem statements.** The out-of-scope,
       safety and non-English extras are left to a future iteration, so the
       language ratio and the floor's passive-ideation phrasings still have
@@ -1781,8 +1785,9 @@ section that tells this is a Phase 5 item.
         matrix row on all ten: the LLM router raised no flag the keyword
         router did not.
       - **`raw+llm:claude` is the cleanest top 2 again**, the only
-        difference from raw that is significant here. It is not shipped:
-        ~$0.009 a query on a public page, and not the open model. Its
+        difference from raw that is significant here. It is not shipped,
+        and was never a candidate: the project is built for Hack Apertus,
+        to run on Apertus, and Claude is the comparator. Its
         prompt is close to the blind sheet's rule (help for this reader,
         obliquely included), so it optimises nearly what dead@2 measures.
       - **The router was right on all ten**: `in_scope`, no false flag,

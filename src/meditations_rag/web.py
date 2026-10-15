@@ -250,6 +250,29 @@ CSCS, the Swiss National Supercomputing Centre, which does not record prompts or
 responses. This page stores nothing you type. English only for now."""
 
 
+ABOUT = """\
+**How it works.** The book's 487 numbered passages are embedded with
+bge-base. Apertus v1.5 70B, an open Swiss model served by CSCS, reads your
+message (a real problem, a greeting, an off-topic question, a safety
+concern) and writes a short passage in Marcus's style to search with (Hypothetical Document Embeddings). A
+keyword safety check always runs beneath it to catch messages that call
+for a referral to professional help.
+
+**What was tried.** Query rewriting (two strategies: theme matching, and self-reflection), HyDE and multi-query,
+each alone and fused with the raw query; keyword (BM25) hybrid search;
+cross-encoder and LLM reranking; Apertus v1.5 70B against Claude (Sonnet 5; Haiku 4.5 for routing) at every LLM step, with thinking off.
+
+**Results.** Share of the top two passages judged unfit (blind) on 20
+hard validation queries: **48%** for raw retrieval (your message searched as typed), **22%** for
+the shipped version. On ten fresh test queries written afterwards: **35% → 15%**.
+
+**The shipped version vs. the winner.** Claude Sonnet 5 reranking the raw retrievals had the cleanest
+top two in both tests (15% judged unfit on the 20 hard validation queries, 0% on the fresh test queries), and raw + Apertus HyDE is the close second (22% and 15%).
+
+Code, evaluation sets and every result:
+[github.com/YingzhiVA/meditations-rag](https://github.com/YingzhiVA/meditations-rag)"""
+
+
 class App:
     """Loads the corpus, index and embedder once; answers queries."""
 
@@ -318,6 +341,7 @@ CSS = """
 .mr-text blockquote { font-size: 18px !important; line-height: 1.65 !important; }
 .mr-text h1 { font-size: 2rem !important; }
 .mr-text blockquote { margin: 0.4em 0 1.2em; }
+.mr-about > button, .mr-about > button * { font-size: 18px !important; font-weight: 600; }
 /* Capped to about the query column's height, so the results start right
    under the query; the rest scrolls inside the panel. */
 /* Gradio puts the class on the block and on its inner .prose: box the
@@ -354,6 +378,8 @@ def build(app: App):
     with gr.Blocks(title="Meditations RAG", analytics_enabled=False) as demo:
         gr.Markdown("# What would Marcus say?", elem_classes="mr-text")
         gr.Markdown(NOTICE, elem_classes="mr-text")
+        with gr.Accordion("About this app", open=False, elem_classes="mr-about"):
+            gr.Markdown(ABOUT, elem_classes="mr-text")
         # The query on the left, x-ray in a narrower panel beside it; on a
         # narrow screen the panel wraps below the query box.
         with gr.Row(equal_height=False):

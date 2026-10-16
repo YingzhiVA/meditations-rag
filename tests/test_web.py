@@ -124,3 +124,16 @@ def test_compare_keeps_the_framing_line_above_the_grid_and_escapes_passages():
     assert "Book 1" not in main                 # the passages moved into the grid
     assert "<script>" not in grid and "&lt;script&gt;" in grid
     assert "also #" not in grid                 # 1.1 and 4.26: no shared passage
+
+
+def test_the_cli_and_the_web_page_run_the_same_configuration(monkeypatch):
+    """Phase 5's Done-when: the two front ends run the row the eval scored.
+    Both call run_query; with equal configs and equal completions they
+    return equal results, so equal configs are the claim to pin. The LLM
+    lookups are stubbed, so this holds whether or not a key is configured."""
+    from meditations_rag import cli, llm, route
+
+    monkeypatch.setattr(route, "get_router", lambda name: object())
+    monkeypatch.setattr(llm, "get_llm", lambda name: object())
+    args = cli.build_parser().parse_args(["query", "my manager ignores me"])
+    assert cli.query_config(args) == web.SHIPPED

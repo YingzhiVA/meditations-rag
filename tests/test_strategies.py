@@ -244,3 +244,47 @@ def test_no_match_reads_the_message_not_the_hyde_passage():
     assert res.passages[0].score == 1.0                    # the fused list matches strongly
     assert abs(res.match_score - 0.2) < 1e-6               # but the message does not
     assert 0.2 < config.MIN_SCORE_THRESHOLD and res.no_strong_match
+
+
+class _JSONRouterClient:
+    """Answers the LLM router's complete_json with a fixed intent."""
+
+    name = "fake-router"
+    model = "fake-router-model"
+
+    def __init__(self, intent):
+        self.intent = intent
+        self.calls = 0
+
+    def complete(self, system, user):  # pragma: no cover
+        raise AssertionError("the router called complete()")
+
+    def complete_json(self, system, user, schema, **kw):
+        self.calls += 1
+        return {"intent": self.intent, "safety": []}
+
+
+def test_on_step_fires_only_before_a_real_llm_call():
+    """The CLI prints "routing with ..." and "<strategy> with ..." from
+    on_step; it must not announce a call that never happens."""
+    from meditations_rag.route.llm import LLMRouter
+
+    cfg = RetrievalConfig(embedder="bge-base", strategy="hyde", llm="fake",
+                          router="fake-router", k=5)
+
+    def steps(problem, intent):
+        seen, client = [], _JSONRouterClient(intent)
+        try:
+            run_query(problem, cfg, router=LLMRouter("fake-router", client),
+                      strategy=HyDEQuery(_FakeClient("A passage.")),
+                      embedder=_RecordingEmbedder(), index=_NoIndex(), passages=[],
+                      on_step=lambda step, llm: seen.append((step, llm)))
+        except _Embedded:
+            pass
+        return seen, client.calls
+
+    assert steps(PROBLEM, "in_scope") == ([("route", "fake-router"), ("hyde", "fake")], 1)
+    assert steps("Which tax software should I use?", "out_of_scope") == (
+        [("route", "fake-router")], 1)
+    assert steps("hello", "in_scope") == ([], 0)          # chitchat shortcut, no call
+    assert steps("je veux mourir", "in_scope") == ([], 0)  # declined before any model

@@ -211,6 +211,7 @@ def run_query(
     index: LoadedIndex | None = None,
     passages: list[Passage] | None = None,
     eval_run_id: str | None = None,
+    on_step: Callable[[str, str], None] | None = None,
 ) -> QueryResult:
     """Execute the flow above. Pure function of (problem, cfg, on-disk
     index): no hidden state, so eval runs are reproducible.
@@ -219,12 +220,15 @@ def run_query(
     eval harness) load the model, index and corpus once and pass them in;
     they must agree with cfg. The CLI passes nothing and pays the load.
     eval_run_id only tags the trace, so a Phoenix trace can be matched to the
-    report that its run produced."""
+    report that its run produced. on_step(step, llm) is called right before
+    a step that will call an LLM ("route", then the strategy's name), and
+    only then: the CLI says what it is waiting for, and says nothing when
+    no call follows (a declined language, a greeting, a non-problem)."""
     with telemetry.span("query", "CHAIN", input=problem) as root:
         telemetry.set_metadata(root, {**cfg.as_dict(), "config": cfg.label,
                                       "eval_run_id": eval_run_id}, tags=[cfg.label])
         result = _run_query(problem, cfg, router, strategy, reranker, embedder, index,
-                            passages)
+                            passages, on_step)
         telemetry.set_output(root, {
             "intent": result.intent.value if result.intent else None,
             "language": result.language,
@@ -280,7 +284,7 @@ def _lexical_list(problem: str, index: LoadedIndex, passages: list[Passage],
 
 
 def _run_query(problem, cfg, router, strategy, reranker, embedder, index,
-               passages) -> QueryResult:
+               passages, on_step=None) -> QueryResult:
     from meditations_rag.route import get_router
     from meditations_rag.route.keyword import safety_flags
     from meditations_rag.route.language import check_language
@@ -294,6 +298,8 @@ def _run_query(problem, cfg, router, strategy, reranker, embedder, index,
                            language=verdict.language, declined=True)
 
     router = router or get_router(cfg.router)
+    if on_step and getattr(router, "needs_call", None) and router.needs_call(problem):
+        on_step("route", router.name)
     with telemetry.span("route", "CHAIN", input=problem,
                         **{"meditations.router": router.name}) as sp:
         decision: RouteDecision = router.route(problem)
@@ -308,13 +314,15 @@ def _run_query(problem, cfg, router, strategy, reranker, embedder, index,
 
     from meditations_rag.embed import get_embedder
     from meditations_rag.llm.base import LLMError
-    from meditations_rag.retrieve.strategies import RawQuery, get_strategy
+    from meditations_rag.retrieve.strategies import LLM_STRATEGIES, RawQuery, get_strategy
 
     if strategy is None:
         from meditations_rag.llm import get_llm
 
         strategy = get_strategy(cfg.strategy, get_llm(cfg.llm) if cfg.llm else None)
     strategy_fallback = None
+    if on_step and cfg.llm and cfg.strategy in LLM_STRATEGIES:
+        on_step(cfg.strategy, cfg.llm)
     with telemetry.span("strategy.expand", "CHAIN", input=problem,
                         **{"meditations.strategy": strategy.name}) as sp:
         try:

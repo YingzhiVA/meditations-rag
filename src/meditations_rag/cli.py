@@ -360,15 +360,16 @@ def _preview(p) -> str:
     return cut + "..."
 
 
-def cmd_query(args: argparse.Namespace) -> None:
+def query_config(args: argparse.Namespace):
+    """The RetrievalConfig a query runs with: the flags, or the shipped
+    defaults where none were given (falling back, and saying so, when the
+    default LLM is not configured). The web UI's web.SHIPPED must equal what
+    this returns with no flags (tests/test_web.py), so the two front ends
+    run the same row."""
     from meditations_rag import config
-    from meditations_rag.corpus.store import CorpusMissingError
-    from meditations_rag.index.vector_index import IndexCorruptError, IndexMissingError
     from meditations_rag.llm.base import LLMError
-    from meditations_rag.retrieve.pipeline import RetrievalConfig, run_query
-    from meditations_rag.llm import UnknownLLMError
-    from meditations_rag.retrieve.strategies import LLM_STRATEGIES, UnknownStrategyError
-    from meditations_rag.route import LLM_ROUTERS, UnknownRouterError
+    from meditations_rag.retrieve.pipeline import RetrievalConfig
+    from meditations_rag.retrieve.strategies import LLM_STRATEGIES
 
     if args.k <= 0:
         raise CLIError("--k must be positive")
@@ -416,14 +417,27 @@ def cmd_query(args: argparse.Namespace) -> None:
         reranker=args.reranker,
         k=args.k,
     )
-    if cfg.router in LLM_ROUTERS:
+    return cfg
+
+
+def cmd_query(args: argparse.Namespace) -> None:
+    from meditations_rag.corpus.store import CorpusMissingError
+    from meditations_rag.index.vector_index import IndexCorruptError, IndexMissingError
+    from meditations_rag.llm.base import LLMError
+    from meditations_rag.retrieve.pipeline import run_query
+    from meditations_rag.llm import UnknownLLMError
+    from meditations_rag.retrieve.strategies import UnknownStrategyError
+    from meditations_rag.route import UnknownRouterError
+
+    cfg = query_config(args)
+    def on_step(step: str, llm: str) -> None:
         # The round trip is the slow part of the query; say so rather than
-        # leave the user watching a silent cursor.
-        print(f"routing with {cfg.router}...", file=sys.stderr, flush=True)
-    if cfg.llm:
-        print(f"{cfg.strategy} with {cfg.llm}...", file=sys.stderr, flush=True)
+        # leave the user watching a silent cursor. Only when a call follows.
+        label = "routing" if step == "route" else step
+        print(f"{label} with {llm}...", file=sys.stderr, flush=True)
+
     try:
-        result = run_query(args.query, cfg)
+        result = run_query(args.query, cfg, on_step=on_step)
     except (CorpusMissingError, IndexMissingError, IndexCorruptError) as exc:
         raise CLIError(str(exc)) from None
     except LLMError as exc:  # no credentials for an LLM router: a setup error

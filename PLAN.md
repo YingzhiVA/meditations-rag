@@ -1818,7 +1818,7 @@ section that tells this is a Phase 5 item.
       The worked examples are fresh queries, one of them a loss, so none
       was picked from the set the default was chosen on. Also states the
       recall lower bound, the single rater and the prompt-injection bound.
-- [ ] `meditations` UX polish: pleasant passage rendering, `--all` paging,
+- [x] `meditations` UX polish: pleasant passage rendering, `--all` paging,
       config defaults set to the eval winner.
       **Defaults set (2026-10-14).** Strategy: `raw+hyde` on Apertus v1.5
       70B (end of Phase 4). Router: Apertus v1.5 70B
@@ -1845,6 +1845,13 @@ section that tells this is a Phase 5 item.
       (`tests/test_render.py`). Retrieval is unchanged: the passages are
       shown either way. Prompted by the fresh-query check, where the hedge
       fired on a real problem.
+      **Status lines fixed (2026-10-16).** `run_query` takes an `on_step`
+      callback, fired right before a step that will call an LLM (routing,
+      then the strategy), and only then; the router's `needs_call()` is the
+      same check its greeting shortcut uses. The CLI prints from it, so
+      chitchat, a declined language and a non-problem print no status line
+      (`tests/test_strategies.py`). `--all` prints every passage in full;
+      no pager was added, since five passages fit a terminal scroll.
 - [ ] Repo hygiene: license note (Gutenberg text is public domain; state the
       edition and translator), reproducibility instructions, key setup
       (`CSCS_INFERENCE_API_KEY` for the shipped path; `HF_TOKEN` only to

@@ -90,13 +90,14 @@ REFERRAL: dict[SafetyFlag, str] = {
         "If you are thinking about harming yourself or ending your life, please "
         "reach out now to someone who can help: a crisis line in your country "
         "(in the US, call or text 988; in the UK and Ireland, Samaritans on 116 "
-        "123; in Switzerland, 143), your local emergency number, or someone you "
-        "trust. This tool is a book of ancient reflections and is not the right "
+        "123; in Switzerland, 143), your local emergency number (112 across "
+        "Europe, 911 in North America), or someone you trust. This tool is a book of ancient reflections and is not the right "
         "place for this moment, so it will not offer a passage here."
     ),
     SafetyFlag.MEDICAL_EMERGENCY: (
         "This sounds like it may be a medical emergency. Please contact your "
-        "local emergency number or a doctor now — this tool cannot help with "
+        "local emergency number (112 across Europe, 911 in North America) or a "
+        "doctor now — this tool cannot help with "
         "physical symptoms and will not offer a passage in their place."
     ),
     SafetyFlag.ABUSE: (
@@ -118,6 +119,16 @@ REFERRAL: dict[SafetyFlag, str] = {
         "group such as AA or NA. A book cannot do what they can."
     ),
 }
+
+# Shown once after the referrals, whatever the flags (Phase 5, "Referral text
+# reviewed for strangers"): the public may be in any country, and the numbers
+# above cover only a few. Once, not per referral, because flags co-occur. Left
+# out when the input was declined (LANGUAGE_DECLINE already carries it) and
+# for MEDICAL_EMERGENCY alone (render.blocks).
+HELPLINE_DIRECTORY = (
+    "Wherever you are, findahelpline.com lists free, confidential helplines "
+    "in over 175 countries."
+)
 
 # Most serious first: when flags co-occur, this is the order their
 # referrals are owed in.

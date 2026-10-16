@@ -1,0 +1,11 @@
+# The versions every result was measured with (data/index/bge-base/meta.json
+# stamps torch, sentence-transformers and numpy). Pinned so the query
+# embedding matches the passage embeddings it is compared with.
+torch==2.14.0
+sentence-transformers==6.0.1
+numpy==2.5.3
+transformers==5.16.1
+gradio==6.30.0
+lingua-language-detector==2.2.0
+httpx==0.28.1
+huggingface-hub==1.30.0

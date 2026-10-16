@@ -38,6 +38,16 @@ from meditations_rag.llm.base import (
 USER_AGENT = "meditations-rag/0.1 (retrieval eval over Marcus Aurelius' Meditations)"
 
 
+def _same_model(served: str, requested: str) -> bool:
+    """Whether the provider served the model asked for. Case and the org
+    prefix are ignored (an endpoint may report "Apertus-v1.5-70B" for
+    "swiss-ai/Apertus-v1.5-70B"); a different model is not. A provider that
+    reports no model is accepted, and the CallRecord says so."""
+    def norm(m: str) -> str:
+        return m.rsplit("/", 1)[-1].lower()
+    return norm(served) == norm(requested)
+
+
 class GatewayClient(ChatJSONClient):
     """An LLMClient backed by one of config.GATEWAYS."""
 
@@ -118,7 +128,7 @@ class GatewayClient(ChatJSONClient):
             call.done(text, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0),
                       json_path, served_model=served,
                       fingerprint=data.get("system_fingerprint"))
-        if served != self._model:
+        if served is not None and not _same_model(served, self._model):
             # Recorded above (the CallRecord shows what really answered), then
             # refused: see the module docstring. ProviderDown, so the
             # prompt-JSON path does not retry into the same substitution.

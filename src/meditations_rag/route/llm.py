@@ -161,10 +161,15 @@ class LLMRouter:
     def prompt_version(self) -> str:
         return PROMPT_VERSION
 
+    def needs_call(self, problem: str) -> bool:
+        """Whether route() will ask the LLM: not for an empty message or an
+        exact chitchat match, which the keyword router settles for free."""
+        text = normalise(problem)
+        return bool(text) and text not in CHITCHAT
+
     def route(self, problem: str) -> RouteDecision:
         floor = safety_flags(problem)
-        text = normalise(problem)
-        if not text or text in CHITCHAT:
+        if not self.needs_call(problem):
             return self._fallback.route(problem)
         try:
             out = self._client.complete_json(SYSTEM, user_message(problem), SCHEMA)

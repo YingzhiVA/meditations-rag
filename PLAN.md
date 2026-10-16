@@ -1747,13 +1747,120 @@ section that tells this is a Phase 5 item.
 
 ## Phase 5 — Benchmark, polish, web UI & writeup (~3–4 days)
 
-- [ ] README results section: the matrix, the router table, 2–3 worked examples
+- [x] **Fresh-query check (Risk 5)**, the independent test of everything
+      Phase 4 read off its own sets: the `raw+hyde` default, the 0.43
+      no-match threshold, the language guard's ratio, the floor's
+      passive-ideation phrasings. `eval/fresh.py`: I write
+      `eval/fresh_set.jsonl` (~10 problem statements, plus a few
+      out-of-scope, safety and non-English inputs, each with its
+      expectation) before anything runs on them. Every entry goes through
+      the shipped path and is scored on its expectations and the hedge; the
+      problem statements are scored by blind dead@2, the Phase 4 top-2
+      layer's method, over `raw`, the shipped `raw+hyde@apertus-v15-70b`
+      and `raw+llm:claude` (the second candidate; ~10 Claude calls, under
+      $0.10, approved 2026-10-14). Report: `eval/results/phase-5-fresh.md`.
+
+      **Naming (2026-10-15):** the README and the web page call these ten
+      the **test set** and the 20 hard golden queries the **validation
+      set**; the entries below keep "fresh" and "hard" as written.
+
+      **Run (2026-10-15), on ten problem statements.** The out-of-scope,
+      safety and non-English extras are left to a future iteration, so the
+      language ratio and the floor's passive-ideation phrasings still have
+      no independent test.
+
+      | config | dead@2 (fresh) | dead@2 (Phase 4 hard) | dead first passage |
+      |---|---|---|---|
+      | `raw` | 35% (7/20) | 48% | 4/10 |
+      | `raw+hyde@apertus-v15-70b` (shipped) | 15% (3/20), p ~ 0.27 | 22% | 0/10 |
+      | `raw+llm:claude` | **0% (0/20)**, p ~ 0.01 | 15% | 0/10 |
+
+      - **The default holds.** Same order as Phase 4, at about the same
+        size, on queries nothing was tuned on; ten queries alone cannot
+        make it significant, but the direction is no longer from one set.
+        Per query against raw, HyDE fixed five (the sister, the finance
+        degree, the cool kid, the estranged family, where raw's top two
+        were both dead, the trapped manager), broke two (job rejections,
+        the promotion), tied three. The shipped path's top 2 equals its
+        matrix row on all ten: the LLM router raised no flag the keyword
+        router did not.
+      - **`raw+llm:claude` is the cleanest top 2 again**, the only
+        difference from raw that is significant here. It is not shipped,
+        and was never a candidate: the project is built for Hack Apertus,
+        to run on Apertus, and Claude is the comparator. Its
+        prompt is close to the blind sheet's rule (help for this reader,
+        obliquely included), so it optimises nearly what dead@2 measures.
+      - **The router was right on all ten**: `in_scope`, no false flag,
+        none declined, ~2.0 s p50 with the router.
+      - **The no-match threshold failed its test.** "I've been looking for
+        a job for half a year and all I ever get are rejections" scores
+        0.416 and is hedged; "…I feel so trapped" scores 0.435. Phase 4's
+        lowest in-scope was 0.459, and "linked list" scores 0.419, so no
+        threshold separates real problems from the trivially off-topic.
+        Not re-tuned on these numbers; the hedge's wording was changed
+        instead (UX polish, below).
+      - **Both LLM rows concentrate:** 10.32, 4.26 and 5.36 each fill
+        three of the shipped row's twenty top-2 slots (each struck at most
+        once). A reader trying several messages will meet them again.
+      - **The HyDE completion is not reproducible live.** The CLI calls
+        CSCS uncached, and Apertus v1.5 70B at temperature 0 words its
+        HyDE passage slightly differently from call to call: two CLI runs
+        of the job-rejection message gave two different top 5s, one of
+        them the eval's (2026-10-15). So every dead@2 above is one sample
+        per query, and the public draws a fresh one each time. How much
+        dead@2 moves between samples is unmeasured (~3 HyDE calls per
+        query and a small extra sheet; after the delivery).
+- [x] README results section: the matrix, the router table, 2–3 worked examples
       (query → baseline vs tuned pipeline), cost notes. (The ANN crossover
       moved to Phase 7.)
-- [ ] `meditations` UX polish: pleasant passage rendering, `--all` paging,
+      **Written (2026-10-15).** Headline: dead@2 48% → 22% on the hard
+      golden queries, recall@5 75% → 80%, and 35% → 15% on the fresh ones.
+      The worked examples are fresh queries, one of them a loss, so none
+      was picked from the set the default was chosen on. Also states the
+      recall lower bound, the single rater and the prompt-injection bound.
+- [x] `meditations` UX polish: pleasant passage rendering, `--all` paging,
       config defaults set to the eval winner.
-- [ ] Repo hygiene: license note (Gutenberg text is public domain; state the
-      edition and translator), reproducibility instructions, `HF_TOKEN` setup.
+      **Defaults set (2026-10-14).** Strategy: `raw+hyde` on Apertus v1.5
+      70B (end of Phase 4). Router: Apertus v1.5 70B
+      (`config.DEFAULT_ROUTER`), the only router that sends anything out of
+      scope: 16 of 18 out-of-scope questions caught, 15 of 16 in-scope kept,
+      every safety flag caught with the keyword floor beneath, ~0.3 s
+      (`eval/results/phase-4-floor-fix.md`). `BASELINE_ROUTER = "keyword"`
+      keeps the eval's retrieval rows from making router calls. Without a
+      CSCS key the CLI's defaults fall back to keyword routing and the raw
+      query and say so; on an outage the router falls back to keyword with
+      the floor intact. Known miss, left as measured: "What does Marcus say
+      about the afterlife?" routes `meta` and gets the tool's description.
+      A deterministic override (keep `in_scope` when the keyword router's
+      content-question pattern matches) would fix it by spec; it would need
+      its own router row first. Still to do here: the CLI's "routing
+      with…" and "raw+hyde with…" status lines print even when no call
+      follows (chitchat, a declined language).
+      **The no-match hedge is a quality warning, up front (2026-10-15).**
+      It said "Marcus may be silent on this", and it *replaced* the framing
+      line, so a weakly matching abuse message lost rule 4's "not as counsel
+      on what you should put up with". It now says the match is weaker than
+      usual and the passages may not speak closely to the situation, comes
+      first, and the framing line follows it under any flag
+      (`tests/test_render.py`). Retrieval is unchanged: the passages are
+      shown either way. Prompted by the fresh-query check, where the hedge
+      fired on a real problem.
+      **Status lines fixed (2026-10-16).** `run_query` takes an `on_step`
+      callback, fired right before a step that will call an LLM (routing,
+      then the strategy), and only then; the router's `needs_call()` is the
+      same check its greeting shortcut uses. The CLI prints from it, so
+      chitchat, a declined language and a non-problem print no status line
+      (`tests/test_strategies.py`). `--all` prints every passage in full;
+      no pager was added, since five passages fit a terminal scroll.
+- [x] Repo hygiene: license note (Gutenberg text is public domain; state the
+      edition and translator), reproducibility instructions, key setup
+      (`CSCS_INFERENCE_API_KEY` for the shipped path; `HF_TOKEN` only to
+      reproduce the 2509 rows).
+      **Done (2026-10-16).** Code under Apache-2.0 (`LICENSE`, as the
+      Hack Apertus submission); the README states the edition, translator
+      and public-domain status, the keys (`.env.example`, rewritten: the
+      `LLM_*` endpoint first, CSCS, then the eval-only keys), and the
+      reproducibility path (`make test`, `make eval`).
 
 ### Web UI: public, for showcase and outside testing
 
@@ -1764,58 +1871,174 @@ guard, so a non-English crisis disclosure is declined rather than served.
 Opening it to the public changes what the rest of the plan has to guarantee.
 The items below are that list.
 
-- [ ] **Extract the rendering contract** from `cli.py` into `render.py`: the
+**The Space was dropped (2026-10-15).** Free HF accounts can no longer
+create a CPU basic Space (only ZeroGPU, which constrains Python and torch
+and is built for GPU work), and HF answers 402 to a downgrade. The
+deployable form is a Docker image instead (`make run`, below), which is also
+what the Hack Apertus submission required. The paragraph below is the plan
+as it stood.
+
+**The LLM runs on CSCS, not HF (2026-10-14).** The Space only hosts Gradio
+and the CPU embedding; every LLM call goes from it to CSCS's public gateway
+(`api.inference.cscs.ch`, reachable from outside CSCS: `401` without a key).
+The Hack Apertus key may serve public traffic, but it is shared research
+capacity, so usage has to be **extremely** sparing, and the key may be
+revoked some time after the hackathon. Two consequences for the items below:
+the cap counts calls, not dollars (CSCS bills node hours, so the `$/query`
+column is blank and a dollar cap would never trip), and a revoked key is an
+expected state of the deployment, not an incident.
+
+- [x] **Extract the rendering contract** from `cli.py` into `render.py`: the
       *decisions* (referral first, the framing line under a flag, the
       withheld count, the intent replies) come back as structured blocks, and
       the CLI and the web UI only format them. Two front ends that each
       re-implement rule 3 will drift, and the one that drifts is the public
       one. **Test invariant:** for every flag combination, the referral block
-      comes first and no withheld id or reason appears outside debug output.
+      comes first, the framing line survives the no-match hedge, and no
+      withheld id or reason appears outside debug output.
       A leak here is silent and a product violation, so it meets the Phase 2
       bar for a test.
-- [ ] **Web front end**: Gradio on a HuggingFace Space. The Space holds
-      `HF_TOKEN` as a secret, the free CPU tier is enough for one query
-      embedding plus a 487-row matmul, Gradio's queue gives a concurrency
-      limit for free, and it keeps the Apertus/HF thread running through the
-      project. It calls `run_query` and nothing else: pipeline config ==
+      **Done (2026-10-15).** `render.blocks()` returns the decisions in
+      order; `cli.render_result` and `web.py` only format them. The CLI's
+      output is unchanged: 24,576 synthetic results (every intent, up to
+      two flags, hedge, withheld, fallbacks, declined, four display modes)
+      render byte-identical before and after. `tests/test_render.py` runs
+      the invariants over all 32 flag sets, and fails when either a
+      withheld id or flagged search text is let through on purpose.
+- [x] **Web front end**: Gradio on a HuggingFace Space. The Space holds
+      `CSCS_INFERENCE_API_KEY` as a secret (a Space secret is an environment
+      variable, and `_load_dotenv` never overrides one), the free CPU tier is
+      enough for one query embedding plus a 487-row matmul, and Gradio's
+      queue gives a concurrency limit for free: one LLM-backed query at a
+      time. It calls `run_query` and nothing else: pipeline config ==
       experiment config, so the public sees exactly the row the matrix
       scored. Ship `passages.jsonl` and the index built by the same code, so a
       cold start never hits Gutenberg, and install the CPU torch wheel, not
       the 2.5 GB CUDA build.
-- [ ] **"Compare with baseline"**: the Phase 5 worked examples, live. The
+      **Built, runs locally (2026-10-15)**: `src/meditations_rag/web.py`,
+      `python app.py`; Gradio is the `web` extra. Not yet deployed.
+      **Deployed as a Docker image instead (2026-10-16).** `make run` builds
+      a CPU-only image (Python 3.14, `constraints.txt` pinned to the index's
+      stamp, bge-base baked in, the Hub offline at runtime) and serves the
+      page on :7860; `make test` and `make eval` run in the same image. A
+      local build reuses `data/`; from a clean checkout the image runs
+      `meditations ingest` and `index` itself, and that CPU-built index
+      reproduces the recorded top 5 on 20/20 validation queries (max cosine
+      difference 0.00005). Backported from the Hack Apertus submission
+      repo: the endpoint can come as `LLM_NAME` / `LLM_BASE_URL` /
+      `LLM_API_KEY` (registry `apertus-endpoint`, the default when all three
+      are set; the eval scripts name `config.MEASURED_LLM`, so no recorded
+      row moves), a cached eval run needs no key (`llm._Offline` stands in
+      for a client whose key is missing, so only a cache miss fails), the
+      served-model check ignores case and org prefix, and the privacy notice
+      names the configured endpoint.
+- [x] **"Compare with baseline"**: the Phase 5 worked examples, live. The
       `raw` row makes no LLM call, so a side-by-side with the tuned pipeline
-      costs one extra embedding.
-- [ ] **Spend cap**: a daily LLM budget, read from the `$/query` accounting
-      Phase 3 already built. Past the cap, the Space runs in outage mode:
-      keyword router and `raw`, English only, non-English refused. That is the
-      same "degrade, and say so" path as Risk 1, so running out of budget
-      needs no new behaviour, only a new trigger. Plus a per-session rate
-      limit.
-- [ ] **Privacy**: people will describe abuse and crisis in this box. By
+      costs one extra embedding. **Built:** the baseline replays the
+      shipped router's decision (`web._Replay`) rather than routing again,
+      so both columns share the referral, the flags and the suppression,
+      and only the search differs.
+- [x] **X-ray mode** (added 2026-10-15): always on, in a narrower panel
+      beside the query box (capped in height, scrolling inside), describing
+      the main search, never the baseline. It shows what the pipeline did: language, routing, flags, search, the message's best
+      cosine against the hedge threshold, each passage's score, every LLM
+      call (model served, latency, tokens; never text), and the HyDE
+      passage Apertus wrote, labelled as machine-written search input, not
+      advice. Not the CLI's `--debug`, which stays a developer tool. Two
+      things stay out, by decision: **withheld passages beyond their
+      count** (an id or a reason points a flagged reader to exactly what
+      the lists keep from them), and **the HyDE text under any safety
+      flag**, since no list reviews it. `render.xray()`, held to every
+      flag set by `tests/test_render.py`. LLM and corpus text are escaped
+      (Markdown and HTML), so an injected message cannot make the page
+      show a link or load an image.
+- [x] **Usage cap**: a global daily cap on CSCS calls, counted at the
+      gateway client (an in-scope query costs two: router and HyDE; chitchat,
+      `meta` and a declined language cost one or none), set low and raised
+      only if real use asks for it. Plus a per-session rate limit. Past the
+      cap, the Space runs in outage mode: keyword router and `raw`, English
+      only, non-English refused. That is the same "degrade, and say so" path
+      as Risk 1, so running out of budget needs no new behaviour, only a new
+      trigger. The counter lives in memory; a Space restart resets it, which
+      is acceptable at this scale and needs no storage.
+      **Built:** `config.WEB_DAILY_LLM_CALLS = 200` (~100 in-scope queries),
+      `WEB_SESSION_QUERIES_PER_HOUR = 10`, and messages over
+      `WEB_MAX_CHARS = 2000` are refused rather than sent. Unit-tested
+      (`tests/test_web.py`); the live trigger is for the deployed Space.
+      **Triggered on purpose (2026-10-16)**, with the new override
+      `MEDITATIONS_WEB_DAILY_LLM_CALLS=2`: the first query ran in full (two
+      live calls), the second came back in reduced mode with "resets in
+      15:34 (h:mm), at 00:00 UTC". The guard counts the calls it captures
+      per thread, and a completion-cache hit is not captured
+      (`llm/cache.py` extends `CALLS` directly), so on the cache the cap
+      would never trip; the page never runs on the cache, so it holds live.
+- [x] **Revoked key latches outage mode.** A `401`/`403` from CSCS switches
+      the Space to outage mode for the life of the process, so a dead key
+      costs one query's failed calls (router and HyDE), not two per query
+      forever, and the page says the
+      hackathon LLM access has ended and the demo now runs the keyword
+      router and `raw` (the matrix's baseline row). A transient error
+      (timeout, `5xx`) keeps the per-query fallback it has today.
+      **Triggered on purpose (2026-10-15)**, with a bogus key on a local
+      run: the first query fell back to keyword and `raw` and said so; the
+      second ran in reduced mode with no LLM attempt.
+- [x] **Privacy**: people will describe abuse and crisis in this box. By
       default the Space **stores no query text**. Tracing stays off in the
       deployment (Phoenix spans carry the input verbatim), and logs record
       config, latency and flags, not the input. An upfront notice says the
-      query is sent to the LLM provider (Apertus via HF) and that this is not
-      a substitute for professional help.
-- [ ] **Referral text reviewed for strangers.** Until now only I have seen it.
+      query is sent to Apertus on CSCS, the Swiss National Supercomputing
+      Centre, which does not record prompts or responses, and that this is
+      not a substitute for professional help. **Built:** no flagging, no
+      analytics, `config.TRACING_ENABLED` forced off at launch; the notice
+      also links findahelpline.com.
+- [x] **Referral text reviewed for strangers.** Until now only I have seen it.
       The public cannot be assumed to be in any one country, so every
       referral also carries an international helpline directory, not only
       local numbers.
-- [ ] **Optional, opt-in feedback**: a per-result "this helped / this missed"
+      **Reviewed (2026-10-15).** One shared line,
+      `safety.HELPLINE_DIRECTORY` ("Wherever you are, findahelpline.com
+      lists free, confidential helplines in over 175 countries."), closes
+      the referrals once, not per referral, since flags co-occur. Left out
+      after a declined message (the decline carries it) and for a medical
+      emergency alone (the emergency number is the action). Self-harm and
+      medical emergency now also give 112 (Europe) and 911 (North
+      America). The other wording is unchanged. `tests/test_render.py`
+      checks the directory's placement over every flag set.
+- [ ] ~~**Optional, opt-in feedback**~~ **moved to Phase 7 (2026-10-15)**:
+      it needs consent wording and storage of query text, which is new
+      privacy surface a day before delivery. A per-result "this helped / this missed"
       that stores the query only with explicit consent. These are candidates
       for Risk 5's fresh queries, **never golden-set labels as they are**. They
       go through the same human verification as every other label, in their
       own commit.
 
-**Prompt injection is bounded by design.** In v1 no LLM text ever reaches the
-user; the LLM only routes and rewrites queries. So an injected query can at
-worst misroute itself, and for English the floor still runs beneath the
-router. Say this in the README rather than leaving it for someone to probe.
+**Prompt injection is bounded by design.** In v1 no LLM text reaches the
+user outside x-ray; the LLM only routes and rewrites queries. So an injected
+query can at worst misroute itself, and for English the floor still runs
+beneath the router. X-ray shows the HyDE text, so there an injected message
+can make Apertus write something back, but only to the person who typed it
+(nothing is stored or shared), escaped so it renders as plain text, and
+never under a safety flag. Say this in the README rather than leaving it
+for someone to probe.
 
-**Done when:** the README results section tells the X% → Y% story; the Space is public and serves the eval-winner config; a query
+**Done when:** the README results section tells the X% → Y% story; ~~the Space is public and serves the eval-winner config~~ `make run`
+from a clean checkout serves the eval-winner config (the Space was dropped,
+2026-10-15); a query
 through the web UI returns the same `QueryResult` as the CLI for the same
-config; and the spend cap and the outage path have both been triggered on
-purpose and seen to degrade as specified.
+config and the same LLM completions (live completions vary between calls,
+see the fresh-query check, so the comparison runs both from the cache); and the usage cap, the outage path and a revoked key (a bogus key,
+on purpose) have each been triggered and seen to degrade as specified.
+
+**Met (2026-10-16).** The README results section tells 48% → 22% (dead@2,
+validation) and 35% → 15% (test). `make run` serves `raw+hyde` on Apertus
+v1.5 70B, built from a clean checkout, and its index reproduces the eval.
+Same `QueryResult`: `cli.query_config` with no flags equals `web.SHIPPED`
+(`tests/test_web.py`), and the ten test queries through the CLI's path and
+the page's `App._run` gave identical results, all forty completions from
+the cache. The cap: today, above. The outage path and a revoked key: with
+a bogus key on 2026-10-15 (first query fell back and said so, the second
+ran in reduced mode with no LLM attempt), and reduced mode with no key in
+the image.
 
 ## Phase 6 — Multilingual queries, German first (~2–3 days, mostly curation)
 
@@ -1888,6 +2111,11 @@ That is the scaling argument against keyword lists, stated as work.
   query rewriting pays off properly** — resolving "what about when it's my
   manager?" into a standalone query is the task rewriting was invented for; in
   v1 it only gets to do half its job.
+- Opt-in web feedback ("this helped / this missed"), moved from Phase 5 on
+  2026-10-15: stores a query only with explicit consent, as candidates for
+  fresh-query checks, never as labels without human verification.
+- HyDE sample variance: how much dead@2 moves between live HyDE samples
+  (Phase 5, fresh-query check).
 
 **Moved here from Phases 4 and 5 (2026-10-13).** The project ships as a
 hackathon artifact on 2026-10-16, polished and with the web UI, so work that
@@ -1952,10 +2180,11 @@ none of it needs re-planning:
 | LLM — default path | Apertus v1.5 70B on CSCS (`config.DEFAULT_LLM = "apertus-v15-70b"`; free to this project through Hack Apertus, but shared capacity). Router calls are tiny; HyDE/multi-query are ~1 short completion per query. Requires `CSCS_INFERENCE_API_KEY`. The 2509 rows run via HF Inference (`HF_TOKEN`; the 70B on featherless-ai). |
 | LLM — comparator | `claude-sonnet-5` ($2/$10 per MTok), scoped to comparator eval runs, not every query. A full golden-set pass is cents. |
 | Telemetry | Phoenix runs locally. Free. |
-| Hosting (Phase 5) | HuggingFace Space, free CPU tier. LLM spend bounded by the daily cap; past it the Space runs keyword + `raw` for free. |
+| Hosting (Phase 5) | A CPU-only Docker image (`make run`; the HF Space was dropped, 2026-10-15); LLM calls go to the configured Apertus endpoint, CSCS as measured. Usage bounded by a daily call cap; past it, or once the key is revoked, the page runs keyword + `raw` with no LLM calls. |
 
-Worst case for a full grid run is bounded by the HF side, not the Anthropic
-side — the comparator column is the smaller half of the bill.
+Only the comparator column costs money: the default path runs on CSCS, which
+costs shared capacity, not dollars, and the 2509 rows on HF are cached. A full
+grid rerun is cents, and nearly free from the completion cache.
 
 ## Key risks
 
@@ -2045,6 +2274,8 @@ side — the comparator column is the smaller half of the bill.
 5. **Overfitting to the golden set** — at ~40 queries a held-out split is too
    small to be informative and costs a fifth of the development signal.
    Instead, sanity-check the Phase 5 winner on ~10 genuinely fresh queries.
+   **Done (2026-10-15)**: the default held; the no-match threshold did not
+   (Phase 5, "Fresh-query check").
 6. **Telemetry scope creep.** Keep tracing optional, no-op when disabled, and
    confined behind `telemetry.py`. `run_eval.py` stays authoritative for
    quality; Phoenix is observability only.

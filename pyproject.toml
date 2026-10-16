@@ -3,6 +3,7 @@ name = "meditations-rag"
 version = "0.1.0"
 description = "Retrieval engine over Marcus Aurelius' Meditations — advanced-RAG practice project"
 requires-python = ">=3.10"
+license = "Apache-2.0"
 # Dependencies stay commented until the phase that needs them (see PLAN.md),
 # so the scaffold installs with zero deps and each phase's footprint is explicit.
 dependencies = [
@@ -30,6 +31,9 @@ dev = [
     "pytest",                   # Phase 1: parser invariant tests
     "arize-phoenix",            # Phase 3: local trace UI — dev tool, not runtime
     # "hnswlib",                # Phase 5: bench/ann_scaling.py only
+]
+web = [
+    "gradio",                   # Phase 5: the public web UI (web.py, app.py)
 ]
 
 [project.scripts]

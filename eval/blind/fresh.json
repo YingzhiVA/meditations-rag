@@ -1,0 +1,214 @@
+{
+ "F001": {
+  "query": "I can't help but think that my parents prefer my sister to me. Sometimes I caught myself wishing I was more like her.",
+  "passage_id": "6.12"
+ },
+ "F002": {
+  "query": "I can't help but think that my parents prefer my sister to me. Sometimes I caught myself wishing I was more like her.",
+  "passage_id": "10.32"
+ },
+ "F003": {
+  "query": "I can't help but think that my parents prefer my sister to me. Sometimes I caught myself wishing I was more like her.",
+  "passage_id": "5.5"
+ },
+ "F004": {
+  "query": "I can't help but think that my parents prefer my sister to me. Sometimes I caught myself wishing I was more like her.",
+  "passage_id": "5.25"
+ },
+ "F005": {
+  "query": "I can't help but think that my parents prefer my sister to me. Sometimes I caught myself wishing I was more like her.",
+  "passage_id": "7.27"
+ },
+ "F006": {
+  "query": "I enrolled in the university studying finance because my parents thought it would be a good career choice. But I'm not sure if it's what I really want. Actually, I don't really know what I want.",
+  "passage_id": "11.39"
+ },
+ "F007": {
+  "query": "I enrolled in the university studying finance because my parents thought it would be a good career choice. But I'm not sure if it's what I really want. Actually, I don't really know what I want.",
+  "passage_id": "4.26"
+ },
+ "F008": {
+  "query": "I enrolled in the university studying finance because my parents thought it would be a good career choice. But I'm not sure if it's what I really want. Actually, I don't really know what I want.",
+  "passage_id": "7.5"
+ },
+ "F009": {
+  "query": "I enrolled in the university studying finance because my parents thought it would be a good career choice. But I'm not sure if it's what I really want. Actually, I don't really know what I want.",
+  "passage_id": "5.12"
+ },
+ "F010": {
+  "query": "I enrolled in the university studying finance because my parents thought it would be a good career choice. But I'm not sure if it's what I really want. Actually, I don't really know what I want.",
+  "passage_id": "6.44"
+ },
+ "F011": {
+  "query": "I enrolled in the university studying finance because my parents thought it would be a good career choice. But I'm not sure if it's what I really want. Actually, I don't really know what I want.",
+  "passage_id": "5.36"
+ },
+ "F012": {
+  "query": "I so much want the cool kid at school to like me that I just suck up to her all the time. It's pathetic.",
+  "passage_id": "8.1"
+ },
+ "F013": {
+  "query": "I so much want the cool kid at school to like me that I just suck up to her all the time. It's pathetic.",
+  "passage_id": "5.5"
+ },
+ "F014": {
+  "query": "I so much want the cool kid at school to like me that I just suck up to her all the time. It's pathetic.",
+  "passage_id": "5.36"
+ },
+ "F015": {
+  "query": "I so much want the cool kid at school to like me that I just suck up to her all the time. It's pathetic.",
+  "passage_id": "9.42"
+ },
+ "F016": {
+  "query": "I so much want the cool kid at school to like me that I just suck up to her all the time. It's pathetic.",
+  "passage_id": "6.16"
+ },
+ "F017": {
+  "query": "I've been looking for a job for half a year and all I ever get are rejections.",
+  "passage_id": "9.23"
+ },
+ "F018": {
+  "query": "I've been looking for a job for half a year and all I ever get are rejections.",
+  "passage_id": "4.26"
+ },
+ "F019": {
+  "query": "I've been looking for a job for half a year and all I ever get are rejections.",
+  "passage_id": "5.23"
+ },
+ "F020": {
+  "query": "I've been looking for a job for half a year and all I ever get are rejections.",
+  "passage_id": "7.58"
+ },
+ "F021": {
+  "query": "I've been looking for a job for half a year and all I ever get are rejections.",
+  "passage_id": "7.27"
+ },
+ "F022": {
+  "query": "I've been looking for a job for half a year and all I ever get are rejections.",
+  "passage_id": "6.50"
+ },
+ "F023": {
+  "query": "I saw my neighbours with their children and grandchildren the other day. They were so blissful together. I regret that I enstranged myself from my family and I wish I could go back in time to fix things.",
+  "passage_id": "9.21"
+ },
+ "F024": {
+  "query": "I saw my neighbours with their children and grandchildren the other day. They were so blissful together. I regret that I enstranged myself from my family and I wish I could go back in time to fix things.",
+  "passage_id": "5.31"
+ },
+ "F025": {
+  "query": "I saw my neighbours with their children and grandchildren the other day. They were so blissful together. I regret that I enstranged myself from my family and I wish I could go back in time to fix things.",
+  "passage_id": "8.47"
+ },
+ "F026": {
+  "query": "I saw my neighbours with their children and grandchildren the other day. They were so blissful together. I regret that I enstranged myself from my family and I wish I could go back in time to fix things.",
+  "passage_id": "7.22"
+ },
+ "F027": {
+  "query": "I saw my neighbours with their children and grandchildren the other day. They were so blissful together. I regret that I enstranged myself from my family and I wish I could go back in time to fix things.",
+  "passage_id": "8.36"
+ },
+ "F028": {
+  "query": "I saw my neighbours with their children and grandchildren the other day. They were so blissful together. I regret that I enstranged myself from my family and I wish I could go back in time to fix things.",
+  "passage_id": "4.26"
+ },
+ "F029": {
+  "query": "I regret my choice on being a parent. I really don't think I'm suited for it. I do like my children, but I'm not sure I love them as a parent should.",
+  "passage_id": "6.12"
+ },
+ "F030": {
+  "query": "I regret my choice on being a parent. I really don't think I'm suited for it. I do like my children, but I'm not sure I love them as a parent should.",
+  "passage_id": "4.49"
+ },
+ "F031": {
+  "query": "I regret my choice on being a parent. I really don't think I'm suited for it. I do like my children, but I'm not sure I love them as a parent should.",
+  "passage_id": "5.3"
+ },
+ "F032": {
+  "query": "I regret my choice on being a parent. I really don't think I'm suited for it. I do like my children, but I'm not sure I love them as a parent should.",
+  "passage_id": "8.47"
+ },
+ "F033": {
+  "query": "I regret my choice on being a parent. I really don't think I'm suited for it. I do like my children, but I'm not sure I love them as a parent should.",
+  "passage_id": "5.36"
+ },
+ "F034": {
+  "query": "I feel very insecure in my relationship. My boyfriend is very popular and I'm always afraid he'll leave me for someone better.",
+  "passage_id": "12.4"
+ },
+ "F035": {
+  "query": "I feel very insecure in my relationship. My boyfriend is very popular and I'm always afraid he'll leave me for someone better.",
+  "passage_id": "6.16"
+ },
+ "F036": {
+  "query": "I feel very insecure in my relationship. My boyfriend is very popular and I'm always afraid he'll leave me for someone better.",
+  "passage_id": "6.51"
+ },
+ "F037": {
+  "query": "I feel very insecure in my relationship. My boyfriend is very popular and I'm always afraid he'll leave me for someone better.",
+  "passage_id": "5.5"
+ },
+ "F038": {
+  "query": "I feel very insecure in my relationship. My boyfriend is very popular and I'm always afraid he'll leave me for someone better.",
+  "passage_id": "10.32"
+ },
+ "F039": {
+  "query": "I've been a regulatory affair manager for 10 years and frankly, I hate this job and I don't give a damn at all. But I don't have other skills to land a different job and I feel so trapped.",
+  "passage_id": "5.9"
+ },
+ "F040": {
+  "query": "I've been a regulatory affair manager for 10 years and frankly, I hate this job and I don't give a damn at all. But I don't have other skills to land a different job and I feel so trapped.",
+  "passage_id": "9.32"
+ },
+ "F041": {
+  "query": "I've been a regulatory affair manager for 10 years and frankly, I hate this job and I don't give a damn at all. But I don't have other skills to land a different job and I feel so trapped.",
+  "passage_id": "8.47"
+ },
+ "F042": {
+  "query": "I've been a regulatory affair manager for 10 years and frankly, I hate this job and I don't give a damn at all. But I don't have other skills to land a different job and I feel so trapped.",
+  "passage_id": "9.31"
+ },
+ "F043": {
+  "query": "I've been a regulatory affair manager for 10 years and frankly, I hate this job and I don't give a damn at all. But I don't have other skills to land a different job and I feel so trapped.",
+  "passage_id": "2.2"
+ },
+ "F044": {
+  "query": "I've been a regulatory affair manager for 10 years and frankly, I hate this job and I don't give a damn at all. But I don't have other skills to land a different job and I feel so trapped.",
+  "passage_id": "9.21"
+ },
+ "F045": {
+  "query": "My PhD thesis is going no where and sometimes I think I just don't have what it takes and that I'm just not good enough.",
+  "passage_id": "7.27"
+ },
+ "F046": {
+  "query": "My PhD thesis is going no where and sometimes I think I just don't have what it takes and that I'm just not good enough.",
+  "passage_id": "10.12"
+ },
+ "F047": {
+  "query": "My PhD thesis is going no where and sometimes I think I just don't have what it takes and that I'm just not good enough.",
+  "passage_id": "5.36"
+ },
+ "F048": {
+  "query": "My PhD thesis is going no where and sometimes I think I just don't have what it takes and that I'm just not good enough.",
+  "passage_id": "8.1"
+ },
+ "F049": {
+  "query": "My PhD thesis is going no where and sometimes I think I just don't have what it takes and that I'm just not good enough.",
+  "passage_id": "5.5"
+ },
+ "F050": {
+  "query": "I'm promoted to a higher position, but I suspect it's only because I'm a woman. I'm afraid I'm just there for the diversity and people know it.",
+  "passage_id": "7.15"
+ },
+ "F051": {
+  "query": "I'm promoted to a higher position, but I suspect it's only because I'm a woman. I'm afraid I'm just there for the diversity and people know it.",
+  "passage_id": "10.32"
+ },
+ "F052": {
+  "query": "I'm promoted to a higher position, but I suspect it's only because I'm a woman. I'm afraid I'm just there for the diversity and people know it.",
+  "passage_id": "7.13"
+ },
+ "F053": {
+  "query": "I'm promoted to a higher position, but I suspect it's only because I'm a woman. I'm afraid I'm just there for the diversity and people know it.",
+  "passage_id": "8.44"
+ }
+}

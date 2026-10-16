@@ -722,8 +722,8 @@ def render_no_match(records: list[dict], intents: dict[str, str]) -> str:
     L = ["## No-match threshold", "",
          f"*config.MIN_SCORE_THRESHOLD = {config.MIN_SCORE_THRESHOLD}, on the cosine of the "
          "best match of the message as typed (max cosine between the message and any "
-         "passage). Fired = \"No strong match — Marcus may be silent on this\" above the "
-         "nearest passages (they are still shown).*", ""]
+         "passage). Fired = the weak-match note (render.HEDGE_TEXT) above the nearest "
+         "passages (they are still shown).*", ""]
     rows = []
     for label in dict.fromkeys(r["config"] for r in records):
         rs = [r for r in records if r["config"] == label]

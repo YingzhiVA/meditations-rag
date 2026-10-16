@@ -1,4 +1,5 @@
-"""HuggingFace Space entry point: the public web UI (src/meditations_rag/web.py)."""
+"""Entry point for the web UI (src/meditations_rag/web.py): `python app.py`
+locally, or `make run`, which starts it in the Docker image."""
 
 import sys
 from pathlib import Path

@@ -1852,10 +1852,15 @@ section that tells this is a Phase 5 item.
       chitchat, a declined language and a non-problem print no status line
       (`tests/test_strategies.py`). `--all` prints every passage in full;
       no pager was added, since five passages fit a terminal scroll.
-- [ ] Repo hygiene: license note (Gutenberg text is public domain; state the
+- [x] Repo hygiene: license note (Gutenberg text is public domain; state the
       edition and translator), reproducibility instructions, key setup
       (`CSCS_INFERENCE_API_KEY` for the shipped path; `HF_TOKEN` only to
       reproduce the 2509 rows).
+      **Done (2026-10-16).** Code under Apache-2.0 (`LICENSE`, as the
+      Hack Apertus submission); the README states the edition, translator
+      and public-domain status, the keys (`.env.example`, rewritten: the
+      `LLM_*` endpoint first, CSCS, then the eval-only keys), and the
+      reproducibility path (`make test`, `make eval`).
 
 ### Web UI: public, for showcase and outside testing
 
@@ -1865,6 +1870,13 @@ winner, so the public sees the tuned pipeline, and after Phase 4's language
 guard, so a non-English crisis disclosure is declined rather than served.
 Opening it to the public changes what the rest of the plan has to guarantee.
 The items below are that list.
+
+**The Space was dropped (2026-10-15).** Free HF accounts can no longer
+create a CPU basic Space (only ZeroGPU, which constrains Python and torch
+and is built for GPU work), and HF answers 402 to a downgrade. The
+deployable form is a Docker image instead (`make run`, below), which is also
+what the Hack Apertus submission required. The paragraph below is the plan
+as it stood.
 
 **The LLM runs on CSCS, not HF (2026-10-14).** The Space only hosts Gradio
 and the CPU embedding; every LLM call goes from it to CSCS's public gateway
@@ -1893,7 +1905,7 @@ expected state of the deployment, not an incident.
       render byte-identical before and after. `tests/test_render.py` runs
       the invariants over all 32 flag sets, and fails when either a
       withheld id or flagged search text is let through on purpose.
-- [ ] **Web front end**: Gradio on a HuggingFace Space. The Space holds
+- [x] **Web front end**: Gradio on a HuggingFace Space. The Space holds
       `CSCS_INFERENCE_API_KEY` as a secret (a Space secret is an environment
       variable, and `_load_dotenv` never overrides one), the free CPU tier is
       enough for one query embedding plus a 487-row matmul, and Gradio's
@@ -1905,6 +1917,21 @@ expected state of the deployment, not an incident.
       the 2.5 GB CUDA build.
       **Built, runs locally (2026-10-15)**: `src/meditations_rag/web.py`,
       `python app.py`; Gradio is the `web` extra. Not yet deployed.
+      **Deployed as a Docker image instead (2026-10-16).** `make run` builds
+      a CPU-only image (Python 3.14, `constraints.txt` pinned to the index's
+      stamp, bge-base baked in, the Hub offline at runtime) and serves the
+      page on :7860; `make test` and `make eval` run in the same image. A
+      local build reuses `data/`; from a clean checkout the image runs
+      `meditations ingest` and `index` itself, and that CPU-built index
+      reproduces the recorded top 5 on 20/20 validation queries (max cosine
+      difference 0.00005). Backported from the Hack Apertus submission
+      repo: the endpoint can come as `LLM_NAME` / `LLM_BASE_URL` /
+      `LLM_API_KEY` (registry `apertus-endpoint`, the default when all three
+      are set; the eval scripts name `config.MEASURED_LLM`, so no recorded
+      row moves), a cached eval run needs no key (`llm._Offline` stands in
+      for a client whose key is missing, so only a cache miss fails), the
+      served-model check ignores case and org prefix, and the privacy notice
+      names the configured endpoint.
 - [x] **"Compare with baseline"**: the Phase 5 worked examples, live. The
       `raw` row makes no LLM call, so a side-by-side with the tuned pipeline
       costs one extra embedding. **Built:** the baseline replays the
@@ -1938,6 +1965,13 @@ expected state of the deployment, not an incident.
       `WEB_SESSION_QUERIES_PER_HOUR = 10`, and messages over
       `WEB_MAX_CHARS = 2000` are refused rather than sent. Unit-tested
       (`tests/test_web.py`); the live trigger is for the deployed Space.
+      **Triggered on purpose (2026-10-16)**, with the new override
+      `MEDITATIONS_WEB_DAILY_LLM_CALLS=2`: the first query ran in full (two
+      live calls), the second came back in reduced mode with "resets in
+      15:34 (h:mm), at 00:00 UTC". The guard counts the calls it captures
+      per thread, and a completion-cache hit is not captured
+      (`llm/cache.py` extends `CALLS` directly), so on the cache the cap
+      would never trip; the page never runs on the cache, so it holds live.
 - [x] **Revoked key latches outage mode.** A `401`/`403` from CSCS switches
       the Space to outage mode for the life of the process, so a dead key
       costs one query's failed calls (router and HyDE), not two per query
@@ -1987,11 +2021,24 @@ can make Apertus write something back, but only to the person who typed it
 never under a safety flag. Say this in the README rather than leaving it
 for someone to probe.
 
-**Done when:** the README results section tells the X% → Y% story; the Space is public and serves the eval-winner config; a query
+**Done when:** the README results section tells the X% → Y% story; ~~the Space is public and serves the eval-winner config~~ `make run`
+from a clean checkout serves the eval-winner config (the Space was dropped,
+2026-10-15); a query
 through the web UI returns the same `QueryResult` as the CLI for the same
 config and the same LLM completions (live completions vary between calls,
 see the fresh-query check, so the comparison runs both from the cache); and the usage cap, the outage path and a revoked key (a bogus key,
 on purpose) have each been triggered and seen to degrade as specified.
+
+**Met (2026-10-16).** The README results section tells 48% → 22% (dead@2,
+validation) and 35% → 15% (test). `make run` serves `raw+hyde` on Apertus
+v1.5 70B, built from a clean checkout, and its index reproduces the eval.
+Same `QueryResult`: `cli.query_config` with no flags equals `web.SHIPPED`
+(`tests/test_web.py`), and the ten test queries through the CLI's path and
+the page's `App._run` gave identical results, all forty completions from
+the cache. The cap: today, above. The outage path and a revoked key: with
+a bogus key on 2026-10-15 (first query fell back and said so, the second
+ran in reduced mode with no LLM attempt), and reduced mode with no key in
+the image.
 
 ## Phase 6 — Multilingual queries, German first (~2–3 days, mostly curation)
 
@@ -2133,7 +2180,7 @@ none of it needs re-planning:
 | LLM — default path | Apertus v1.5 70B on CSCS (`config.DEFAULT_LLM = "apertus-v15-70b"`; free to this project through Hack Apertus, but shared capacity). Router calls are tiny; HyDE/multi-query are ~1 short completion per query. Requires `CSCS_INFERENCE_API_KEY`. The 2509 rows run via HF Inference (`HF_TOKEN`; the 70B on featherless-ai). |
 | LLM — comparator | `claude-sonnet-5` ($2/$10 per MTok), scoped to comparator eval runs, not every query. A full golden-set pass is cents. |
 | Telemetry | Phoenix runs locally. Free. |
-| Hosting (Phase 5) | HuggingFace Space, free CPU tier; LLM calls go to CSCS. CSCS usage bounded by a daily call cap; past it, or once the hackathon key is revoked, the Space runs keyword + `raw` with no LLM calls. |
+| Hosting (Phase 5) | A CPU-only Docker image (`make run`; the HF Space was dropped, 2026-10-15); LLM calls go to the configured Apertus endpoint, CSCS as measured. Usage bounded by a daily call cap; past it, or once the key is revoked, the page runs keyword + `raw` with no LLM calls. |
 
 Only the comparator column costs money: the default path runs on CSCS, which
 costs shared capacity, not dollars, and the 2509 rows on HF are cached. A full

@@ -20,7 +20,10 @@ rigorous enough to say which of them actually helped and what each one cost.
 
 ## Status
 
-**Phases 0-4 done; Phase 5 (results, polish, a public web UI) in progress.**
+**Phases 0-5 done** (results, the web UI with x-ray, a Docker image); Phase 6,
+German and other languages, is next. Submitted to Hack Apertus (Track 2B,
+15 October 2026) from
+[YingzhiVA/meditations-Apertus-RAG](https://github.com/YingzhiVA/meditations-Apertus-RAG).
 The shipped pipeline: a language guard, then an LLM router (Apertus v1.5 70B
 on CSCS) above a keyword safety floor, then `raw+hyde` retrieval over
 `bge-base` (the message as typed, fused with a passage Apertus writes in
@@ -218,13 +221,14 @@ kept all ten problem statements `in_scope` with no false flag.
 ## Web UI
 
 ```sh
+make run                              # Docker: build and serve http://localhost:7860
+# or, without Docker:
 .venv/bin/python -m pip install -e ".[web]"
 .venv/bin/python app.py               # http://127.0.0.1:7860
 ```
 
-The same pipeline as the CLI, with the shipped defaults, built for a public
-HuggingFace Space (`app.py` is the Space's entry point). One option, and
-one panel that is always there:
+The same pipeline as the CLI, with the same configuration (a test holds the
+two equal). One option, and one panel that is always there:
 
 - **Compare with baseline**: the same message searched as typed, with no
   language model, beside the shipped result. It reuses the shipped router's
@@ -247,7 +251,21 @@ over 2,000 characters keep usage small. Past any cap, or after a `401` or
 search, and says so. The keyword safety floor runs either way.
 
 **Privacy.** The page stores and logs nothing you type, and tracing is
-off. Messages go to CSCS, which does not record prompts or responses.
+off. Messages go to CSCS, which does not record prompts or responses, or to
+whichever endpoint `LLM_BASE_URL` names; the page says which.
+
+**Docker.** `make run` builds a CPU-only image (Python 3.14, versions pinned
+in `constraints.txt` to those stamped in the index) with bge-base baked in
+and the HuggingFace Hub offline at runtime, so the only thing the container
+needs at runtime is the LLM endpoint: point it at a self-hosted Apertus and
+it runs on-premise or air-gapped. A local build reuses your `data/`; on a
+clean checkout the image downloads the text and builds the index itself,
+and that index reproduces the eval's top 5 on all 20 validation queries.
+`make test` runs the tests in the image; `make eval` reproduces the
+headline rows from the completion cache in `data/cache/llm` with no key
+(the cache is not tracked here; the submission repo ships it). Set
+`MEDITATIONS_WEB_DAILY_LLM_CALLS` or `MEDITATIONS_WEB_SESSION_QUERIES_PER_HOUR`
+to change the caps, e.g. to trigger reduced mode on purpose.
 
 ## Languages
 
@@ -266,7 +284,9 @@ path. See "The floor reads English only" in [PLAN.md](PLAN.md).
 Project Gutenberg [#55317](https://www.gutenberg.org/ebooks/55317) — *The
 Meditations of the Emperor Marcus Aurelius Antoninus*, translated by **George
 W. Chrystal** (1902), "a new rendering based on the Foulis translation of
-1742". Public domain.
+1742". Public domain; the parser strips Project Gutenberg's header and
+licence. The code in this repository is under the Apache License 2.0
+([LICENSE](LICENSE)).
 
 Chosen for its structure, verified against the file: 12 books, **487 sections**,
 numbering contiguous 1..N in every book, no footnotes, no bracket markers, no
@@ -333,11 +353,16 @@ src/meditations_rag/
   llm/hf.py              Apertus 2509 via HuggingFace Inference (the earlier rows)
   llm/cache.py           on-disk completion cache for eval runs
   llm/claude.py          Claude Sonnet — the eval comparator
+  render.py              the rendering contract shared by the CLI and the web UI
+  web.py                 the web UI (Gradio): compare, x-ray, usage guard
   cli.py                 `meditations` entry point
+app.py                   starts the web UI (locally, or in the Docker image)
+Dockerfile, docker-compose.yml, Makefile, constraints.txt
+                         `make run` / `make test` / `make eval`, CPU-only
 eval/                    golden set + router set + eval harness
 bench/ann_scaling.py     when does ANN start to pay? (stub; moved to Phase 7)
-tests/                   parser, index/embedder and router invariants
-data/                    (gitignored) raw text, passages, indexes
+tests/                   parser, index/embedder, router, rendering and web invariants
+data/                    (gitignored) raw text, passages, indexes, completion cache
 ```
 
 ## Setup
@@ -366,9 +391,13 @@ gitignored and loaded by `config.py`; rotating a key is then one edited line:
 cp .env.example .env    # then fill in the values
 ```
 
+- `LLM_NAME`, `LLM_BASE_URL`, `LLM_API_KEY` (the Hack Apertus convention):
+  any OpenAI-compatible endpoint serving Apertus. When all three are set
+  they are the default router and HyDE model; the eval scripts still name
+  their measured model, so they never move a recorded row.
 - `CSCS_INFERENCE_API_KEY` for the default LLM, Apertus v1.5 70B on CSCS
   (the Swiss National Supercomputing Centre), which records neither
-  prompts nor responses. The default router and query strategy use it;
+  prompts nor responses. Without `LLM_*`, the default router and query strategy use it;
   without the key, `meditations` says so and falls back to the keyword
   router and the raw query. The keyword safety floor runs either way.
 - `HF_TOKEN` for the Apertus 2509 rows via HF Inference Providers. A

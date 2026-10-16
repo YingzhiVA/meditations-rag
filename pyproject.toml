@@ -3,6 +3,7 @@ name = "meditations-rag"
 version = "0.1.0"
 description = "Retrieval engine over Marcus Aurelius' Meditations — advanced-RAG practice project"
 requires-python = ">=3.10"
+license = "Apache-2.0"
 # Dependencies stay commented until the phase that needs them (see PLAN.md),
 # so the scaffold installs with zero deps and each phase's footprint is explicit.
 dependencies = [

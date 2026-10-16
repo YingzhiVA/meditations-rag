@@ -47,6 +47,8 @@ def _hf(name: str, model: str, provider: str,
         from meditations_rag.llm.hf import HFClient
 
         return HFClient(name, model, sampling, provider)
+    # What the client would report, for _Offline (the cache key's parts).
+    make.spec = (name, model, provider or config.HF_PROVIDER, sampling)
     return make
 
 
@@ -55,6 +57,7 @@ def _gateway(name: str, model: str, gateway: str) -> Callable[[], LLMClient]:
         from meditations_rag.llm.gateway import GatewayClient
 
         return GatewayClient(name, model, gateway)
+    make.spec = (name, model, gateway, None)
     return make
 
 
@@ -84,6 +87,9 @@ _REGISTRY: dict[str, Callable[[], LLMClient]] = {
     # its gateway substitutes models (phase-4-publicai-serving-probe.txt).
     "apertus-v15": _gateway("apertus-v15", config.CSCS_ROUTER_MODEL, "cscs"),
     "apertus-v15-70b": _gateway("apertus-v15-70b", config.CSCS_GEN_MODEL, "cscs"),
+    # The endpoint named by LLM_NAME / LLM_BASE_URL / LLM_API_KEY: the
+    # default when all three are set (config.LLM_ENDPOINT_SET).
+    "apertus-endpoint": _gateway("apertus-endpoint", config.LLM_ENDPOINT_MODEL, "endpoint"),
     "claude": _claude("claude", config.CLAUDE_MODEL),
     "claude-haiku": _claude("claude-haiku", config.CLAUDE_ROUTER_MODEL),
     # The blind eval's judge (eval/blind.py): neither Apertus nor Claude.
@@ -115,6 +121,26 @@ def enable_cache(directory: Path = config.LLM_CACHE_DIR) -> None:
     _cache_dir = directory
 
 
+class _Offline:
+    """Stands in, in a cached eval run only, for a client whose key is not
+    configured. It reports what the real client would (name, model,
+    provider, sampling: the cache key's parts), so the completion cache
+    serves every completion it holds, and only a miss needs the provider:
+    a miss fails with the original setup error. This is what lets anyone
+    reproduce the recorded eval numbers from data/cache/llm with no key."""
+
+    def __init__(self, spec: tuple, reason: str) -> None:
+        self.name, self.model, self.provider, sampling = spec
+        self.sampling = dict(sampling or config.DEFAULT_SAMPLING)
+        self._reason = reason
+
+    def complete(self, system: str, user: str) -> str:
+        raise LLMError(f"{self.name}: not in the completion cache, and {self._reason}")
+
+    def complete_json(self, system: str, user: str, schema: dict, **kw) -> dict:
+        raise LLMError(f"{self.name}: not in the completion cache, and {self._reason}")
+
+
 def get_llm(name: str) -> LLMClient:
     """Return an LLMClient by registry name. Raises LLMError when the
     provider is not configured (no token) — a setup error for the caller to
@@ -125,7 +151,14 @@ def get_llm(name: str) -> LLMClient:
         raise UnknownLLMError(
             f"unknown llm {name!r}; known: {', '.join(LLM_NAMES)}"
         ) from None
-    client = factory()
+    try:
+        client = factory()
+    except LLMError as exc:
+        # Outside a cached eval run a missing key is a setup error, as
+        # documented above; inside one, the cache may hold every answer.
+        if _cache_dir is None or not hasattr(factory, "spec"):
+            raise
+        client = _Offline(factory.spec, str(exc))
     if _cache_dir is not None:
         from meditations_rag.llm.cache import CachedClient
 

@@ -70,11 +70,12 @@ KEY = EVAL_DIR / "blind" / "fresh.json"
 SEED = 20261014
 TOP = 2
 
-SHIPPED = RetrievalConfig(strategy=config.DEFAULT_STRATEGY, llm=config.DEFAULT_LLM,
-                          router=config.DEFAULT_ROUTER)
+# The measured setup, named explicitly: LLM_* never moves a recorded row.
+SHIPPED = RetrievalConfig(strategy=config.DEFAULT_STRATEGY, llm=config.MEASURED_LLM,
+                          router=config.MEASURED_LLM)
 # Baseline first: every other row is tested against it.
 ROWS = [RetrievalConfig(),
-        RetrievalConfig(strategy=config.DEFAULT_STRATEGY, llm=config.DEFAULT_LLM),
+        RetrievalConfig(strategy=config.DEFAULT_STRATEGY, llm=config.MEASURED_LLM),
         RetrievalConfig(reranker="llm:claude")]
 FIELDS = {"query", "intent", "flags", "declined", "note"}
 
@@ -156,8 +157,8 @@ def cmd_run() -> None:
              "lingua": H._version("lingua-language-detector"),
              "language_min_ratio": config.LANGUAGE_MIN_RATIO,
              "min_score_threshold": config.MIN_SCORE_THRESHOLD,
-             "router (shipped)": H._llm_stamp(get_llm(config.DEFAULT_ROUTER)),
-             "llm (strategy)": H._llm_stamp(get_llm(config.DEFAULT_LLM)),
+             "router (shipped)": H._llm_stamp(get_llm(config.MEASURED_LLM)),
+             "llm (strategy)": H._llm_stamp(get_llm(config.MEASURED_LLM)),
              "reranker (llm:claude)": H._llm_stamp(get_llm("claude"))}
     with DETAIL.open("w", encoding="utf-8") as fh:
         fh.write(json.dumps({"table": "stamp", **stamp}, ensure_ascii=False) + "\n")

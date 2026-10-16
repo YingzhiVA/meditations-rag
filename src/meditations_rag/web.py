@@ -245,9 +245,24 @@ writes no advice of its own.
 local emergency number or a crisis line: [findahelpline.com](https://findahelpline.com)
 lists free, confidential helplines in over 175 countries.
 
-**Privacy.** Your message is sent to Apertus, an open language model served by
-CSCS, the Swiss National Supercomputing Centre, which does not record prompts or
-responses. This page stores nothing you type. English only for now."""
+**Privacy.** {where} This page stores nothing you type. English only for now."""
+
+_CSCS = ("Your message is sent to Apertus, an open language model served by CSCS, the "
+         "Swiss National Supercomputing Centre, which does not record prompts or responses.")
+
+
+def notice() -> str:
+    """The notice, naming where messages actually go: CSCS (as measured), or
+    the endpoint LLM_BASE_URL names (config.LLM_ENDPOINT_SET)."""
+    from urllib.parse import urlparse
+
+    if not config.LLM_ENDPOINT_SET:
+        return NOTICE.format(where=_CSCS)
+    host = urlparse(config.GATEWAYS["endpoint"]["base_url"]).hostname or "the configured endpoint"
+    if host.endswith("cscs.ch"):
+        return NOTICE.format(where=_CSCS)
+    return NOTICE.format(where=f"Your message is sent to Apertus at {escape(host)}, the "
+                               "endpoint this deployment is configured with.")
 
 
 ABOUT = """\
@@ -377,7 +392,7 @@ def build(app: App):
 
     with gr.Blocks(title="Meditations RAG", analytics_enabled=False) as demo:
         gr.Markdown("# What would Marcus say?", elem_classes="mr-text")
-        gr.Markdown(NOTICE, elem_classes="mr-text")
+        gr.Markdown(notice(), elem_classes="mr-text")
         with gr.Accordion("About this app", open=False, elem_classes="mr-about"):
             gr.Markdown(ABOUT, elem_classes="mr-text")
         # The query on the left, x-ray in a narrower panel beside it; on a

@@ -46,6 +46,7 @@ _REGISTRY: dict[str, Callable[[], Router]] = {
     # size row. Same names as the LLMs they run on (llm/__init__.py, Naming).
     "apertus-v15": _llm("apertus-v15", "apertus-v15"),
     "apertus-v15-70b": _llm("apertus-v15-70b", "apertus-v15-70b"),
+    "apertus-endpoint": _llm("apertus-endpoint", "apertus-endpoint"),
     "claude": _llm("claude", "claude-haiku"),
 }
 
@@ -55,7 +56,7 @@ ROUTER_NAMES: tuple[str, ...] = tuple(_REGISTRY)
 # spending).
 LLM_ROUTERS: frozenset[str] = frozenset(
     {"apertus", "apertus-70b", "apertus-t08", "apertus-70b-t08",
-     "apertus-v15", "apertus-v15-70b", "claude"})
+     "apertus-v15", "apertus-v15-70b", "apertus-endpoint", "claude"})
 
 
 class UnknownRouterError(KeyError):

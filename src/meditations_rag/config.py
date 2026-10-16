@@ -82,7 +82,17 @@ SUBCHUNK_MAX_WORDS = 150
 # Hackathon targets — now v1.5 70B on CSCS: the generation still served
 # (publicai dropped the 2509 70B), identity verified, and on the router
 # and safety sets at least the 2509 70B's level (PLAN.md, Phase 4 results).
-DEFAULT_LLM = "apertus-v15-70b"  # key into the llm registry; see llm/__init__.py
+# The endpoint a deployment runs against can come as three environment
+# variables, the Hack Apertus convention. When all three are set they define
+# the "apertus-endpoint" LLM and router (an OpenAI-compatible gateway,
+# LLM_BASE_URL ending in /v1), and it becomes the default. Otherwise the
+# default is Apertus v1.5 70B on CSCS, the setup every result was measured
+# on. The eval scripts name their LLMs explicitly, so setting these never
+# moves a recorded row.
+LLM_ENDPOINT_MODEL = os.environ.get("LLM_NAME", "")
+LLM_ENDPOINT_SET = all(os.environ.get(v) for v in ("LLM_NAME", "LLM_BASE_URL", "LLM_API_KEY"))
+MEASURED_LLM = "apertus-v15-70b"
+DEFAULT_LLM = "apertus-endpoint" if LLM_ENDPOINT_SET else MEASURED_LLM
 
 # HuggingFace Inference Providers. "publicai" is the one provider verified live
 # for these models; "featherless-ai" currently reports an error status, which is
@@ -114,6 +124,10 @@ GATEWAYS: dict[str, dict[str, str]] = {
     "cscs": {"base_url": "https://api.inference.cscs.ch/v1",
              "key_env": "CSCS_INFERENCE_API_KEY",
              "where": "ui.inference.cscs.ch"},
+    # Whatever LLM_BASE_URL names (see LLM_ENDPOINT_SET above).
+    "endpoint": {"base_url": os.environ.get("LLM_BASE_URL", ""),
+                 "key_env": "LLM_API_KEY",
+                 "where": "set LLM_NAME, LLM_BASE_URL and LLM_API_KEY (.env.example)"},
 }
 # Apertus v1.5 on publicAI: the non-thinking releases. NOT USED — its
 # "v1.5-8b" serves the 2509 8B and its gateway substitutes models (PLAN.md,
@@ -193,7 +207,7 @@ LANGUAGE_MIN_RATIO = 1.2
 # safety flag with the floor beneath; eval/results/phase-4-floor-fix.md).
 # On a provider error it falls back to ROUTER_FALLBACK with the floor intact.
 BASELINE_ROUTER = "keyword"
-DEFAULT_ROUTER = "apertus-v15-70b"
+DEFAULT_ROUTER = "apertus-endpoint" if LLM_ENDPOINT_SET else MEASURED_LLM
 # Where an LLM router falls back when its provider errors, rather than failing
 # the whole query. Must name a router that never touches the network.
 ROUTER_FALLBACK = "keyword"
@@ -208,8 +222,10 @@ TRACING_ENABLED = os.environ.get("MEDITATIONS_TRACING", "0") == "1"
 # past either cap the page runs keyword routing and the raw query. An
 # in-scope query costs two calls (router, HyDE). Set low; raise only if
 # real use asks for it.
-WEB_DAILY_LLM_CALLS = 200
-WEB_SESSION_QUERIES_PER_HOUR = 10
+# Both caps can be overridden by environment variable (.env or the shell),
+# to trigger reduced mode on purpose without a code change.
+WEB_DAILY_LLM_CALLS = int(os.environ.get("MEDITATIONS_WEB_DAILY_LLM_CALLS", "200"))
+WEB_SESSION_QUERIES_PER_HOUR = int(os.environ.get("MEDITATIONS_WEB_SESSION_QUERIES_PER_HOUR", "10"))
 WEB_MAX_CHARS = 2000   # longer messages are refused, not truncated
 OTLP_ENDPOINT = os.environ.get(
     "MEDITATIONS_OTLP_ENDPOINT", "http://localhost:6006/v1/traces"
